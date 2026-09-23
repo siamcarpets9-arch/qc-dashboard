@@ -5,8 +5,9 @@
 ## สถานะล่าสุด
 
 - วันที่สรุป: 19 กันยายน 2026
-- Repository: `https://github.com/walaipanno-sudo/Qc-Dashbord`
-- GitHub Pages: `https://walaipanno-sudo.github.io/Qc-Dashbord/`
+- Repository (ปัจจุบัน): `https://github.com/siamcarpets9-arch/qc-dashboard`
+- GitHub Pages (ปัจจุบัน): `https://siamcarpets9-arch.github.io/qc-dashboard/`
+- Repository เดิม (ก่อนย้าย): `https://github.com/walaipanno-sudo/Qc-Dashbord`
 - PR #6: **merged** เข้า `main`
 - Merge commit ล่าสุดของ PR #6: `3f07d5b1ac8c58174adff86ead5cbfa9de9b2ea4`
 - GitHub Pages deployment ล่าสุด:
@@ -68,6 +69,13 @@ GitHub Pages และ Apps Script Production เป็นคนละระบ�
 
 - GitHub Pages deploy จาก `main`
 - Apps Script Production ใช้ deployment ID เดิมด้านบน
+
+## SC-FOS Planning V1 (23 กันยายน 2026)
+
+- เพิ่มแท็บ Planning & Capacity, กล่อง DELIVERY CONTROL / Plan vs Actual ในหน้ารายละเอียด M/O, Baseline Freeze, Actual Finish, Delay Log และ KPI (Original/Revised OTD) — รายละเอียดทั้งหมดอยู่ใน `PLANNING_V1_CHANGELOG.md`
+- เพิ่ม 7 column ในชีต M/O-S/O ผ่าน `ensureOrdersHeaders()` (ไม่ reset ชีต)
+- ต้อง deploy Apps Script เข้า deployment ID เดิมก่อน แล้วจึง merge frontend
+- ทดสอบเพิ่ม: `node scripts/verify-planning-backend.js`
 
 ## ไฟล์และคำสั่งสำคัญ
 
@@ -146,7 +154,7 @@ git diff --check
 ```powershell
 git fetch origin main --prune
 git log -1 --oneline origin/main
-gh api "repos/walaipanno-sudo/Qc-Dashbord/deployments?environment=github-pages&per_page=3"
+gh api "repos/siamcarpets9-arch/qc-dashboard/deployments?environment=github-pages&per_page=3"
 ```
 
 ## งานถัดไปที่แนะนำ
