@@ -3054,6 +3054,34 @@
         </div>
     </div>
 
+    <!-- NEW (2026-09-24): "ติ๊กโอนงาน" — confirm handing work to the next department before the
+         details are keyed in (see openQuickTransferModal()/submitQuickTransfer()). -->
+    <div id="quickTransferModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div><h3 class="font-bold text-lg text-slate-800">ติ๊กโอนงาน (ยังไม่กรอกรายละเอียด)</h3><p id="quickTransferSummary" class="text-[11px] text-slate-500 mt-0.5"></p></div>
+                <button onclick="closeQuickTransferModal()" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2"><i class="fa-solid fa-circle-info mr-1"></i><span id="quickTransferReason"></span> — โอนงานก่อนได้ แล้วกลับมากรอกรายละเอียดของแผนกนี้ทีหลังในหน้ารายละเอียด M/O (จะมีป้าย "รอกรอกรายละเอียด" จนกว่าจะครบ 100%)</p>
+            <label class="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
+                <input type="checkbox" id="quickTransferConfirm" class="mt-0.5 w-4 h-4 accent-indigo-600">
+                <span>ยืนยันว่างานของแผนกนี้เสร็จ และส่งต่อให้แผนกถัดไปแล้ว</span>
+            </label>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ผู้โอนงาน *</label>
+                <input type="text" id="quickTransferBy" placeholder="ชื่อผู้โอนงาน" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">หมายเหตุ (ไม่บังคับ)</label>
+                <input type="text" id="quickTransferNote" placeholder="เช่น จะกรอกรายการสีพรุ่งนี้" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeQuickTransferModal()" class="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition">ยกเลิก</button>
+                <button onclick="submitQuickTransfer()" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white shadow transition flex items-center gap-2"><i class="fa-solid fa-arrow-right"></i> ติ๊กโอนงาน</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Planning V1: Delay Reason modal — per-stage delay log (opened from Plan vs Actual, and
          automatically when a stage completes LATE vs Baseline without a reason). See submitPlanningDelayLog(). -->
     <div id="planningDelayModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
@@ -10133,6 +10161,8 @@
                 // automatically (see updateOrderField()), so a manual correction is never silently
                 // reverted back to AI on the next reload.
                 planMode: planningRaw.planMode === 'manual' ? 'manual' : 'ai',
+                // "ติ๊กโอนงาน" record (see markQuickTransfer()) — kept so the badge survives a reload.
+                quickTransfer: (planningRaw.quickTransfer && typeof planningRaw.quickTransfer === 'object') ? planningRaw.quickTransfer : null,
                 percent: 0
             };
             if (!('specDone' in planningRaw) && !('planEntered' in planningRaw)) {
@@ -11790,6 +11820,7 @@
                         <p class="font-bold ${moSoTextColorClass(order)} text-xs font-mono truncate">${orderTypeBadgeHtml(order.orderType)}${marketBadgeHtml(order.market)}${escapeHtml(order.moSo)}</p>
                         ${order.customerName ? `<p class="text-[10px] text-slate-500 truncate">${escapeHtml(order.customerName)}</p>` : ''}
                         <p class="text-[10px] text-slate-400">กำหนดเสร็จ: ${escapeHtml(order.dueDate || '-')}</p>
+                        ${typeof quickTransferIncomingNoteHtml === 'function' ? quickTransferIncomingNoteHtml(order, 'weaving') : ''}
                     </div>
                     <div class="w-full aspect-[4/3] bg-slate-50 border border-slate-200 rounded-md overflow-hidden flex items-center justify-center">
                         ${order.designImageUrl
@@ -11832,6 +11863,7 @@
                         <p class="font-bold ${moSoTextColorClass(order)} font-mono truncate">${orderTypeBadgeHtml(order.orderType)}${marketBadgeHtml(order.market)}${escapeHtml(order.moSo)}</p>
                         <p class="text-[10px] text-slate-400 truncate">${escapeHtml(order.customerName || '-')} • กำหนดเสร็จ: ${escapeHtml(order.dueDate || '-')}</p>
                         ${deadlineWarningHtml ? `<div class="mt-0.5">${deadlineWarningHtml}</div>` : ''}
+                        ${typeof quickTransferIncomingNoteHtml === 'function' ? quickTransferIncomingNoteHtml(order, 'weaving') : ''}
                         </div>
                         <button onclick="openOrderDetailModal(${orderIndex}, 'weaving')" class="shrink-0 text-indigo-500 hover:text-indigo-700 px-1" title="ดู/แก้ไข"><i class="fa-solid fa-pen-to-square"></i></button>
                     </div>
@@ -11856,6 +11888,7 @@
                         </div>
                     </div>
                     <p class="text-[10px] text-slate-500">${escapeHtml(order.customerName || '-')} • กำหนดเสร็จ: ${escapeHtml(order.dueDate || '-')}</p>
+                    ${typeof quickTransferIncomingNoteHtml === 'function' ? quickTransferIncomingNoteHtml(order, 'weaving') : ''}
                     <p class="text-[10px] text-slate-500">ส่งผ้า+ไหม: ${escapeHtml(ext.sentDate || '-')}${ext.vendorDueDate ? ` • กำหนดส่ง: ${escapeHtml(ext.vendorDueDate)}` : ''}</p>
                     <p class="text-[10px]">${qcBadge}${ext.receivedDate ? ` • ได้รับพรม: ${escapeHtml(ext.receivedDate)}` : ''}</p>
                     ${deadlineWarningHtml ? `<div>${deadlineWarningHtml}</div>` : ''}
@@ -13755,6 +13788,7 @@
                             <p class="font-bold ${moSoTextColorClass(order)} text-xs font-mono">${orderTypeBadgeHtml(order.orderType)}${marketBadgeHtml(order.market)}${escapeHtml(order.moSo)}</p>
                             <p class="text-[10px] text-slate-500 truncate">${escapeHtml(order.customerName || '-')}</p>
                             <p class="text-[10px] text-slate-400">วันที่รับใบสั่งย้อม: ${escapeHtml(receivedDate)}</p>
+                            ${typeof quickTransferIncomingNoteHtml === 'function' ? quickTransferIncomingNoteHtml(order, 'dyeing') : ''}
                         </div>
                         <div class="text-right shrink-0">
                             <span class="inline-flex text-[10px] font-bold px-2 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">${completed}/${rows.length} สีผ่าน</span>
@@ -13773,7 +13807,7 @@
                         <button type="button" onclick="sendDyeingColorListToKpiLog(${orderIndex})" class="text-[10px] font-semibold text-violet-700 border border-violet-200 bg-violet-50 rounded px-2 py-1"><i class="fa-solid fa-rotate mr-1"></i>อัปเดต KPI</button>
                     </div>
                     ${isCurrentStage
-                        ? `<button onclick="transferOrderStage(${orderIndex}, 'dyeing', '${toStage}')" ${Number((order.dyeing || {}).percent) < 100 ? 'disabled' : ''} class="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-[11px] font-medium py-1.5 rounded transition"><i class="fa-solid fa-arrow-right mr-1"></i>โอนไปแผนก${STAGE_LABELS[toStage]} (${Number((order.dyeing || {}).percent) || 0}%)</button>`
+                        ? `<button onclick="transferOrderStage(${orderIndex}, 'dyeing', '${toStage}')" class="w-full ${Number((order.dyeing || {}).percent) < 100 ? 'bg-slate-400 hover:bg-slate-500' : 'bg-violet-600 hover:bg-violet-700'} text-white text-[11px] font-medium py-1.5 rounded transition" title="${Number((order.dyeing || {}).percent) < 100 ? 'ยังกรอกไม่ครบ 100% — กดเพื่อติ๊กยืนยันโอนงานก่อนได้' : ''}"><i class="fa-solid fa-arrow-right mr-1"></i>โอนไปแผนก${STAGE_LABELS[toStage]} (${Number((order.dyeing || {}).percent) || 0}%)</button>`
                         : `<p class="text-[10px] text-slate-500 bg-slate-50 border border-slate-200 rounded px-2 py-1">ใบสั่งย้อมแสดงล่วงหน้า • สถานะปัจจุบัน: ${escapeHtml(STAGE_LABELS[getEffectiveStage(order)] || getEffectiveStage(order))}</p>`}
                 </div>
             `;
@@ -14093,6 +14127,7 @@
                             <p class="font-bold ${moSoTextColorClass(order)} text-xs font-mono">${orderTypeBadgeHtml(order.orderType)}${marketBadgeHtml(order.market)}${escapeHtml(order.moSo)}</p>
                             <p class="text-[11px] text-slate-500">${escapeHtml(order.customerName || '-')}</p>
                             <p class="text-[10px] text-slate-400">เกรด ${escapeHtml(f.grade || (order.departmentGrades || {}).finishing || '-')} • เริ่ม ${escapeHtml(f.startDate || '-')} • เสร็จ ${escapeHtml(f.completedDate || '-')}</p>
+                            ${typeof quickTransferIncomingNoteHtml === 'function' ? quickTransferIncomingNoteHtml(order, 'finishing') : ''}
                         </div>
                         <button onclick="openOrderDetailModal(${orderIndex}, 'finishing')" class="shrink-0 w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600" title="ดู/แก้ไขรายละเอียด"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
                     </div>
@@ -14835,6 +14870,7 @@
             const deadlineWarningHtml = renderDeadlineWarningBadge(order);
             const bodyHtml = `
                 ${mainHtml}
+                ${typeof quickTransferIncomingNoteHtml === 'function' ? quickTransferIncomingNoteHtml(order, stage) : ''}
                 <p class="text-xs ${complete ? 'text-emerald-600 font-semibold' : 'text-slate-500'}"><i class="fa-solid ${complete ? 'fa-circle-check' : 'fa-hourglass-half'} mr-1"></i>${escapeHtml(stageProgressText(order, stage))}</p>
                 <div>${renderQcBadge(order.moSo, stage)}</div>
                 ${deadlineWarningHtml ? `<div>${deadlineWarningHtml}</div>` : ''}
@@ -15612,7 +15648,102 @@
         // แล้ว แค่ 100% ก็โอนได้ทุกแผนก"). The QC badge/records elsewhere in the app are now purely
         // informational and no longer block anything. Weaving additionally still requires both
         // prerequisite checkboxes to be confirmed first.
-        function transferOrderStage(orderIndex, fromStage, toStage) {
+        // =========================================================================================
+        // NEW (2026-09-24): "ติ๊กโอนงานระหว่างแผนก" — staff are not always ready to key every detail
+        // (color items, weaving batches, fabric/yarn confirmations) at the moment the work physically
+        // moves on. Clicking any "โอนงานไป..." button while the department is below 100% now opens a small
+        // confirmation (tick + name) instead of only refusing. Confirming transfers the work and stores
+        // order[fromStage].quickTransfer = {by, at, toStage, percentAtTransfer, note, detailsPending} so
+        // everyone can see the details are still to be filled in later. Detail entry stays exactly the
+        // same afterwards; the pending badge clears itself once that stage reaches 100%.
+        // =========================================================================================
+        let quickTransferState = null;
+
+        function markQuickTransfer(order, fromStage, toStage, quick) {
+            if (!order || !order[fromStage]) return;
+            order[fromStage].quickTransfer = {
+                by: String((quick && quick.by) || ''),
+                at: (typeof planningTodayKey === 'function') ? planningTodayKey() : new Date().toISOString().split('T')[0],
+                toStage,
+                percentAtTransfer: Number(order[fromStage].percent) || 0,
+                note: String((quick && quick.note) || ''),
+                detailsPending: true
+            };
+        }
+
+        function isQuickTransferPending(order, stage) {
+            const q = order && order[stage] && order[stage].quickTransfer;
+            if (!q || !q.detailsPending) return false;
+            return (Number(order[stage].percent) || 0) < 100;
+        }
+
+        function quickTransferBadgeHtml(order, stage) {
+            const q = order && order[stage] && order[stage].quickTransfer;
+            if (!q) return '';
+            const pending = isQuickTransferPending(order, stage);
+            const title = `ติ๊กโอนงานเมื่อ ${q.at || '-'}${q.by ? ' โดย ' + q.by : ''} (ตอนโอน ${q.percentAtTransfer || 0}%)${q.note ? ' — ' + q.note : ''}`;
+            return pending
+                ? `<span class="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 font-semibold px-2 py-0.5 rounded-full" title="${escapeHtml(title)}"><i class="fa-solid fa-square-check mr-1"></i>ติ๊กโอนแล้ว • รอกรอกรายละเอียด</span>`
+                : `<span class="text-[10px] bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-full" title="${escapeHtml(title)}"><i class="fa-solid fa-square-check mr-1"></i>ติ๊กโอน ${escapeHtml(q.at || '')}</span>`;
+        }
+
+        // Shown on the receiving department's board card: the previous department handed over by tick.
+        function quickTransferIncomingNoteHtml(order, stage) {
+            const prev = Object.keys(NEXT_STAGE).find(k => NEXT_STAGE[k] === stage);
+            const candidates = [prev, stage === 'weaving' ? 'planning' : null].filter(Boolean);
+            const from = candidates.find(s => isQuickTransferPending(order, s));
+            if (!from) return '';
+            const q = order[from].quickTransfer;
+            return `<p class="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 w-fit" title="${escapeHtml(`โดย ${q.by || '-'} เมื่อ ${q.at || '-'}`)}"><i class="fa-solid fa-square-check"></i> รับงานแบบติ๊กจากแผนก${escapeHtml(STAGE_LABELS[from] || from)} • รอกรอกรายละเอียด</p>`;
+        }
+
+        function openQuickTransferModal(orderIndex, fromStage, toStage, reasonText) {
+            const order = productionOrders[orderIndex];
+            const modal = document.getElementById('quickTransferModal');
+            if (!order || !modal) return;
+            quickTransferState = { orderIndex, moSo: order.moSo, fromStage, toStage };
+            const toLabel = toStage === 'weaving-direct' ? `${STAGE_LABELS.weaving} (ข้ามแผนกย้อม)` : (STAGE_LABELS[toStage] || toStage);
+            document.getElementById('quickTransferSummary').textContent = `${order.moSo || '-'} • แผนก${STAGE_LABELS[fromStage] || fromStage} → แผนก${toLabel}`;
+            document.getElementById('quickTransferReason').textContent = reasonText || '';
+            document.getElementById('quickTransferConfirm').checked = false;
+            document.getElementById('quickTransferBy').value = (typeof planningCurrentUserName === 'function') ? planningCurrentUserName() : '';
+            document.getElementById('quickTransferNote').value = '';
+            modal.classList.remove('hidden');
+        }
+
+        function closeQuickTransferModal() {
+            quickTransferState = null;
+            const modal = document.getElementById('quickTransferModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function submitQuickTransfer() {
+            const st = quickTransferState;
+            if (!st) { closeQuickTransferModal(); return; }
+            if (!document.getElementById('quickTransferConfirm').checked) {
+                showToast('กรุณาติ๊กยืนยันว่างานของแผนกนี้เสร็จและส่งต่อแล้ว', 'fa-circle-exclamation', 'text-amber-400');
+                return;
+            }
+            const by = document.getElementById('quickTransferBy').value.trim();
+            if (!by) {
+                showToast('กรุณาระบุชื่อผู้โอนงาน', 'fa-circle-exclamation', 'text-amber-400');
+                return;
+            }
+            const note = document.getElementById('quickTransferNote').value.trim();
+            // Re-resolve by M/O key — productionOrders is re-normalized on every save.
+            const key = normalizeMoSoKey(st.moSo);
+            const idx = productionOrders.findIndex(o => normalizeMoSoKey(o.moSo) === key);
+            closeQuickTransferModal();
+            if (idx === -1) return;
+            if (st.toStage === 'weaving-direct') transferPlanningDirectToWeaving(idx, { quick: { by, note } });
+            else transferOrderStage(idx, st.fromStage, st.toStage, { quick: { by, note } });
+        }
+
+        function transferOrderStage(orderIndex, fromStage, toStage, options) {
+            // options.quick = { by, note } — "ติ๊กโอนงาน" (2026-09-24): the department confirms its work is done
+            // and hands it over now, while the detailed items/checklists are filled in later. Only the
+            // "100% / prerequisites" gates are skipped; stage/route guards below always apply.
+            const quick = options && options.quick ? options.quick : null;
             const order = productionOrders[orderIndex];
             if (!order) return;
             const currentStage = getEffectiveStage(order);
@@ -15627,14 +15758,17 @@
             }
 
             const percent = order[fromStage].percent || 0;
-            if (percent < 100) {
-                showToast(`แผนก${STAGE_LABELS[fromStage]}ยังทำงานไม่ครบ 100% (ตอนนี้ ${percent}%) ยังโอนงานไม่ได้`, 'fa-circle-exclamation', 'text-amber-400');
+            if (percent < 100 && !quick) {
+                showToast(`แผนก${STAGE_LABELS[fromStage]}ยังกรอกงานไม่ครบ 100% (ตอนนี้ ${percent}%) — ติ๊กยืนยันเพื่อโอนงานก่อน แล้วกรอกรายละเอียดทีหลังได้`, 'fa-circle-exclamation', 'text-amber-400');
+                if (typeof openQuickTransferModal === 'function') openQuickTransferModal(orderIndex, fromStage, toStage, `ยังกรอกงานไม่ครบ 100% (ตอนนี้ ${percent}%)`);
                 return;
             }
-            if (fromStage === 'weaving' && order.weaving.mode !== 'external' && (!order.weaving.receivedPrintedFabric || !order.weaving.yarnComplete)) {
-                showToast('กรุณายืนยันว่าได้รับผ้าปั๊มลายและไหมครบสำหรับทอแล้ว ก่อนโอนงาน', 'fa-circle-exclamation', 'text-amber-400');
+            if (!quick && fromStage === 'weaving' && order.weaving.mode !== 'external' && (!order.weaving.receivedPrintedFabric || !order.weaving.yarnComplete)) {
+                showToast('ยังไม่ได้ยืนยันว่าได้รับผ้าปั๊มลายและไหมครบ — ติ๊กยืนยันเพื่อโอนงานก่อนได้', 'fa-circle-exclamation', 'text-amber-400');
+                if (typeof openQuickTransferModal === 'function') openQuickTransferModal(orderIndex, fromStage, toStage, 'ยังไม่ได้ยืนยันรับผ้าปั๊มลาย/ไหมครบ');
                 return;
             }
+            if (quick) markQuickTransfer(order, fromStage, toStage, quick);
 
             // Planning V1: Actual Finish of the department handing the work over (first stamp wins).
             const planningStamped = typeof planningOnStagesCompleted === 'function' ? planningOnStagesCompleted(order, [fromStage]) : [];
@@ -15642,7 +15776,9 @@
             persistOrderChange(order);
             incrementTransferCount();
             rerenderOrderViews(orderIndex);
-            showToast(`โอนงาน "${order.moSo}" ไปแผนก${STAGE_LABELS[toStage]}แล้ว`, 'fa-arrow-right', 'text-emerald-400');
+            showToast(quick
+                ? `โอนงาน "${order.moSo}" ไปแผนก${STAGE_LABELS[toStage]}แล้ว (ติ๊กโอน — กรอกรายละเอียดแผนก${STAGE_LABELS[fromStage]}ย้อนหลังได้)`
+                : `โอนงาน "${order.moSo}" ไปแผนก${STAGE_LABELS[toStage]}แล้ว`, 'fa-arrow-right', 'text-emerald-400');
             mascotCelebrate('transfer');
             notifyLineStageTransfer(order, fromStage, toStage);
             if (planningStamped.length && typeof planningNotifyLateStages === 'function') planningNotifyLateStages(order, planningStamped);
@@ -16017,7 +16153,8 @@
         // re-checked here too since this is reachable directly by onclick. Mirrors transferOrderStage()'s
         // own guard/side-effects (100% planning checklist required, transfer counter, LINE notify,
         // mascot) so this reads as "the same kind of transfer", just skipping one stage in the chain.
-        function transferPlanningDirectToWeaving(orderIndex) {
+        function transferPlanningDirectToWeaving(orderIndex, options) {
+            const quick = options && options.quick ? options.quick : null;
             const order = productionOrders[orderIndex];
             if (!order) return;
             if (getEffectiveStage(order) !== 'planning') {
@@ -16026,14 +16163,16 @@
                 return;
             }
             const percent = order.planning.percent || 0;
-            if (percent < 100) {
-                showToast(`แผนกวางแผนยังทำงานไม่ครบ 100% (ตอนนี้ ${percent}%) ยังโอนงานไม่ได้`, 'fa-circle-exclamation', 'text-amber-400');
+            if (percent < 100 && !quick) {
+                showToast(`แผนกวางแผนยังติ๊กไม่ครบ 100% (ตอนนี้ ${percent}%) — ติ๊กยืนยันเพื่อโอนงานก่อนได้`, 'fa-circle-exclamation', 'text-amber-400');
+                if (typeof openQuickTransferModal === 'function') openQuickTransferModal(orderIndex, 'planning', 'weaving-direct', `ยังติ๊กไม่ครบ 100% (ตอนนี้ ${percent}%)`);
                 return;
             }
             if (!dyeingFullyCoveredBySurplus(order)) {
                 showToast('ไหม surplus ยังไม่ครอบคลุมทุกสีที่วางแผนไว้ ต้องโอนผ่านแผนกย้อมตามปกติ', 'fa-circle-exclamation', 'text-amber-400');
                 return;
             }
+            if (quick) markQuickTransfer(order, 'planning', 'weaving', quick);
             // Planning V1: planning finishes now; dyeing is fully covered by surplus so it is complete too.
             const planningStamped = typeof planningOnStagesCompleted === 'function' ? planningOnStagesCompleted(order, ['planning', 'dyeing']) : [];
             order.currentStage = 'weaving';
@@ -18110,6 +18249,7 @@
                             <i class="fa-solid ${STAGE_ICONS[stage]} text-indigo-600"></i>
                             <span class="font-bold text-slate-700 text-sm">${escapeHtml(STAGE_LABELS[stage])}</span>
                             ${isCurrent ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded-full">กำลังดำเนินการอยู่</span>' : ''}
+                            ${typeof quickTransferBadgeHtml === 'function' ? quickTransferBadgeHtml(order, stage) : ''}
                         </div>
                         <div class="flex items-center gap-2">
                             ${renderQcBadge(order.moSo, stage)}
