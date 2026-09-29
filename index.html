@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -12266,19 +12264,14 @@
         // แล้ว แค่ 100% ก็โอนได้ทุกแผนก"). The QC badge/records elsewhere in the app are now purely
         // informational and no longer block anything. Weaving additionally still requires both
         // prerequisite checkboxes to be confirmed first.
+        // UPDATED (2026-09-29): "ทุกแผนกให้สามารถกดปุ่มผ่านได้โดยไม่ต้องลงรายละเอียดข้อมูล" — removed the
+        // "งานครบ 100%" checklist gate and the weaving fabric/yarn-received gate that used to block this
+        // button. Any department can now transfer an order onward regardless of how much of its own
+        // checklist/detail data has been filled in; the % complete is still tracked and shown elsewhere
+        // as information, it just no longer blocks the click.
         function transferOrderStage(orderIndex, fromStage, toStage) {
             const order = productionOrders[orderIndex];
             if (!order) return;
-
-            const percent = order[fromStage].percent || 0;
-            if (percent < 100) {
-                showToast(`แผนก${STAGE_LABELS[fromStage]}ยังทำงานไม่ครบ 100% (ตอนนี้ ${percent}%) ยังโอนงานไม่ได้`, 'fa-circle-exclamation', 'text-amber-400');
-                return;
-            }
-            if (fromStage === 'weaving' && order.weaving.mode !== 'external' && (!order.weaving.receivedPrintedFabric || !order.weaving.yarnComplete)) {
-                showToast('กรุณายืนยันว่าได้รับผ้าปั๊มลายและไหมครบสำหรับทอแล้ว ก่อนโอนงาน', 'fa-circle-exclamation', 'text-amber-400');
-                return;
-            }
 
             order.currentStage = toStage;
             persistOrderChange(order);
@@ -12473,16 +12466,15 @@
         // Lets Planning send an M/O, S/O straight to Weaving, skipping Dyeing entirely — only offered
         // (see buildOrderCard()'s planning footer) when dyeingFullyCoveredBySurplus() is true, but
         // re-checked here too since this is reachable directly by onclick. Mirrors transferOrderStage()'s
-        // own guard/side-effects (100% planning checklist required, transfer counter, LINE notify,
-        // mascot) so this reads as "the same kind of transfer", just skipping one stage in the chain.
+        // own side-effects (transfer counter, LINE notify, mascot) so this reads as "the same kind of
+        // transfer", just skipping one stage in the chain.
+        // UPDATED (2026-09-29): removed the "งานวางแผนครบ 100%" gate, per the same
+        // "ทุกแผนกให้สามารถกดปุ่มผ่านได้โดยไม่ต้องลงรายละเอียดข้อมูล" request as transferOrderStage(). The
+        // surplus-coverage check below is kept — it's not a data-completeness gate, it's the actual
+        // business condition that makes skipping Dyeing valid at all.
         function transferPlanningDirectToWeaving(orderIndex) {
             const order = productionOrders[orderIndex];
             if (!order) return;
-            const percent = order.planning.percent || 0;
-            if (percent < 100) {
-                showToast(`แผนกวางแผนยังทำงานไม่ครบ 100% (ตอนนี้ ${percent}%) ยังโอนงานไม่ได้`, 'fa-circle-exclamation', 'text-amber-400');
-                return;
-            }
             if (!dyeingFullyCoveredBySurplus(order)) {
                 showToast('ไหม surplus ยังไม่ครอบคลุมทุกสีที่วางแผนไว้ ต้องโอนผ่านแผนกย้อมตามปกติ', 'fa-circle-exclamation', 'text-amber-400');
                 return;
@@ -12496,24 +12488,16 @@
             notifyLineStageTransfer(order, 'planning', 'weaving');
         }
 
-        // Finishing reaches "รอส่ง" once its own work is 100% complete AND the packaging-department QC
-        // check for this M/O, S/O has been recorded as PASS — unlike every other stage transfer (which
-        // only needs 100%), this specific step is the last gate before shipping, so it requires an
-        // actual passed QC record, not just a self-reported percentage. Fires a LINE broadcast once
-        // confirmed (see notifyLineReadyToShip) so the team finds out the carpet is ready without
-        // needing to check the dashboard.
+        // Finishing used to reach "รอส่ง" only once its own work hit 100% AND the packaging-department QC
+        // check for this M/O, S/O was recorded as PASS.
+        // UPDATED (2026-09-29): both gates removed per "ทุกแผนกให้สามารถกดปุ่มผ่านได้โดยไม่ต้องลงรายละเอียด
+        // ข้อมูล" (confirmed explicitly to include the QC-PASS requirement, not just the % checklist) — staff
+        // can confirm ready-to-ship immediately regardless of the finishing checklist % or any packaging QC
+        // record. Fires a LINE broadcast once confirmed (see notifyLineReadyToShip) so the team finds out
+        // the carpet is ready without needing to check the dashboard.
         function markOrderReadyToShip(orderIndex) {
             const order = productionOrders[orderIndex];
             if (!order) return;
-            const percent = order.finishing.percent || 0;
-            if (percent < 100) {
-                showToast(`แผนกตกแต่ง/บรรจุยังทำงานไม่ครบ 100% (ตอนนี้ ${percent}%) กรุณาอัปเดตให้ครบก่อน`, 'fa-circle-exclamation', 'text-amber-400');
-                return;
-            }
-            if (!hasQcPass(order.moSo, PACKAGING_DEPARTMENT)) {
-                showToast(`ต้องบันทึกผล QC แผนกตกแต่ง/บรรจุภัณฑ์เป็น "PASS" ก่อน จึงจะยืนยันพร้อมส่งได้`, 'fa-circle-exclamation', 'text-amber-400');
-                return;
-            }
             order.readyToShip = true;
             persistOrderChange(order);
             rerenderOrderViews(orderIndex);
@@ -12537,14 +12521,11 @@
 
         // Optional: still lets staff log an actual packaging QC check for this M/O if they want an
         // audit record of it — purely informational now, not required to progress the order.
+        // UPDATED (2026-09-29): removed the "งานตกแต่ง/บรรจุครบ 100%" gate that used to block opening this
+        // modal, per the same "ทุกแผนกให้สามารถกดปุ่มผ่านได้โดยไม่ต้องลงรายละเอียดข้อมูล" request.
         function attemptOpenPackagingQc(orderIndex) {
             const order = productionOrders[orderIndex];
             if (!order) return;
-            const percent = order.finishing.percent || 0;
-            if (percent < 100) {
-                showToast(`แผนกตกแต่ง/บรรจุยังทำงานไม่ครบ 100% (ตอนนี้ ${percent}%) กรุณาอัปเดตให้ครบก่อนบันทึกผล QC`, 'fa-circle-exclamation', 'text-amber-400');
-                return;
-            }
             openQCModalForOrder(order.moSo, PACKAGING_DEPARTMENT);
         }
 
