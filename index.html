@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -3074,6 +3076,7 @@
                 <p id="loginErrorMsg" class="text-xs text-rose-600 hidden"></p>
                 <button type="submit" id="loginSubmitBtn" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow transition">เข้าสู่ระบบ</button>
                 <p class="text-[11px] text-slate-400 text-center">ยังไม่มีบัญชี? ติดต่อ Admin ให้สร้างบัญชีให้ (Supabase -> Authentication -> Add user)</p>
+                <button type="button" onclick="if (confirm('ปิดระบบเข้าสู่ระบบ (Supabase) สำหรับเครื่องนี้ และกลับไปใช้งานแบบไม่ต้องล็อกอินเหมือนเดิมหรือไม่?')) disableSupabaseLoginAndReload();" class="w-full text-[11px] text-slate-400 hover:text-slate-600 underline text-center pt-1">ปิดระบบเข้าสู่ระบบชั่วคราว (สำหรับเครื่องนี้เท่านั้น)</button>
             </form>
         </div>
     </div>
@@ -3388,6 +3391,22 @@
         function hideLoginOverlay() {
             const el = document.getElementById('loginOverlay');
             if (el) { el.classList.add('hidden'); el.classList.remove('flex'); }
+        }
+
+        // NEW (2026-09-29): "ส่งไฟล์ให้แผนกอื่นแล้วต้องใส่รหัสผ่าน ทั้งที่ไม่เคยตั้งไว้" — before this fix,
+        // once qc_supabase_url/qc_supabase_anon_key got saved into a given browser's localStorage (e.g.
+        // by accident while testing the "ตั้งค่าเชื่อมต่อ" modal, since the Supabase fields sit right below
+        // the GAS URL field there), the loginOverlay above would block that ONE BROWSER's entire app
+        // forever with no way back in — no backdrop-click-to-close, and no Supabase user account was ever
+        // created to actually sign in with. This escape hatch (a plain text link on the overlay itself,
+        // since it's the only thing left on screen) clears the saved Supabase config for THIS BROWSER
+        // ONLY and turns the login system back off immediately — restoring the documented default
+        // behaviour ("ว่างไว้ = ระบบทำงานแบบเดิมทุกประการ ไม่มีหน้า login") without touching any other
+        // machine or the Supabase project itself.
+        function disableSupabaseLoginAndReload() {
+            localStorage.removeItem('qc_supabase_url');
+            localStorage.removeItem('qc_supabase_anon_key');
+            location.reload();
         }
 
         async function doLogin() {
@@ -14595,8 +14614,22 @@
 
             // NEW (2026-09-11): Supabase URL/anon key — see initSupabase()/"Supabase — Login + สิทธิ์"
             // block above. Saving a blank value here turns the whole login/permission system back off.
-            supabaseUrl = document.getElementById('supabaseUrlInput').value.trim();
-            supabaseAnonKey = document.getElementById('supabaseAnonKeyInput').value.trim();
+            const newSupabaseUrl = document.getElementById('supabaseUrlInput').value.trim();
+            const newSupabaseAnonKey = document.getElementById('supabaseAnonKeyInput').value.trim();
+            // UPDATED (2026-09-29): "ส่งไฟล์ให้แผนกอื่นแล้วต้องใส่รหัสผ่าน ทั้งที่ไม่เคยตั้งไว้" — this is
+            // exactly how that happened: these two fields sit right below the GAS URL field in the same
+            // modal, so it's easy to fill them in (even by accident) without realizing it turns on a full
+            // login wall for THIS BROWSER with no Supabase user account to actually sign in with. Confirm
+            // explicitly whenever this save would newly turn the login system ON (was empty, now isn't) —
+            // turning it back OFF (clearing to blank) never needs confirming.
+            const isNewlyEnabling = (newSupabaseUrl || newSupabaseAnonKey) && !(supabaseUrl && supabaseAnonKey);
+            if (isNewlyEnabling && !confirm('การกรอก Supabase Project URL / anon key จะเปิดระบบ "เข้าสู่ระบบ" (login) ทันที และจะบล็อกหน้าจอทั้งหมดของเครื่องนี้จนกว่าจะมีบัญชีผู้ใช้ Supabase ให้ล็อกอิน — ต้องการเปิดใช้งานจริงหรือไม่?')) {
+                document.getElementById('supabaseUrlInput').value = supabaseUrl;
+                document.getElementById('supabaseAnonKeyInput').value = supabaseAnonKey;
+                return;
+            }
+            supabaseUrl = newSupabaseUrl;
+            supabaseAnonKey = newSupabaseAnonKey;
             localStorage.setItem('qc_supabase_url', supabaseUrl);
             localStorage.setItem('qc_supabase_anon_key', supabaseAnonKey);
             initSupabase();
