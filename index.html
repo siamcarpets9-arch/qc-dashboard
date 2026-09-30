@@ -14412,7 +14412,14 @@
                 sproutingLabel: sproutingLabel,
                 productionInstruction: productionInstruction,
                 currentStage: 'planning',
-                planning: { specDone: false, specDoneBy: '', planEntered: false, planEnteredBy: '', percent: 0 },
+                // FIX (2026-09-30): "คีย์ข้อมูลเข้าไปใหม่แล้ว ไม่สามารถกด ปุ่มแก้ไขได้" — this object literal
+                // never included `bom` (added to normalizeOrder()'s planning defaults on 2026-09-16 for the
+                // BOM ต้นทุนประมาณการผลิต feature), so every order created through this real "เพิ่ม M/O, S/O
+                // ใหม่" form was missing order.planning.bom entirely, unlike orders normalizeOrder() builds
+                // (from an Excel import, Google Sheet sync, etc.) — see renderBomCardHtml()'s matching fix
+                // for the crash this caused. Shape now matches normalizeOrder()'s planning.bom default
+                // exactly (see its comment there).
+                planning: { specDone: false, specDoneBy: '', planEntered: false, planEnteredBy: '', percent: 0, bom: { yarnSkuCode: '', prices: {} } },
                 // NEW: "แผนกดีไซน์/ขยายลาย" — a simple done/who/note checklist, not part of the
                 // planning→dyeing→...→shipped state machine (see STAGE_LABELS.design's comment) — see
                 // renderDesignSectionHtml().
@@ -14686,7 +14693,17 @@
             const spec = bom.spec;
             const hasArea = bom.area > 0;
             const defaults = getBomDefaultPrices();
-            const overrides = (order.planning.bom.prices) || {};
+            // FIX (2026-09-30): "คีย์ข้อมูลเข้าไปใหม่แล้ว ไม่สามารถกด ปุ่มแก้ไขได้" — this read order.planning.
+            // bom.prices directly (no guard), unlike every other .planning.bom access in this file (see
+            // computeBomForOrder()/resolveBomPrices() above, both already defensive). submitNewOrder()'s
+            // hand-built order object (unlike normalizeOrder()) never set planning.bom at all, so ANY order
+            // created through the real "เพิ่ม M/O, S/O ใหม่" form crashed here the moment its Planning
+            // section was opened (openOrderDetailModal calls renderOrderDetailModalBody BEFORE unhiding the
+            // modal, so the thrown error left the modal permanently hidden — "กดปุ่มแก้ไขไม่ได้" from the
+            // user's side, with no visible error). Fixed at both ends: this line is now defensive like its
+            // siblings, AND submitNewOrder() now sets planning.bom explicitly (see its object literal) so
+            // newly created orders match normalizeOrder()'s shape exactly.
+            const overrides = (order.planning && order.planning.bom && order.planning.bom.prices) || {};
 
             const priceInputsHtml = BOM_PRICE_FIELDS.map(f => {
                 const isOverridden = Object.prototype.hasOwnProperty.call(overrides, f.key);
