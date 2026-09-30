@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -11559,6 +11557,13 @@
             return d;
         }
         function daysBetweenUTC(d1, d2) {
+            // Defensive guard (2026-09-30): d1/d2 can be null when they come from parseDateOnly() on a
+            // date string that normalizeDateString() couldn't actually turn into YYYY-MM-DD (e.g. a raw
+            // Excel serial number or other garbage text that survives normalizeDateString's fallback as
+            // a truthy-but-unparseable string). daysBetweenUTC is called from initApp's very first render
+            // (via renderProductionTimeline), so an uncaught throw here breaks the ENTIRE page load, not
+            // just one order's row — same "must never throw on bad data" rule as normalizeOrder() callers.
+            if (!(d1 instanceof Date) || !(d2 instanceof Date) || isNaN(d1.getTime()) || isNaN(d2.getTime())) return 0;
             return Math.round((d2.getTime() - d1.getTime()) / 86400000);
         }
 
@@ -11715,7 +11720,10 @@
                 // the colored segment itself (previously only in the hover tooltip) — "แทบสีตรงไทมไลน์
                 // ให้ขึ้นว่าแผนกอะไร เริ่มวันแรกวันที่ให้ตัวเลขขึ้นในแทบสีด้วย" per the user's request. The
                 // tooltip (title=) is kept too, for the full start→end date range on hover.
-                const barsHtml = segments.filter(seg => seg.stage).map(seg => {
+                // NEW (2026-09-30): also drop any segment whose start/end can't actually be parsed into a
+                // real date (see daysBetweenUTC's guard above) — otherwise it would silently render a
+                // misleading bar pinned to day 0 instead of just being skipped.
+                const barsHtml = segments.filter(seg => seg.stage && parseDateOnly(seg.start) && parseDateOnly(seg.end)).map(seg => {
                     const colorCls = STAGE_COLORS[seg.stage].solid;
                     const leftPx = daysBetweenUTC(minDate, parseDateOnly(seg.start)) * dayWidth;
                     const spanDays = Math.max(daysBetweenUTC(parseDateOnly(seg.start), parseDateOnly(seg.end)), 0);
@@ -11743,7 +11751,7 @@
 
                 let dueFlagHtml = '';
                 const dueDateNorm = normalizeDateString(order.dueDate);
-                if (dueDateNorm) {
+                if (dueDateNorm && parseDateOnly(dueDateNorm)) {
                     const dueOffsetPx = daysBetweenUTC(minDate, parseDateOnly(dueDateNorm)) * dayWidth;
                     const postponeCount = Array.isArray(order.dueDateHistory) ? order.dueDateHistory.length : 0;
                     const flagColorCls = (deadlineWarningHtml || postponeCount > 0) ? 'text-rose-500' : 'text-slate-400';
