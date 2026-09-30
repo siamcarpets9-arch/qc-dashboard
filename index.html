@@ -537,6 +537,12 @@
                 <button onclick="switchView('central')" id="tabCentralBtn" class="flex-1 md:flex-none px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-indigo-700 transition">
                     <i class="fa-solid fa-gauge-high mr-1.5"></i> Dashboard กลาง
                 </button>
+                <!-- NEW (2026-09-29): SC-FOS Planning V1 — Delivery Control (Original vs Revised Due
+                     Date), Planning Baseline (Plan-vs-Actual), Delay Log, OTD/Schedule-Adherence KPI,
+                     and daily Capacity check — see renderPlanningDashboard(). -->
+                <button onclick="switchView('planning')" id="tabPlanningBtn" class="flex-1 md:flex-none px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-indigo-700 transition">
+                    <i class="fa-solid fa-calendar-days mr-1.5"></i> Planning & Capacity
+                </button>
             </div>
 
             <div id="globalSearchFilterWrapper" class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
@@ -2360,6 +2366,10 @@
             </div>
         </div>
 
+        <!-- NEW (2026-09-29): SC-FOS Planning V1 — "Planning & Capacity" view. renderPlanningDashboard()
+             injects its content here (KPI cards, Daily Capacity Check, งานเสี่ยง/เลย Baseline table). -->
+        <div id="planningViewContainer" class="hidden space-y-4"></div>
+
         <!-- Ready-to-Ship View: M/O, S/O whose packaging department (แผนกตกแต่ง/ทากาว/บรรจุภัณฑ์) has PASSed and not yet marked shipped -->
         <div id="shippingViewContainer" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hidden">
             <!-- Sub-tabs: "รายการรอส่ง" (the existing ready-to-ship table) and "ใบส่งของ Mark & Nos"
@@ -2845,6 +2855,27 @@
                 <button onclick="closeOverviewRemarkModal()" class="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition">ยกเลิก</button>
                 <button onclick="saveOverviewRemark()" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white shadow transition flex items-center gap-2"><i class="fa-solid fa-check"></i> บันทึก</button>
             </div>
+        </div>
+    </div>
+
+    <!-- NEW (2026-09-29): SC-FOS Planning V1 — Delay Log modal (opened from renderPlanningControlOrderBlock()'s
+         "Delay" buttons or automatically via notifyMissingDelayReasonAfterCompletion() when a stage finishes
+         late against its Baseline Plan with no reason on file yet). See submitPlanningDelayLog(). -->
+    <div id="planningDelayModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-5 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div><h3 class="font-bold text-slate-800">บันทึก Delay Reason</h3><p id="planningDelaySummary" class="text-[11px] text-slate-400 mt-0.5"></p></div>
+                <button onclick="closePlanningDelayModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div><label class="block font-semibold text-slate-600 mb-1">Delay Type</label><select id="planningDelayType" class="w-full p-2 border border-slate-200 rounded-lg"><option>Internal</option><option>Customer</option><option>Supplier / External</option></select></div>
+                <div><label class="block font-semibold text-slate-600 mb-1">Owner Department</label><input id="planningDelayOwnerDept" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                <div class="sm:col-span-2"><label class="block font-semibold text-slate-600 mb-1">Delay Reason</label><select id="planningDelayReason" class="w-full p-2 border border-slate-200 rounded-lg"></select></div>
+                <div><label class="block font-semibold text-slate-600 mb-1">Recovery Date</label><input id="planningDelayRecoveryDate" type="date" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                <div><label class="block font-semibold text-slate-600 mb-1">Recorded By</label><input id="planningDelayRecordedBy" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                <div class="sm:col-span-2"><label class="block font-semibold text-slate-600 mb-1">Remark</label><textarea id="planningDelayRemark" rows="2" class="w-full p-2 border border-slate-200 rounded-lg"></textarea></div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100"><button onclick="closePlanningDelayModal()" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs">ยกเลิก</button><button onclick="submitPlanningDelayLog()" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-semibold">บันทึก Delay</button></div>
         </div>
     </div>
 
@@ -4052,7 +4083,9 @@
                 shipped: { btn: 'tabShippedBtn', container: 'shippedViewContainer' },
                 issues: { btn: 'tabIssuesBtn', container: 'issuesViewContainer' },
                 analytics: { btn: 'tabAnalyticsBtn', container: 'analyticsViewContainer' },
-                central: { btn: 'tabCentralBtn', container: 'centralViewContainer' }
+                central: { btn: 'tabCentralBtn', container: 'centralViewContainer' },
+                // NEW (2026-09-29): SC-FOS Planning V1 — see renderPlanningDashboard().
+                planning: { btn: 'tabPlanningBtn', container: 'planningViewContainer' }
             };
             const activeTabCls = "flex-1 md:flex-none px-4 py-2 rounded-lg text-xs font-semibold bg-white text-indigo-700 shadow-sm transition";
             const inactiveTabCls = "flex-1 md:flex-none px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-indigo-700 transition";
@@ -4076,6 +4109,7 @@
             if (view === 'issues') renderIssuesTable();
             if (view === 'analytics') renderAnalyticsDashboard();
             if (view === 'central') renderCentralDashboard();
+            if (view === 'planning') renderPlanningDashboard();
         }
 
         // Global M/O, S/O switch (see the `orderTypeFilter` declaration above) — one switch that
@@ -7764,6 +7798,11 @@
             ['dyeing', 'weaving', 'finishing'].forEach(stage => {
                 if (!migratedFlags[stage]) recomputeStagePercent(order, stage);
             });
+            // NEW (2026-09-29): SC-FOS Planning V1 — Delivery Control (Original vs Revised Due Date),
+            // Planning Baseline (Plan-vs-Actual), Delay Log, and Capacity fields — see
+            // applyPlanningControlDefaults() and the "SC-FOS PLANNING CONTROL MODULE V1" section below.
+            // Must run last so it sees the fully-normalized dueDateHistory/planDates above.
+            applyPlanningControlDefaults(order, raw);
             return order;
         }
 
@@ -12169,6 +12208,11 @@
             let obj = order;
             for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
             const fieldKey = parts[parts.length - 1];
+            // NEW (2026-09-29): SC-FOS Planning V1 — capture the pre-change value/plan dates so
+            // planningAfterOrderFieldUpdate() (called below, after the existing hooks) can detect a
+            // planEntered false→true transition (freeze baseline) and diff planDates for revision history.
+            const planningPreviousValue = obj[fieldKey];
+            const planningBeforePlanDates = Object.assign({}, order.planDates || {});
 
             // NEW: track every postponement of the whole-order delivery due date ("กำหนดส่ง") — a real
             // change from one non-empty date to a different one counts as one postponement. The very
@@ -12224,6 +12268,11 @@
             if (path === 'designReceivedDate' || path === 'design.doneBy') {
                 recomputeDesignDone(order);
             }
+            // NEW (2026-09-29): SC-FOS Planning V1 hook — freezes the Planning baseline the first time
+            // planEntered flips true, stamps Planning's Actual Finish once its checklist is 100%, and
+            // records any plan-date change (after a baseline exists) into planRevisionHistory. See
+            // planningAfterOrderFieldUpdate() in the "SC-FOS PLANNING CONTROL MODULE V1" section below.
+            planningAfterOrderFieldUpdate(order, path, value, planningPreviousValue, planningBeforePlanDates);
             persistOrderChange(order);
             rerenderOrderViews(orderIndex);
         }
@@ -12231,6 +12280,12 @@
         function recomputeDesignDone(order) {
             if (!order || !order.design) return;
             order.design.done = !!(order.design.doneBy && order.designReceivedDate);
+            // NEW (2026-09-29): SC-FOS Planning V1 — design.done is derived (never set via
+            // updateOrderField('design.done', ...)), so its Actual Finish is stamped right here, the
+            // moment it's recomputed true, rather than from a field-update hook that would never fire.
+            // Stamped with designReceivedDate itself (the date design actually came back), not "today",
+            // since that's the true completion date, including when this fires on a past-dated order.
+            if (order.design.done) stampActualFinish(order, 'design', order.designReceivedDate);
         }
 
         // Switches this M/O's dyeing stage between "ย้อมในบริษัท" (internal, default) and "ไหมสั่งย้อม
@@ -12292,6 +12347,9 @@
             const order = productionOrders[orderIndex];
             if (!order) return;
 
+            // NEW (2026-09-29): SC-FOS Planning V1 — stamp the department being LEFT as finished (first
+            // stamp wins; see stampActualFinish()) before moving the order on.
+            stampActualFinish(order, fromStage);
             order.currentStage = toStage;
             persistOrderChange(order);
             incrementTransferCount();
@@ -12299,6 +12357,9 @@
             showToast(`โอนงาน "${order.moSo}" ไปแผนก${STAGE_LABELS[toStage]}แล้ว`, 'fa-arrow-right', 'text-emerald-400');
             mascotCelebrate('transfer');
             notifyLineStageTransfer(order, fromStage, toStage);
+            // NEW (2026-09-29): if that department finished LATE against its Baseline Plan and no Delay
+            // Reason is on file yet, prompt for one now — see notifyMissingDelayReasonAfterCompletion().
+            notifyMissingDelayReasonAfterCompletion(orderIndex, fromStage);
         }
 
         // NEW (2026-09-16): "ถ้าใช้ไหม Surplus ทอให้กดโอนไปแผนกทอได้เลยโดยไม่ต้องผ่านแผนกย้อม" — true only
@@ -12517,12 +12578,16 @@
         function markOrderReadyToShip(orderIndex) {
             const order = productionOrders[orderIndex];
             if (!order) return;
+            // NEW (2026-09-29): SC-FOS Planning V1 — Finishing is considered done the moment the order
+            // is marked ready to ship; stamp its Actual Finish (first stamp wins).
+            stampActualFinish(order, 'finishing');
             order.readyToShip = true;
             persistOrderChange(order);
             rerenderOrderViews(orderIndex);
             notifyLineReadyToShip(order);
             showToast(`M/O "${order.moSo}" งานเสร็จครบแล้ว ย้ายไปรายการรอส่ง`, 'fa-truck-fast', 'text-emerald-400');
             mascotCelebrate('readyToShip');
+            notifyMissingDelayReasonAfterCompletion(orderIndex, 'finishing');
         }
 
         // Marks a ready-to-ship order as actually shipped — the order-level counterpart of the
@@ -12537,6 +12602,703 @@
             showToast(`บันทึกว่าส่งมอบ M/O "${order.moSo}" แล้ว`, 'fa-truck-fast', 'text-emerald-400');
             mascotCelebrate('shipped');
         }
+
+        /* ============================================================================
+         SC-FOS PLANNING CONTROL MODULE V1 (2026-09-29)
+         "รายการนี้หายไปจาก QC Dashboard" — a new Delivery Control (Original vs Revised Due Date),
+         Planning Baseline (Plan-vs-Actual per department), Delay Log, OTD/Schedule-Adherence KPI,
+         and daily Capacity check for Design/Weaving/Finishing, added per the user's uploaded
+         SC-FOS Planning V1 spec/code package and their explicit "ให้ติดตั้งฟีเจอร์นี้เข้าไปตอนนี้เลย".
+
+         Reuses existing globals/functions rather than duplicating them: productionOrders,
+         productionSettings, computeProductionSuggestions(), normalizeDateString(), escapeHtml(),
+         persistOrderChange(), rerenderOrderViews(), showToast(). Source of truth stays
+         productionOrders + Google Sheets backend — no second M/O database.
+
+         ADAPTED from the original uploaded patch to fit this codebase's ALREADY-EXISTING due-date
+         history/reschedule/acknowledgment system (see pushDueDateHistoryEntry()/
+         buildDueDateRescheduleWidgetHtml()/openDueDateRescheduleModal() etc. above), instead of
+         introducing a second, competing one:
+           - order.postponeDispatchDate is NOT touched here — that field already holds a raw value
+             imported from the sales team's "เปิด M/O" Excel sheet (see normalizeOrder()) and is
+             unrelated to due-date revision tracking.
+           - "Revised Due Date" is derived purely from order.dueDateHistory (already tracked by
+             updateOrderField() for every dueDate edit, from any UI path) — never a second field.
+           - The order-detail "เลื่อนกำหนดส่ง" action reuses the EXISTING
+             buildDueDateRescheduleWidgetHtml()/openDueDateRescheduleModal() (with its own
+             acknowledgment-by-department flow), instead of the originally-proposed
+             planningDueRevisionModal — so there is exactly one place a due date reschedule happens.
+           - The originally-proposed read-only lock on #orderDetailDueDate was skipped: the existing
+             updateOrderField() already tracks every dueDate edit into dueDateHistory regardless of
+             which UI field triggered it, so the premise for locking it (edits "bypass tracking")
+             does not hold here.
+           - Internal Reschedule Rate (KPI) — the existing reschedule flow tags a change with a
+             direction (เลื่อนเข้า/เลื่อนออก) and a free-text reason, not an Internal/Customer/
+             Supplier classification, so that classification isn't available on dueDateHistory
+             entries. Approximated instead as: order was revised (has dueDateHistory) AND has at
+             least one Delay Log entry (the genuinely new tracking this module adds) tagged
+             delayType === 'Internal'.
+        ============================================================================ */
+
+        const PLANNING_CONTROL_STAGES = ['planning', 'design', 'dyeing', 'weaving', 'finishing'];
+        const PLANNING_STAGE_LABELS = {
+            planning: 'วางแผน',
+            design: 'ดีไซน์/ขยายลาย',
+            dyeing: 'ย้อม',
+            weaving: 'ทอ',
+            finishing: 'ตกแต่ง/บรรจุ'
+        };
+
+        const PLANNING_DELAY_TYPES = ['Internal', 'Customer', 'Supplier / External'];
+        const PLANNING_DELAY_REASONS = [
+            'Planning - Capacity Overload',
+            'Planning - Plan Not Feasible',
+            'Planning - Wrong Priority / Sequence',
+            'Planning - Planning Error',
+            'Production - Productivity Below Plan',
+            'Production - Manpower Shortage',
+            'Production - Machine / Tool Breakdown',
+            'Dyeing Delay',
+            'Weaving Delay',
+            'Finishing Delay',
+            'QC Reject / Rework',
+            'Material / Yarn Delay',
+            'Customer Requested Postponement',
+            'Customer Changed Design / Spec',
+            'Customer Approval Delay',
+            'Sales Confirmed Due Date Without Capacity Check',
+            'Management Priority Change',
+            'Other'
+        ];
+
+        function planningTodayKey() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function planningParseJson(raw, fallback) {
+            if (raw && typeof raw === 'object') return raw;
+            if (typeof raw === 'string' && raw.trim()) {
+                try { return JSON.parse(raw); } catch (e) {}
+            }
+            return fallback;
+        }
+
+        function planningDateKey(raw) {
+            if (!raw) return '';
+            if (typeof normalizeDateString === 'function') return normalizeDateString(raw) || '';
+            const s = String(raw).trim();
+            return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : '';
+        }
+
+        function planningDateMs(raw) {
+            const k = planningDateKey(raw);
+            if (!k) return null;
+            const [y, m, d] = k.split('-').map(Number);
+            return Date.UTC(y, m - 1, d);
+        }
+
+        function planningDiffDays(fromDate, toDate) {
+            const a = planningDateMs(fromDate);
+            const b = planningDateMs(toDate);
+            if (a === null || b === null) return null;
+            return Math.round((b - a) / 86400000);
+        }
+
+        function planningEmptyStageDates() {
+            return { planning: '', design: '', dyeing: '', weaving: '', finishing: '' };
+        }
+
+        function planningNormalizeDateObject(raw) {
+            const obj = Object.assign(planningEmptyStageDates(), planningParseJson(raw, {}));
+            PLANNING_CONTROL_STAGES.forEach(stage => { obj[stage] = planningDateKey(obj[stage]); });
+            return obj;
+        }
+
+        // Reads the EXISTING order.dueDateHistory as-is (from/to/changedAt, plus direction/
+        // acknowledgedBy when present) — no separate history array for this module.
+        function planningNormalizeHistory(raw) {
+            const arr = planningParseJson(raw, []);
+            if (!Array.isArray(arr)) return [];
+            return arr.filter(Boolean).map(h => ({
+                from: planningDateKey(h.from),
+                to: planningDateKey(h.to),
+                changedAt: planningDateKey(h.changedAt) || String(h.changedAt || ''),
+                direction: h.direction || '',
+                reason: String(h.reason || ''),
+                requestedBy: String(h.requestedBy || '')
+            }));
+        }
+
+        /**
+         * Called from normalizeOrder(raw) right before `return order;`, and once after constructing a
+         * brand-new order in submitNewOrder(). Derives/repairs the Planning V1 fields without ever
+         * touching order.dueDate/order.postponeDispatchDate/order.dueDateHistory (all owned by the
+         * existing due-date system above).
+         */
+        function applyPlanningControlDefaults(order, raw) {
+            raw = raw || order || {};
+            if (!order) return order;
+
+            const history = planningNormalizeHistory(order.dueDateHistory);
+
+            // Original Due Date is an immutable baseline. Migration priority:
+            // 1) already-saved originalDueDate, 2) the earliest historical `from`, 3) current dueDate.
+            const historyOriginal = history.length ? history[0].from : '';
+            order.originalDueDate = planningDateKey(raw.originalDueDate || order.originalDueDate) || historyOriginal || planningDateKey(order.dueDate);
+
+            order.baselinePlanDates = planningNormalizeDateObject(raw.baselinePlanDates || order.baselinePlanDates);
+            order.actualFinishDates = planningNormalizeDateObject(raw.actualFinishDates || order.actualFinishDates);
+            // Backfill: an order whose design was already marked done (design.done, derived from
+            // doneBy+designReceivedDate) before this stamp existed would otherwise sit with a blank
+            // design Actual Finish until its next edit happens to re-trigger recomputeDesignDone().
+            // Recover it here from designReceivedDate — the date design genuinely came back — instead.
+            if (order.design && order.design.done && !order.actualFinishDates.design) {
+                order.actualFinishDates.design = planningDateKey(order.designReceivedDate) || planningTodayKey();
+            }
+
+            order.planRevisionHistory = planningParseJson(raw.planRevisionHistory || order.planRevisionHistory, []);
+            if (!Array.isArray(order.planRevisionHistory)) order.planRevisionHistory = [];
+
+            order.delayLog = planningParseJson(raw.delayLog || order.delayLog, []);
+            if (!Array.isArray(order.delayLog)) order.delayLog = [];
+
+            order.planningCapacityOverride = planningParseJson(raw.planningCapacityOverride || order.planningCapacityOverride, {});
+            if (!order.planningCapacityOverride || typeof order.planningCapacityOverride !== 'object' || Array.isArray(order.planningCapacityOverride)) {
+                order.planningCapacityOverride = {};
+            }
+
+            return order;
+        }
+
+        // ------------------------------
+        // Due Date helpers / OTD — all derived from the EXISTING dueDate/dueDateHistory fields.
+        // ------------------------------
+        function getOriginalDueDate(order) {
+            if (!order) return '';
+            const explicit = planningDateKey(order.originalDueDate);
+            if (explicit) return explicit;
+            const history = planningNormalizeHistory(order.dueDateHistory);
+            if (history.length && history[0].from) return history[0].from;
+            return planningDateKey(order.dueDate);
+        }
+
+        function getRevisedDueDate(order) {
+            if (!order) return '';
+            const history = planningNormalizeHistory(order.dueDateHistory);
+            return history.length ? history[history.length - 1].to : '';
+        }
+
+        function getCurrentDueDate(order) {
+            // Keep compatibility with legacy/live code: the latest revision wins; otherwise dueDate as-is.
+            return getRevisedDueDate(order) || planningDateKey(order.dueDate) || getOriginalDueDate(order);
+        }
+
+        function getActualDeliveryDate(order) {
+            return planningDateKey(order && order.shippedDate);
+        }
+
+        function getOriginalOtd(order) {
+            const actual = getActualDeliveryDate(order);
+            const due = getOriginalDueDate(order);
+            if (!actual || !due) return 'NO DATA';
+            return planningDiffDays(due, actual) <= 0 ? 'ON TIME' : 'LATE';
+        }
+
+        function getRevisedOtd(order) {
+            const actual = getActualDeliveryDate(order);
+            const due = getCurrentDueDate(order);
+            if (!actual || !due) return 'NO DATA';
+            return planningDiffDays(due, actual) <= 0 ? 'ON TIME' : 'LATE';
+        }
+
+        function getExtensionDays(order) {
+            const original = getOriginalDueDate(order);
+            const revised = getRevisedDueDate(order);
+            if (!original || !revised) return 0;
+            return Math.max(0, planningDiffDays(original, revised) || 0);
+        }
+
+        function getDelayVsOriginalDays(order) {
+            const original = getOriginalDueDate(order);
+            const actual = getActualDeliveryDate(order);
+            if (!original || !actual) return null;
+            return Math.max(0, planningDiffDays(original, actual) || 0);
+        }
+
+        function planningStatusBadge(status) {
+            if (status === 'ON TIME' || status === 'ON PLAN') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">' + status + '</span>';
+            if (status === 'LATE' || status === 'OVERDUE') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">' + status + '</span>';
+            if (status === 'AT RISK') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">AT RISK</span>';
+            return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">' + (status || 'NO DATA') + '</span>';
+        }
+
+        // ------------------------------
+        // Baseline Plan / Plan Revisions
+        // ------------------------------
+        function hasBaselinePlan(order) {
+            const b = planningNormalizeDateObject(order && order.baselinePlanDates);
+            return PLANNING_CONTROL_STAGES.some(s => !!b[s]);
+        }
+
+        function freezeBaselinePlan(order, frozenBy) {
+            applyPlanningControlDefaults(order, order);
+            if (hasBaselinePlan(order)) return false;
+            order.baselinePlanDates = Object.assign(planningEmptyStageDates(), planningNormalizeDateObject(order.planDates));
+            order.baselinePlanDates.__frozenAt = planningTodayKey();
+            order.baselinePlanDates.__frozenBy = frozenBy || order.planning?.planEnteredBy || '';
+            return true;
+        }
+
+        function capturePlanDateRevisions(order, beforeDates, afterDates, changedBy, reason) {
+            if (!hasBaselinePlan(order)) return;
+            beforeDates = planningNormalizeDateObject(beforeDates);
+            afterDates = planningNormalizeDateObject(afterDates);
+            PLANNING_CONTROL_STAGES.forEach(stage => {
+                if (beforeDates[stage] !== afterDates[stage]) {
+                    order.planRevisionHistory.push({
+                        stage,
+                        oldDate: beforeDates[stage] || '',
+                        newDate: afterDates[stage] || '',
+                        changedAt: planningTodayKey(),
+                        changedBy: changedBy || order.planning?.planEnteredBy || '',
+                        reason: reason || 'Plan adjusted after baseline'
+                    });
+                }
+            });
+        }
+
+        // ------------------------------
+        // Actual Finish / Plan vs Actual
+        // ------------------------------
+        function stampActualFinish(order, stage, dateKey) {
+            if (!order || !PLANNING_CONTROL_STAGES.includes(stage)) return false;
+            applyPlanningControlDefaults(order, order);
+            if (order.actualFinishDates[stage]) return false; // first completion wins
+            order.actualFinishDates[stage] = planningDateKey(dateKey) || planningTodayKey();
+            return true;
+        }
+
+        function getStageBaselineDate(order, stage) {
+            applyPlanningControlDefaults(order, order);
+            return planningDateKey(order.baselinePlanDates?.[stage]);
+        }
+
+        function getStageCurrentPlanDate(order, stage) {
+            return planningDateKey(order?.planDates?.[stage]);
+        }
+
+        function getStageActualDate(order, stage) {
+            applyPlanningControlDefaults(order, order);
+            return planningDateKey(order.actualFinishDates?.[stage]);
+        }
+
+        function getStageVarianceDays(order, stage) {
+            const baseline = getStageBaselineDate(order, stage);
+            const actual = getStageActualDate(order, stage);
+            if (!baseline || !actual) return null;
+            return planningDiffDays(baseline, actual);
+        }
+
+        function getStageScheduleResult(order, stage) {
+            const baseline = getStageBaselineDate(order, stage);
+            if (!baseline) return 'NO BASELINE';
+            const actual = getStageActualDate(order, stage);
+            if (actual) return (planningDiffDays(baseline, actual) || 0) <= 0 ? 'ON PLAN' : 'LATE';
+            const left = planningDiffDays(planningTodayKey(), baseline);
+            if (left === null) return 'NO DATA';
+            if (left < 0) return 'OVERDUE';
+            if (left <= 3) return 'AT RISK';
+            return 'OPEN';
+        }
+
+        function hasDelayLogForStage(order, stage) {
+            applyPlanningControlDefaults(order, order);
+            return order.delayLog.some(x => x && x.stage === stage);
+        }
+
+        function notifyMissingDelayReasonAfterCompletion(orderIndex, stage) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            if (getStageScheduleResult(order, stage) === 'LATE' && !hasDelayLogForStage(order, stage)) {
+                showToast(`งาน ${PLANNING_STAGE_LABELS[stage]} เสร็จช้ากว่า Baseline — กรุณาระบุ Delay Reason`, 'fa-triangle-exclamation', 'text-amber-400');
+                setTimeout(() => openPlanningDelayModal(orderIndex, stage), 250);
+            }
+        }
+
+        // ------------------------------
+        // Delay Log
+        // ------------------------------
+        let planningDelayOrderIndex = null;
+        let planningDelayStage = '';
+
+        function addPlanningDelayLog(order, payload) {
+            applyPlanningControlDefaults(order, order);
+            order.delayLog.push({
+                stage: payload.stage || 'planning',
+                delayType: payload.delayType || '',
+                delayReason: payload.delayReason || '',
+                ownerDept: payload.ownerDept || '',
+                remark: payload.remark || '',
+                recordedAt: payload.recordedAt || planningTodayKey(),
+                recordedBy: payload.recordedBy || '',
+                recoveryDate: planningDateKey(payload.recoveryDate) || ''
+            });
+        }
+
+        function openPlanningDelayModal(orderIndex, stage) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            planningDelayOrderIndex = orderIndex;
+            planningDelayStage = stage || order.currentStage || 'planning';
+            document.getElementById('planningDelaySummary').textContent = `${order.moSo || '-'} | ${PLANNING_STAGE_LABELS[planningDelayStage] || planningDelayStage}`;
+            document.getElementById('planningDelayType').value = 'Internal';
+            document.getElementById('planningDelayReason').innerHTML = PLANNING_DELAY_REASONS.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+            ['planningDelayOwnerDept', 'planningDelayRemark', 'planningDelayRecordedBy'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('planningDelayRecoveryDate').value = '';
+            document.getElementById('planningDelayModal').classList.remove('hidden');
+        }
+
+        function closePlanningDelayModal() {
+            planningDelayOrderIndex = null;
+            planningDelayStage = '';
+            document.getElementById('planningDelayModal')?.classList.add('hidden');
+        }
+
+        function submitPlanningDelayLog() {
+            const order = productionOrders[planningDelayOrderIndex];
+            if (!order) return;
+            addPlanningDelayLog(order, {
+                stage: planningDelayStage,
+                delayType: document.getElementById('planningDelayType').value,
+                delayReason: document.getElementById('planningDelayReason').value,
+                ownerDept: document.getElementById('planningDelayOwnerDept').value.trim(),
+                remark: document.getElementById('planningDelayRemark').value.trim(),
+                recordedBy: document.getElementById('planningDelayRecordedBy').value.trim(),
+                recoveryDate: document.getElementById('planningDelayRecoveryDate').value
+            });
+            persistOrderChange(order);
+            rerenderOrderViews(planningDelayOrderIndex);
+            closePlanningDelayModal();
+            renderPlanningDashboard();
+            showToast('บันทึก Delay Reason แล้ว');
+        }
+
+        // ------------------------------
+        // Integration hook called from the EXISTING updateOrderField(), after its own recompute hooks
+        // ------------------------------
+        function planningAfterOrderFieldUpdate(order, path, value, previousValue, beforePlanDates) {
+            applyPlanningControlDefaults(order, order);
+
+            // Freeze baseline the FIRST time Planning confirms "ลงแผนงานแล้ว".
+            if (path === 'planning.planEntered' && value === true && previousValue !== true) {
+                freezeBaselinePlan(order, order.planning?.planEnteredBy || '');
+            }
+
+            // If the 2-step Planning checklist just reached 100%, stamp its Actual Finish.
+            if ((path === 'planning.planEntered' || path === 'planning.specDone') && order.planning?.specDone && order.planning?.planEntered) {
+                stampActualFinish(order, 'planning');
+            }
+
+            // NOTE: design's Actual Finish is stamped from recomputeDesignDone() instead of a
+            // 'design.done' field-update path here, since design.done is derived, never set directly
+            // through updateOrderField() under this codebase's design-checklist system.
+
+            // Any plan-duration/open-date/planning-deadline change after a baseline exists may shift
+            // downstream planDates — record what moved.
+            if (path.indexOf('planDurations.') === 0 || path === 'openDate' || path === 'planDates.planning') {
+                capturePlanDateRevisions(order, beforePlanDates || {}, order.planDates || {}, order.planning?.planEnteredBy || '', 'Plan updated after baseline');
+            }
+        }
+
+        // ------------------------------
+        // KPI
+        // ------------------------------
+        function planningOrderInDateRange(order, startDate, endDate) {
+            if (!startDate && !endDate) return true;
+            const key = getActualDeliveryDate(order) || planningDateKey(order.lastUpdated) || planningDateKey(order.createdAt);
+            if (!key) return false;
+            if (startDate && key < startDate) return false;
+            if (endDate && key > endDate) return false;
+            return true;
+        }
+
+        function computePlanningKpis(orders, opts) {
+            opts = opts || {};
+            const filtered = (orders || []).filter(o => {
+                if (opts.orderType && opts.orderType !== 'all' && (o.orderType || detectOrderTypeFromMoSo(o.moSo)) !== opts.orderType) return false;
+                if (opts.market && opts.market !== 'all' && o.market !== opts.market) return false;
+                return planningOrderInDateRange(o, opts.startDate || '', opts.endDate || '');
+            });
+
+            const delivered = filtered.filter(o => !!getActualDeliveryDate(o));
+            const originalEligible = delivered.filter(o => !!getOriginalDueDate(o));
+            const revisedEligible = delivered.filter(o => !!getCurrentDueDate(o));
+
+            const originalOnTime = originalEligible.filter(o => getOriginalOtd(o) === 'ON TIME').length;
+            const revisedOnTime = revisedEligible.filter(o => getRevisedOtd(o) === 'ON TIME').length;
+
+            const completedStagePairs = [];
+            filtered.forEach(order => {
+                applyPlanningControlDefaults(order, order);
+                PLANNING_CONTROL_STAGES.forEach(stage => {
+                    const baseline = getStageBaselineDate(order, stage);
+                    const actual = getStageActualDate(order, stage);
+                    if (baseline && actual) completedStagePairs.push({ order, stage });
+                });
+            });
+            const onPlanCount = completedStagePairs.filter(x => getStageScheduleResult(x.order, x.stage) === 'ON PLAN').length;
+
+            // ADAPTED: the existing reschedule flow doesn't classify Internal/Customer/Supplier on
+            // dueDateHistory entries — approximate "internal reschedule" as: due date was revised AND
+            // this module's own Delay Log has at least one entry tagged Internal (see module note above).
+            const internalRescheduled = filtered.filter(o => {
+                const hasRevision = planningNormalizeHistory(o.dueDateHistory).length > 0;
+                if (!hasRevision) return false;
+                const dl = Array.isArray(o.delayLog) ? o.delayLog : [];
+                return dl.some(x => x && x.delayType === 'Internal');
+            }).length;
+
+            const delays = delivered.map(getDelayVsOriginalDays).filter(v => v !== null);
+            const extensions = filtered.map(getExtensionDays).filter(v => v > 0);
+
+            const atRisk = filtered.filter(order => PLANNING_CONTROL_STAGES.some(stage => ['AT RISK', 'OVERDUE'].includes(getStageScheduleResult(order, stage)))).length;
+
+            const pct = (n, d) => d > 0 ? (n / d) * 100 : null;
+            const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+            return {
+                totalOrders: filtered.length,
+                deliveredOrders: delivered.length,
+                originalOtdPct: pct(originalOnTime, originalEligible.length),
+                revisedOtdPct: pct(revisedOnTime, revisedEligible.length),
+                scheduleAdherencePct: pct(onPlanCount, completedStagePairs.length),
+                internalReschedulePct: pct(internalRescheduled, filtered.length),
+                avgDelayVsOriginal: avg(delays),
+                avgExtensionDays: avg(extensions),
+                atRiskOrders: atRisk
+            };
+        }
+
+        // ------------------------------
+        // Capacity Check — DAILY load, Design/Weaving/Finishing only (Dyeing intentionally not
+        // guessed in V1 — see getCapacityStageSettings()). Reuses computeProductionSuggestions() and
+        // productionSettings — no second capacity engine.
+        // ------------------------------
+        function getCapacityStageSettings(stage) {
+            const reg = Number(productionSettings?.regularHoursPerDay) || 0;
+            // "แผนกทอ" (weaving) capacity lives under productionSettings.tufting in this codebase.
+            if (stage === 'weaving') return { staff: Number(productionSettings?.tufting?.staffCount) || 0, regular: reg, ot: Number(productionSettings?.tufting?.otHours) || 0 };
+            if (stage === 'design') return { staff: Number(productionSettings?.design?.staffCount) || 0, regular: reg, ot: Number(productionSettings?.design?.otHours) || 0 };
+            if (stage === 'finishing') return { staff: Number(productionSettings?.finishing?.staffCount) || 0, regular: reg, ot: Number(productionSettings?.finishing?.otHours) || 0 };
+            return null;
+        }
+
+        function getStagePlannedRange(order, stage) {
+            const dates = order.planDates || {};
+            const startMap = {
+                design: planningDateKey(order.openDate || order.createdAt),
+                dyeing: planningDateKey(dates.design || order.openDate || order.createdAt),
+                weaving: planningDateKey(dates.dyeing || dates.design || order.openDate || order.createdAt),
+                finishing: planningDateKey(dates.weaving || dates.dyeing || dates.design || order.openDate || order.createdAt)
+            };
+            return { start: startMap[stage] || '', end: planningDateKey(dates[stage]) };
+        }
+
+        function planningDateWithinRange(dateKey, range) {
+            const d = planningDateKey(dateKey);
+            if (!d || !range.start || !range.end) return false;
+            return d >= range.start && d <= range.end;
+        }
+
+        function getOrderDailyRequiredHours(order, stage) {
+            if (!['design', 'weaving', 'finishing'].includes(stage)) return null;
+            const suggestions = computeProductionSuggestions(order);
+            const suggestion = suggestions && suggestions[stage];
+            if (!suggestion || suggestion.baseHours === null || suggestion.baseHours === undefined) return null;
+            const days = Number(order.planDurations?.[stage]) || Number(suggestion.days) || 0;
+            if (days <= 0) return null;
+            return Number(suggestion.baseHours) / days;
+        }
+
+        function computeDailyCapacitySnapshot(dateKey, orders) {
+            const target = planningDateKey(dateKey) || planningTodayKey();
+            const stages = ['design', 'weaving', 'finishing'];
+            return stages.map(stage => {
+                const settings = getCapacityStageSettings(stage);
+                const available = settings ? settings.staff * (settings.regular + settings.ot) : 0;
+                let booked = 0;
+                const affectedOrders = [];
+
+                (orders || productionOrders || []).forEach(order => {
+                    if (order.shipped) return;
+                    const range = getStagePlannedRange(order, stage);
+                    if (!planningDateWithinRange(target, range)) return;
+                    const required = getOrderDailyRequiredHours(order, stage);
+                    if (required === null) return;
+                    booked += required;
+                    affectedOrders.push({ moSo: order.moSo, requiredHours: required, range });
+                });
+
+                const utilization = available > 0 ? (booked / available) * 100 : null;
+                let status = 'SET CAPACITY';
+                if (utilization !== null) {
+                    if (utilization <= 80) status = 'SAFE';
+                    else if (utilization <= 90) status = 'WATCH';
+                    else if (utilization <= 100) status = 'CRITICAL';
+                    else status = 'OVERBOOKED';
+                }
+
+                return { stage, date: target, availableHours: available, bookedHours: booked, utilizationPct: utilization, remainingHours: available - booked, status, affectedOrders };
+            });
+        }
+
+        function getOrderCapacityFeasibility(order) {
+            const currentPlanStages = ['design', 'weaving', 'finishing'];
+            const conflicts = [];
+            currentPlanStages.forEach(stage => {
+                const range = getStagePlannedRange(order, stage);
+                if (!range.start || !range.end) return;
+                let cursor = planningDateMs(range.start);
+                const end = planningDateMs(range.end);
+                if (cursor === null || end === null) return;
+                while (cursor <= end) {
+                    const key = new Date(cursor).toISOString().split('T')[0];
+                    const snap = computeDailyCapacitySnapshot(key, productionOrders).find(x => x.stage === stage);
+                    if (snap && snap.utilizationPct !== null && snap.utilizationPct > 100) conflicts.push(snap);
+                    cursor += 86400000;
+                }
+            });
+            if (!conflicts.length) return { status: 'FEASIBLE', conflicts: [] };
+            const maxUtil = Math.max(...conflicts.map(c => c.utilizationPct || 0));
+            return { status: maxUtil > 110 ? 'NOT FEASIBLE' : 'CAPACITY RISK', conflicts };
+        }
+
+        // ------------------------------
+        // Order Detail UI — prefixed onto renderOrderDetailModalBody()'s output.
+        // ------------------------------
+        function renderPlanningControlOrderBlock(order, orderIndex) {
+            applyPlanningControlDefaults(order, order);
+            const original = getOriginalDueDate(order);
+            const revised = getRevisedDueDate(order);
+            const current = getCurrentDueDate(order);
+            const actual = getActualDeliveryDate(order);
+            const originalOtd = getOriginalOtd(order);
+            const revisedOtd = getRevisedOtd(order);
+            const extDays = getExtensionDays(order);
+            const delayDays = getDelayVsOriginalDays(order);
+            const feasibility = getOrderCapacityFeasibility(order);
+
+            const rows = PLANNING_CONTROL_STAGES.map(stage => {
+                const baseline = getStageBaselineDate(order, stage);
+                const cur = getStageCurrentPlanDate(order, stage);
+                const act = getStageActualDate(order, stage);
+                const variance = getStageVarianceDays(order, stage);
+                const result = getStageScheduleResult(order, stage);
+                return `<tr class="border-b border-slate-100">
+                    <td class="py-2 px-2 font-semibold text-slate-700">${escapeHtml(PLANNING_STAGE_LABELS[stage])}</td>
+                    <td class="py-2 px-2 text-xs">${escapeHtml(baseline || '-')}</td>
+                    <td class="py-2 px-2 text-xs">${escapeHtml(cur || '-')}</td>
+                    <td class="py-2 px-2 text-xs">${escapeHtml(act || '-')}</td>
+                    <td class="py-2 px-2 text-xs text-center">${variance === null ? '-' : (variance > 0 ? '+' + variance : variance)}</td>
+                    <td class="py-2 px-2">${planningStatusBadge(result)}</td>
+                    <td class="py-2 px-2 text-center"><button type="button" onclick="openPlanningDelayModal(${orderIndex}, '${stage}')" class="text-[10px] px-2 py-1 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100">Delay</button></td>
+                </tr>`;
+            }).join('');
+
+            const delays = (order.delayLog || []).slice().reverse().slice(0, 5).map(x => `<div class="text-[11px] border-b border-slate-100 py-1.5"><span class="font-semibold">${escapeHtml(PLANNING_STAGE_LABELS[x.stage] || x.stage)}</span> • ${escapeHtml(x.delayType || '-')} • ${escapeHtml(x.delayReason || '-')} ${x.ownerDept ? `• ${escapeHtml(x.ownerDept)}` : ''}</div>`).join('') || '<p class="text-[11px] text-slate-400">ยังไม่มี Delay Log</p>';
+
+            const capacityClass = feasibility.status === 'FEASIBLE' ? 'bg-emerald-100 text-emerald-700' : feasibility.status === 'CAPACITY RISK' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700';
+
+            return `<div class="space-y-3 mb-4">
+                <div class="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4">
+                    <div class="flex flex-wrap justify-between items-start gap-2 mb-3">
+                        <div><h3 class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-calendar-check mr-1.5"></i> Delivery Control / Planning Baseline</h3><p class="text-[10px] text-indigo-500 mt-0.5">Original Due Date ต้องไม่หาย แม้ลูกค้ายอมเลื่อนวันส่ง</p></div>
+                        <div class="flex flex-col items-end gap-1">
+                            <span class="px-2 py-1 rounded-full text-[10px] font-bold ${capacityClass}">${feasibility.status}</span>
+                            ${buildDueDateRescheduleWidgetHtml(order, orderIndex)}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                        <div class="bg-white rounded-xl border border-slate-100 p-2"><span class="text-[10px] text-slate-400 block">Original Due</span><b>${escapeHtml(original || '-')}</b></div>
+                        <div class="bg-white rounded-xl border border-slate-100 p-2"><span class="text-[10px] text-slate-400 block">Revised Due</span><b>${escapeHtml(revised || '-')}</b>${extDays ? `<span class="text-rose-600 text-[10px] ml-1">(+${extDays}d)</span>` : ''}</div>
+                        <div class="bg-white rounded-xl border border-slate-100 p-2"><span class="text-[10px] text-slate-400 block">Internal Target</span><b>${escapeHtml(order.planDates?.planning || '-')}</b></div>
+                        <div class="bg-white rounded-xl border border-slate-100 p-2"><span class="text-[10px] text-slate-400 block">Actual Delivery</span><b>${escapeHtml(actual || '-')}</b></div>
+                        <div class="bg-white rounded-xl border border-slate-100 p-2"><span class="text-[10px] text-slate-400 block">Original OTD</span>${planningStatusBadge(originalOtd)}${delayDays ? `<span class="text-rose-600 text-[10px] ml-1">Late ${delayDays}d</span>` : ''}</div>
+                        <div class="bg-white rounded-xl border border-slate-100 p-2"><span class="text-[10px] text-slate-400 block">Revised OTD</span>${planningStatusBadge(revisedOtd)}</div>
+                        <div class="bg-white rounded-xl border border-slate-100 p-2"><span class="text-[10px] text-slate-400 block">Current Due</span><b>${escapeHtml(current || '-')}</b></div>
+                        <div class="bg-white rounded-xl border border-slate-100 p-2"><span class="text-[10px] text-slate-400 block">Due Revisions</span><b>${(order.dueDateHistory || []).length}</b></div>
+                    </div>
+                </div>
+
+                <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                    <div class="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center"><h3 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-code-compare mr-1.5 text-indigo-600"></i> Plan vs Actual</h3>${hasBaselinePlan(order) ? '<span class="text-[10px] text-emerald-600 font-semibold">Baseline Frozen</span>' : '<span class="text-[10px] text-amber-600 font-semibold">ยังไม่มี Baseline</span>'}</div>
+                    <div class="overflow-x-auto"><table class="w-full text-left text-xs"><thead class="bg-white text-slate-400"><tr><th class="p-2">Process</th><th class="p-2">Baseline</th><th class="p-2">Current Plan</th><th class="p-2">Actual</th><th class="p-2 text-center">Variance</th><th class="p-2">Result</th><th class="p-2">Reason</th></tr></thead><tbody>${rows}</tbody></table></div>
+                </div>
+
+                <div class="bg-white border border-slate-200 rounded-2xl p-3"><div class="flex justify-between items-center mb-1"><h3 class="font-bold text-slate-700 text-xs">Delay Log ล่าสุด</h3><button type="button" onclick="openPlanningDelayModal(${orderIndex}, '${order.currentStage || 'planning'}')" class="text-[10px] text-indigo-600 hover:underline">+ เพิ่ม Delay</button></div>${delays}</div>
+            </div>`;
+        }
+
+        // ------------------------------
+        // Planning & Capacity dashboard (new tab) renderer
+        // ------------------------------
+        function fmtPlanningPct(v) { return v === null || v === undefined ? '-' : `${v.toFixed(1)}%`; }
+        function fmtPlanningNum(v, suffix) { return v === null || v === undefined ? '-' : `${v.toFixed(1)}${suffix || ''}`; }
+
+        function renderPlanningDashboard() {
+            const root = document.getElementById('planningViewContainer');
+            if (!root) return;
+
+            const dateInput = document.getElementById('planningCapacityDate');
+            const capacityDate = planningDateKey(dateInput?.value) || planningTodayKey();
+            const kpi = computePlanningKpis(productionOrders, {});
+            const cap = computeDailyCapacitySnapshot(capacityDate, productionOrders);
+
+            const atRiskRows = productionOrders
+                .filter(o => !o.shipped)
+                .map((order, orderIndex) => {
+                    let worst = null;
+                    PLANNING_CONTROL_STAGES.forEach(stage => {
+                        const status = getStageScheduleResult(order, stage);
+                        const rank = { OVERDUE: 3, 'AT RISK': 2, OPEN: 1 }[status] || 0;
+                        if (!worst || rank > worst.rank) worst = { stage, status, rank };
+                    });
+                    return { order, orderIndex, worst };
+                })
+                .filter(x => x.worst && x.worst.rank >= 2)
+                .sort((a, b) => b.worst.rank - a.worst.rank)
+                .map(x => `<tr class="border-b border-slate-100"><td class="p-2 font-mono font-semibold">${escapeHtml(x.order.moSo || '-')}</td><td class="p-2">${escapeHtml(x.order.customerName || '-')}</td><td class="p-2">${escapeHtml(getOriginalDueDate(x.order) || '-')}</td><td class="p-2">${escapeHtml(getRevisedDueDate(x.order) || '-')}</td><td class="p-2">${escapeHtml(PLANNING_STAGE_LABELS[x.worst.stage])}</td><td class="p-2">${planningStatusBadge(x.worst.status)}</td><td class="p-2"><button onclick="openOrderDetailModal(${x.orderIndex}, '${x.order.currentStage || ''}')" class="text-indigo-600 text-xs hover:underline">ดู M/O</button></td></tr>`).join('');
+
+            const capacityRows = cap.map(c => {
+                const badgeClass = c.status === 'SAFE' ? 'bg-emerald-100 text-emerald-700' : c.status === 'WATCH' ? 'bg-amber-100 text-amber-700' : c.status === 'CRITICAL' ? 'bg-orange-100 text-orange-700' : c.status === 'OVERBOOKED' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500';
+                return `<tr class="border-b border-slate-100"><td class="p-2 font-semibold">${escapeHtml(PLANNING_STAGE_LABELS[c.stage])}</td><td class="p-2 text-right">${c.availableHours.toFixed(1)} h/day</td><td class="p-2 text-right">${c.bookedHours.toFixed(1)} h/day</td><td class="p-2 text-right">${c.utilizationPct === null ? '-' : c.utilizationPct.toFixed(1) + '%'}</td><td class="p-2 text-right">${c.remainingHours.toFixed(1)} h</td><td class="p-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeClass}">${c.status}</span></td><td class="p-2 text-[10px] text-slate-500">${c.affectedOrders.map(x => escapeHtml(x.moSo)).join(', ') || '-'}</td></tr>`;
+            }).join('');
+
+            root.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3"><div><h2 class="font-bold text-slate-800 text-lg"><i class="fa-solid fa-calendar-days mr-2 text-indigo-600"></i>Planning & Capacity</h2><p class="text-xs text-slate-400">วัดจาก Baseline เดิม ไม่ใช่วันที่ถูกเลื่อนภายหลัง</p></div><div class="flex items-center gap-2"><label class="text-xs text-slate-500">Capacity Date</label><input id="planningCapacityDate" type="date" value="${capacityDate}" onchange="renderPlanningDashboard()" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs"></div></div>
+
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        ${planningKpiCard('Original OTD', fmtPlanningPct(kpi.originalOtdPct), 'เทียบวันส่งที่ Commit ครั้งแรก')}
+                        ${planningKpiCard('Revised OTD', fmtPlanningPct(kpi.revisedOtdPct), 'เทียบวันส่งล่าสุดที่ตกลงใหม่')}
+                        ${planningKpiCard('Schedule Adherence', fmtPlanningPct(kpi.scheduleAdherencePct), 'Actual Finish เทียบ Baseline Plan')}
+                        ${planningKpiCard('Internal Reschedule', fmtPlanningPct(kpi.internalReschedulePct), 'M/O ที่เลื่อน+มี Delay Log ระบุสาเหตุภายใน')}
+                        ${planningKpiCard('Avg Delay vs Original', fmtPlanningNum(kpi.avgDelayVsOriginal, ' วัน'), 'ช้าจากวันเดิมโดยเฉลี่ย')}
+                        ${planningKpiCard('Avg Extension', fmtPlanningNum(kpi.avgExtensionDays, ' วัน'), 'จำนวนวันที่ขอเลื่อนเฉลี่ย')}
+                        ${planningKpiCard('At Risk / Overdue', String(kpi.atRiskOrders), 'M/O ที่ต้องติดตาม')}
+                        ${planningKpiCard('Delivered', String(kpi.deliveredOrders), 'จำนวนงานที่ส่งแล้วในข้อมูลชุดนี้')}
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"><div class="p-4 border-b border-slate-100"><h3 class="font-bold text-slate-700 text-sm">Daily Capacity Check — ${capacityDate}</h3><p class="text-[11px] text-slate-400">ใช้ Required Hours จาก Production Calculation / Planned Duration เทียบ Available Man-Hours ต่อวัน — ยังไม่เดา Capacity ของแผนกย้อม</p></div><div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500"><tr><th class="p-2 text-left">Department</th><th class="p-2 text-right">Available</th><th class="p-2 text-right">Booked</th><th class="p-2 text-right">Utilization</th><th class="p-2 text-right">Remaining</th><th class="p-2 text-left">Risk</th><th class="p-2 text-left">M/O</th></tr></thead><tbody>${capacityRows}</tbody></table></div></div>
+
+                    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"><div class="p-4 border-b border-slate-100"><h3 class="font-bold text-slate-700 text-sm">งานเสี่ยง / เลย Baseline Plan</h3></div><div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500"><tr><th class="p-2 text-left">M/O</th><th class="p-2 text-left">Customer</th><th class="p-2 text-left">Original Due</th><th class="p-2 text-left">Revised Due</th><th class="p-2 text-left">Process</th><th class="p-2 text-left">Risk</th><th class="p-2"></th></tr></thead><tbody>${atRiskRows || '<tr><td colspan="7" class="p-6 text-center text-slate-400">ยังไม่มีงาน At Risk / Overdue</td></tr>'}</tbody></table></div></div>
+                </div>`;
+        }
+
+        function planningKpiCard(title, value, note) {
+            return `<div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4"><p class="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">${escapeHtml(title)}</p><p class="text-2xl font-bold text-slate-800 mt-1">${escapeHtml(value)}</p><p class="text-[10px] text-slate-400 mt-1">${escapeHtml(note)}</p></div>`;
+        }
+        /* ======================== END SC-FOS PLANNING CONTROL MODULE V1 ======================== */
 
         // Optional: still lets staff log an actual packaging QC check for this M/O if they want an
         // audit record of it — purely informational now, not required to progress the order.
@@ -13157,8 +13919,18 @@
                 planningDeadlineAuto: true,
                 // NEW (2026-09-12): "SPECIFICATIONS" checklist — see SPEC_FIELD_GROUPS/renderNewOrderSpecPanel()
                 // above and buildProductionWorkOrderPrintHTML() for how this prints.
-                specs: newOrderSpecState ? JSON.parse(JSON.stringify(newOrderSpecState)) : defaultSpecsState()
+                specs: newOrderSpecState ? JSON.parse(JSON.stringify(newOrderSpecState)) : defaultSpecsState(),
+                // NEW (2026-09-29): SC-FOS Planning V1 defaults for a brand-new M/O, S/O — see
+                // applyPlanningControlDefaults(). The just-entered dueDate becomes the immutable
+                // Original Due Date; everything else starts empty until Planning/production fill it in.
+                originalDueDate: dueDate,
+                baselinePlanDates: planningEmptyStageDates(),
+                actualFinishDates: planningEmptyStageDates(),
+                planRevisionHistory: [],
+                delayLog: [],
+                planningCapacityOverride: {}
             };
+            applyPlanningControlDefaults(order, order);
             productionOrders.push(order);
             const newOrderIndex = productionOrders.length - 1;
             saveOrdersToLocal();
@@ -14207,7 +14979,11 @@
             // "Supabase — Login + สิทธิ์" block above) has one place to lock down when the signed-in
             // user isn't วางแผน/Admin — everything here (size items, design image, PO/customer/due date
             // etc.) is master M/O info, not any one department's working data.
+            // NEW (2026-09-29): SC-FOS Planning V1 — Delivery Control / Plan-vs-Actual / Delay Log,
+            // prefixed above the rest of the M/O detail — see renderPlanningControlOrderBlock().
+            const planningControlHtml = renderPlanningControlOrderBlock(order, orderIndex);
             document.getElementById('orderDetailBody').innerHTML =
+                planningControlHtml +
                 `<div id="orderDetailMasterFieldsBlock" class="space-y-3">${orderSizeItemsHtml}${orderDesignImageHtml}${orderExtraInfoHtml}${orderSpecificationsHtml}</div>` +
                 stageTabsHtml + stageSectionsHtml;
             applyDeptPermissionGating();
