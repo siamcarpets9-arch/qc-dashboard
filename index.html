@@ -876,67 +876,85 @@
                 </div>
 
                 <div id="salesSubTab-add">
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 max-w-lg mx-auto overflow-hidden p-6 space-y-4">
-                <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i class="fa-solid fa-plus-circle text-indigo-600"></i> เพิ่ม M/O, S/O ใหม่เข้าสายการผลิต</h3>
-                <p class="text-[11px] text-slate-400 -mt-3"><i class="fa-solid fa-circle-info mr-1"></i>สำหรับแผนกขายเป็นผู้กรอกข้อมูล — ทุกแผนกยังแก้ไข/ลบรายการนี้ได้ตามปกติ</p>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ประเภทรายการ</label>
-                    <div class="flex gap-2">
-                        <label id="newOrderTypeMoLabel" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition bg-indigo-600 border-indigo-600 text-white">
-                            <input type="radio" name="newOrderType" id="newOrderTypeMo" value="MO" checked class="hidden" onchange="updateNewOrderTypeStyle()"> M/O
-                        </label>
-                        <label id="newOrderTypeSoLabel" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition bg-amber-50 border-amber-300 text-amber-700">
-                            <input type="radio" name="newOrderType" id="newOrderTypeSo" value="SO" class="hidden" onchange="updateNewOrderTypeStyle()"> S/O
-                        </label>
+                <!-- REDESIGNED (2026-09-30): ผู้ใช้ขอปรับหน้าตาฟอร์มนี้ให้เหมือนรูปตัวอย่างจากเว็บ "ต้นทุนโครงการ
+                     แผนกดีไซน์" (การ์ดกว้างขึ้น หัวการ์ดสีเข้ม, จัดฟิลด์เป็นกริด 2 คอลัมน์แทนคอลัมน์เดียวยาวๆ)
+                     — เป็นการจัดหน้าใหม่ล้วนๆ ทุกช่อง/ทุกฟังก์ชันเดิมยังอยู่ครบ (ไม่มีการตัดข้อมูลออก) ตามที่
+                     ผู้ใช้ยืนยันว่าต้องการปรับฟอร์มเดิมให้หน้าตาเหมือนรูป ไม่ใช่สร้างฟอร์มใหม่แยกต่างหาก. ช่อง
+                     สเปกผลิต/SPECIFICATIONS/แนบรูปดีไซน์/วันส่งแบบ-รับแบบ ย้ายไปอยู่ใน accordion "ข้อมูลใบ
+                     M/O A3 สำหรับ Planning" ด้านล่าง (ชื่อ/ตำแหน่งเดียวกับในรูปตัวอย่างพอดี) แทนที่จะแสดงเปิด
+                     ค้างตลอดเวลาเหมือนเดิม — ลดความรกของฟอร์มลงให้ใกล้เคียงรูปมากขึ้น. -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 max-w-4xl mx-auto overflow-hidden">
+                <div class="bg-gradient-to-r from-teal-700 to-teal-600 px-6 py-4">
+                    <h3 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-plus-circle"></i> เปิด M/O, S/O ใหม่</h3>
+                    <p class="text-[11px] text-teal-100/90 mt-0.5"><i class="fa-solid fa-circle-info mr-1"></i>M/O เดียวกันใส่ได้หลายรายการ — ให้เลขซ้ำกับ M/O เดิมเพื่อพ่วงรายการเข้าเดิม • สำหรับแผนกขายเป็นผู้กรอกข้อมูล ทุกแผนกยังแก้ไข/ลบรายการนี้ได้ตามปกติ</p>
+                </div>
+                <div class="p-6 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ประเภทรายการ</label>
+                        <div class="flex gap-2">
+                            <label id="newOrderTypeMoLabel" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition bg-indigo-600 border-indigo-600 text-white">
+                                <input type="radio" name="newOrderType" id="newOrderTypeMo" value="MO" checked class="hidden" onchange="updateNewOrderTypeStyle()"> M/O
+                            </label>
+                            <label id="newOrderTypeSoLabel" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition bg-amber-50 border-amber-300 text-amber-700">
+                                <input type="radio" name="newOrderType" id="newOrderTypeSo" value="SO" class="hidden" onchange="updateNewOrderTypeStyle()"> S/O
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ตลาด</label>
+                        <div class="flex gap-2">
+                            <label id="newOrderMarketExportLabel" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition bg-slate-50 border-slate-200 text-slate-600">
+                                <input type="radio" name="newOrderMarket" id="newOrderMarketExport" value="export" class="hidden" onchange="updateNewOrderMarketStyle()"> ต่างประเทศ
+                            </label>
+                            <label id="newOrderMarketDomesticLabel" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition bg-slate-50 border-slate-200 text-slate-600">
+                                <input type="radio" name="newOrderMarket" id="newOrderMarketDomestic" value="domestic" class="hidden" onchange="updateNewOrderMarketStyle()"> ในประเทศ
+                            </label>
+                        </div>
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ตลาด</label>
-                    <div class="flex gap-2">
-                        <label id="newOrderMarketExportLabel" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition bg-slate-50 border-slate-200 text-slate-600">
-                            <input type="radio" name="newOrderMarket" id="newOrderMarketExport" value="export" class="hidden" onchange="updateNewOrderMarketStyle()"> ต่างประเทศ
-                        </label>
-                        <label id="newOrderMarketDomesticLabel" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition bg-slate-50 border-slate-200 text-slate-600">
-                            <input type="radio" name="newOrderMarket" id="newOrderMarketDomestic" value="domestic" class="hidden" onchange="updateNewOrderMarketStyle()"> ในประเทศ
-                        </label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">เลขที่ M/O และ S/O</label>
+                        <!-- NEW (2026-09-11): auto-run number — RUNS automatically from the ประเภทรายการ
+                             (M/O/S/O) + ตลาด (ต่างประเทศ/ในประเทศ) toggles above (see refreshAutoMoSo(),
+                             triggered from updateNewOrderTypeStyle()/updateNewOrderMarketStyle()), but stays
+                             a plain editable text field — typing in it (markNewOrderMoSoManual()) stops it
+                             from being overwritten if the type/market toggles change afterward. The refresh
+                             button lets someone re-run the auto number on demand (e.g. after editing it away
+                             and changing their mind). -->
+                        <div class="flex items-center gap-1.5">
+                            <input type="text" id="newOrderMoSo" oninput="markNewOrderMoSoManual()" placeholder="เลือกประเภทรายการ + ตลาด ด้านบนเพื่อรันเลขอัตโนมัติ (แก้ไขเองได้)" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button type="button" onclick="refreshAutoMoSo(true)" title="รันเลขใหม่อัตโนมัติ" class="shrink-0 w-10 h-10 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition inline-flex items-center justify-center">
+                                <i class="fa-solid fa-arrows-rotate text-sm"></i>
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1">รูปแบบ: [นำหน้า][เลข 4 หลัก]/[ปี 2 หลัก] — M/O ในประเทศ = นำหน้าด้วย <span class="font-semibold">TH</span> • S/O ในประเทศ = นำหน้าด้วย <span class="font-semibold">D</span> • S/O ต่างประเทศ = นำหน้าด้วย <span class="font-semibold">SC</span> • M/O ต่างประเทศ = ไม่มีตัวนำหน้า (เช่น 0178/26) • เลขรันใหม่ทุกปี</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ชื่อเซล (Sale)</label>
+                        <input type="text" id="newOrderSalesName" placeholder="ชื่อพนักงานขายที่ดูแล M/O, S/O นี้" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ชื่อเซล (Sale)</label>
-                    <input type="text" id="newOrderSalesName" placeholder="ชื่อพนักงานขายที่ดูแล M/O, S/O นี้" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">เลขที่ M/O และ S/O</label>
-                    <!-- NEW (2026-09-11): auto-run number — RUNS automatically from the ประเภทรายการ
-                         (M/O/S/O) + ตลาด (ต่างประเทศ/ในประเทศ) toggles above (see refreshAutoMoSo(),
-                         triggered from updateNewOrderTypeStyle()/updateNewOrderMarketStyle()), but stays
-                         a plain editable text field — typing in it (markNewOrderMoSoManual()) stops it
-                         from being overwritten if the type/market toggles change afterward. The refresh
-                         button lets someone re-run the auto number on demand (e.g. after editing it away
-                         and changing their mind). -->
-                    <div class="flex items-center gap-1.5">
-                        <input type="text" id="newOrderMoSo" oninput="markNewOrderMoSoManual()" placeholder="เลือกประเภทรายการ + ตลาด ด้านบนเพื่อรันเลขอัตโนมัติ (แก้ไขเองได้)" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <button type="button" onclick="refreshAutoMoSo(true)" title="รันเลขใหม่อัตโนมัติ" class="shrink-0 w-10 h-10 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition inline-flex items-center justify-center">
-                            <i class="fa-solid fa-arrows-rotate text-sm"></i>
-                        </button>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ชื่อลูกค้า</label>
+                        <input type="text" id="newOrderCustomerName" placeholder="เช่น บริษัท เอบีซี จำกัด" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </div>
-                    <p class="text-[10px] text-slate-400 mt-1">รูปแบบ: [นำหน้า][เลข 4 หลัก]/[ปี 2 หลัก] — M/O ในประเทศ = นำหน้าด้วย <span class="font-semibold">TH</span> • S/O ในประเทศ = นำหน้าด้วย <span class="font-semibold">D</span> • S/O ต่างประเทศ = นำหน้าด้วย <span class="font-semibold">SC</span> • M/O ต่างประเทศ = ไม่มีตัวนำหน้า (เช่น 0178/26) • เลขรันใหม่ทุกปี</p>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">PROJECT / PO ลูกค้า</label>
+                        <input type="text" id="newOrderCustomerPO" placeholder="เลขที่ PO และชื่อโปรเจกต์ของลูกค้า" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ชื่อลูกค้า</label>
-                    <input type="text" id="newOrderCustomerName" placeholder="เช่น บริษัท เอบีซี จำกัด" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">PO ลูกค้า / ชื่อโปรเจกต์</label>
-                    <input type="text" id="newOrderCustomerPO" placeholder="เลขที่ PO และชื่อโปรเจกต์ของลูกค้า" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">วันที่เปิด M/O</label>
-                    <input type="date" id="newOrderOpenDate" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">เลขที่/ชื่อสถานที่ติดตั้ง</label>
-                    <input type="text" id="newOrderLocationName" placeholder="เช่น GROUND FLOOR - MAJLIS" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">วันที่เปิด M/O</label>
+                        <input type="date" id="newOrderOpenDate" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">เลขที่/ชื่อสถานที่ติดตั้ง</label>
+                        <input type="text" id="newOrderLocationName" placeholder="เช่น GROUND FLOOR - MAJLIS" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -957,82 +975,6 @@
                         <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">รหัสดีไซน์ (Design Ref.)</label>
                         <input type="text" id="newOrderDesignRef" placeholder="เช่น RLS-26-002-02" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </div>
-                </div>
-                <!-- NEW: วันที่ส่งแบบที่ลูกค้าให้ ไปยังแผนกดีไซน์ + วันที่ได้รับแบบ (ขยายลายแล้ว) กลับมาจาก
-                     แผนกดีไซน์ — เก็บเป็น order.designSentDate/designReceivedDate (ดู submitNewOrder()/
-                     normalizeOrder()) และแสดง/แก้ไขซ้ำได้ทั้งที่นี่และในส่วนแผนกดีไซน์ของหน้ารายละเอียด M/O
-                     (renderDesignSectionHtml()) เป็นช่องเดียวกัน อัปเดตพร้อมกันเสมอ — ตอบโจทย์ "ต้องลิงค์กับ
-                     แผนกดีไซน์ด้วย". -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">วันที่ส่งแบบให้แผนกดีไซน์</label>
-                        <input type="date" id="newOrderDesignSentDate" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">วันที่ได้รับแบบจากแผนกดีไซน์</label>
-                        <input type="date" id="newOrderDesignReceivedDate" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                </div>
-                <!-- NEW: แนบรูปดีไซน์/แบบที่ลูกค้าให้ ได้ทันทีตอนเปิด M/O, S/O ใหม่ — เก็บไฟล์ไว้ใน
-                     newOrderPendingDesignImageFile ก่อน แล้วอัปโหลดจริงหลัง submitNewOrder() สร้างออเดอร์
-                     สำเร็จแล้ว (ดู handleNewOrderDesignImageChange()/isAcceptableImageFile() — รับไฟล์รูป
-                     แทบทุกชนิด/นามสกุล ไม่ใช่แค่ที่ browser รายงาน MIME type มาให้ตรงเป๊ะ). -->
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">แนบรูปดีไซน์ (ถ้ามี)</label>
-                    <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-2.5">
-                        <div id="newOrderDesignImagePreviewWrap" class="w-14 h-14 rounded-lg bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-slate-300 shrink-0 overflow-hidden">
-                            <i class="fa-solid fa-image"></i>
-                        </div>
-                        <div class="flex-grow min-w-0">
-                            <p id="newOrderDesignImageFileName" class="text-[11px] text-slate-500 mb-1 truncate">ยังไม่ได้แนบรูป — จะอัปโหลดให้อัตโนมัติหลังกด "เพิ่มรายการ"</p>
-                            <label class="cursor-pointer bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-medium px-2.5 py-1 rounded-lg transition inline-flex items-center gap-1">
-                                <i class="fa-solid fa-upload"></i> เลือกไฟล์รูป
-                                <input type="file" accept="image/*,.heic,.heif" id="newOrderDesignImageInput" class="hidden" onchange="handleNewOrderDesignImageChange(event)">
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div class="border border-indigo-100 bg-indigo-50/40 rounded-xl p-3 space-y-3">
-                    <div>
-                        <p class="text-xs font-bold text-indigo-800"><i class="fa-solid fa-clipboard-list mr-1"></i> ข้อกำหนดสำหรับฝ่ายผลิต</p>
-                        <p class="text-[10px] text-slate-500 mt-0.5">ข้อมูลนี้จะแสดงในใบสั่งผลิต เพื่อให้ทอ ย้อม ตกแต่ง และ QC ใช้ข้อกำหนดชุดเดียวกัน</p>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">ชนิดไหม (Yarn type)</label><input type="text" id="newOrderYarnType" placeholder="เช่น NZ Wool 100% / Rayon" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">สเปกทอ (Tufting spec)</label><input type="text" id="newOrderTuftingSpec" placeholder="เช่น Cut pile 9 mm. / Gauge" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">ผิวงาน (Surface)</label><input type="text" id="newOrderSurface" placeholder="เช่น Cut / Loop / Carving" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">ผิวสัมผัส (Texture)</label><input type="text" id="newOrderTexture" placeholder="เช่น Soft / Flat / High-low" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
-                    </div>
-                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">ตำแหน่งและรายละเอียดสี (Color & Color placement)</label><textarea id="newOrderColorPlacement" rows="2" placeholder="ระบุสีหลัก สีขอบ ตำแหน่งพิเศษ หรือแนบอ้างอิงตามดีไซน์" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></textarea></div>
-                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">แผนไหม/สีสำหรับผลิต</label><textarea id="newOrderYarnPlan" rows="3" placeholder="หนึ่งบรรทัดต่อหนึ่งสี: รหัสสี | จ้างย้อม กก. | ย้อมเอง กก. | Surplus กก. | ย้อมเพิ่ม กก." class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></textarea></div>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">งานทากาว (Latexing)</label><input type="text" id="newOrderLatexing" placeholder="ระบุวิธี/ความหนา" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Tuft bind</label><input type="text" id="newOrderTuftBind" placeholder="ระบุข้อกำหนด" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Sprouting / Label</label><input type="text" id="newOrderSproutingLabel" placeholder="การเก็บปลายไหม / ป้าย" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
-                    </div>
-                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">คำสั่งพิเศษถึงฝ่ายผลิต / QC</label><textarea id="newOrderProductionInstruction" rows="2" placeholder="ข้อควรระวัง มาตรฐานรับงาน หรือรายละเอียดพิเศษ" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></textarea></div>
-                </div>
-                <div class="border border-emerald-100 bg-emerald-50/40 rounded-xl p-3 space-y-2">
-                    <div>
-                        <p class="text-xs font-bold text-emerald-800"><i class="fa-solid fa-list-check mr-1"></i> SPECIFICATIONS</p>
-                        <p class="text-[10px] text-slate-500 mt-0.5">ติ๊กรายการที่ต้องใช้ในการผลิต — จะแสดงในใบสั่งเปิดงานผลิต</p>
-                    </div>
-                    <!-- NEW (2026-09-12): แม่แบบ (Template) ลูกค้า/สินค้า — เลือกแล้วติ๊ก SPECIFICATIONS ให้
-                         อัตโนมัติตามแม่แบบนั้น ลดเวลาคีย์ซ้ำสำหรับลูกค้า/สินค้าที่คุ้นเคยกัน — see
-                         renderSpecTemplateOptions()/applySpecTemplate()/saveCurrentAsSpecTemplate() below. -->
-                    <div class="flex items-center gap-1.5 bg-white border border-emerald-200 rounded-lg p-1.5">
-                        <i class="fa-solid fa-bookmark text-emerald-500 text-xs ml-1"></i>
-                        <select id="newOrderSpecTemplateSelect" onchange="applySpecTemplate(this.value)" class="flex-grow px-2 py-1.5 bg-transparent text-xs focus:outline-none">
-                            <option value="">-- เลือกแม่แบบ (ลูกค้า/สินค้า) --</option>
-                        </select>
-                        <button type="button" onclick="saveCurrentAsSpecTemplate()" title="บันทึกรายการที่ติ๊กไว้เป็นแม่แบบใหม่" class="shrink-0 px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-medium rounded-lg transition flex items-center gap-1">
-                            <i class="fa-solid fa-floppy-disk"></i> บันทึกแม่แบบ
-                        </button>
-                        <button type="button" onclick="deleteSelectedSpecTemplate()" title="ลบแม่แบบที่เลือก" class="shrink-0 px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] rounded-lg transition">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </div>
-                    <div id="newOrderSpecPanel" class="space-y-2"></div>
                 </div>
                 <div>
                     <div class="flex items-center justify-between mb-1">
@@ -1073,19 +1015,115 @@
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">หมายเหตุ (Remarks)</label>
                     <textarea id="newOrderRemark" rows="2" placeholder="หมายเหตุเพิ่มเติมสำหรับ M/O นี้" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                 </div>
+                <!-- MOVED (2026-09-30): สเปกผลิต/SPECIFICATIONS/แนบรูปดีไซน์/วันส่งแบบ-รับแบบ (เดิมแสดงเปิดค้าง
+                     ไว้กลางฟอร์ม) ย้ายมารวมใน accordion นี้แทน — ชื่อ/ตำแหน่ง (ก่อนปุ่มบันทึก) ตรงกับ
+                     "▸ ข้อมูลใบ M/O A3 สำหรับ Planning — Specs · โค้ดสี · ตรวจสี" ในรูปตัวอย่างที่ผู้ใช้แนบมา
+                     พอดี ทุกช่อง/ทุกฟังก์ชันเดิมยังอยู่ครบ (ไม่มีการตัดข้อมูลออก) — แค่ยุบไว้ไม่ให้รกฟอร์มหลัก. -->
+                <details class="group border border-indigo-100 bg-indigo-50/30 rounded-xl overflow-hidden">
+                    <summary style="list-style: none" class="[&::-webkit-details-marker]:hidden cursor-pointer select-none px-3 py-2.5 text-xs font-bold text-indigo-800 flex items-center gap-1.5 hover:bg-indigo-50/60 transition">
+                        <i class="fa-solid fa-chevron-right text-[10px] transition-transform group-open:rotate-90"></i>
+                        ข้อมูลใบ M/O A3 สำหรับ Planning — Specs · โค้ดสี · ตรวจสี
+                    </summary>
+                    <div class="px-3 pb-3 space-y-3">
+                        <!-- NEW: วันที่ส่งแบบที่ลูกค้าให้ ไปยังแผนกดีไซน์ + วันที่ได้รับแบบ (ขยายลายแล้ว) กลับมาจาก
+                             แผนกดีไซน์ — เก็บเป็น order.designSentDate/designReceivedDate (ดู submitNewOrder()/
+                             normalizeOrder()) และแสดง/แก้ไขซ้ำได้ทั้งที่นี่และในส่วนแผนกดีไซน์ของหน้ารายละเอียด M/O
+                             (renderDesignSectionHtml()) เป็นช่องเดียวกัน อัปเดตพร้อมกันเสมอ — ตอบโจทย์ "ต้องลิงค์กับ
+                             แผนกดีไซน์ด้วย". -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">วันที่ส่งแบบให้แผนกดีไซน์</label>
+                                <input type="date" id="newOrderDesignSentDate" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">วันที่ได้รับแบบจากแผนกดีไซน์</label>
+                                <input type="date" id="newOrderDesignReceivedDate" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                        <!-- NEW: แนบรูปดีไซน์/แบบที่ลูกค้าให้ ได้ทันทีตอนเปิด M/O, S/O ใหม่ — เก็บไฟล์ไว้ใน
+                             newOrderPendingDesignImageFile ก่อน แล้วอัปโหลดจริงหลัง submitNewOrder() สร้างออเดอร์
+                             สำเร็จแล้ว (ดู handleNewOrderDesignImageChange()/isAcceptableImageFile() — รับไฟล์รูป
+                             แทบทุกชนิด/นามสกุล ไม่ใช่แค่ที่ browser รายงาน MIME type มาให้ตรงเป๊ะ). -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">แนบรูปดีไซน์ (ถ้ามี)</label>
+                            <div class="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-2.5">
+                                <div id="newOrderDesignImagePreviewWrap" class="w-14 h-14 rounded-lg bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-slate-300 shrink-0 overflow-hidden">
+                                    <i class="fa-solid fa-image"></i>
+                                </div>
+                                <div class="flex-grow min-w-0">
+                                    <p id="newOrderDesignImageFileName" class="text-[11px] text-slate-500 mb-1 truncate">ยังไม่ได้แนบรูป — จะอัปโหลดให้อัตโนมัติหลังกด "เพิ่มรายการ"</p>
+                                    <label class="cursor-pointer bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-medium px-2.5 py-1 rounded-lg transition inline-flex items-center gap-1">
+                                        <i class="fa-solid fa-upload"></i> เลือกไฟล์รูป
+                                        <input type="file" accept="image/*,.heic,.heif" id="newOrderDesignImageInput" class="hidden" onchange="handleNewOrderDesignImageChange(event)">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border border-indigo-100 bg-white rounded-xl p-3 space-y-3">
+                            <div>
+                                <p class="text-xs font-bold text-indigo-800"><i class="fa-solid fa-clipboard-list mr-1"></i> ข้อกำหนดสำหรับฝ่ายผลิต</p>
+                                <p class="text-[10px] text-slate-500 mt-0.5">ข้อมูลนี้จะแสดงในใบสั่งผลิต เพื่อให้ทอ ย้อม ตกแต่ง และ QC ใช้ข้อกำหนดชุดเดียวกัน</p>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div><label class="block text-xs font-semibold text-slate-600 mb-1">ชนิดไหม (Yarn type)</label><input type="text" id="newOrderYarnType" placeholder="เช่น NZ Wool 100% / Rayon" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
+                                <div><label class="block text-xs font-semibold text-slate-600 mb-1">สเปกทอ (Tufting spec)</label><input type="text" id="newOrderTuftingSpec" placeholder="เช่น Cut pile 9 mm. / Gauge" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
+                                <div><label class="block text-xs font-semibold text-slate-600 mb-1">ผิวงาน (Surface)</label><input type="text" id="newOrderSurface" placeholder="เช่น Cut / Loop / Carving" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
+                                <div><label class="block text-xs font-semibold text-slate-600 mb-1">ผิวสัมผัส (Texture)</label><input type="text" id="newOrderTexture" placeholder="เช่น Soft / Flat / High-low" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
+                            </div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">ตำแหน่งและรายละเอียดสี (Color & Color placement)</label><textarea id="newOrderColorPlacement" rows="2" placeholder="ระบุสีหลัก สีขอบ ตำแหน่งพิเศษ หรือแนบอ้างอิงตามดีไซน์" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></textarea></div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">แผนไหม/สีสำหรับผลิต</label><textarea id="newOrderYarnPlan" rows="3" placeholder="หนึ่งบรรทัดต่อหนึ่งสี: รหัสสี | จ้างย้อม กก. | ย้อมเอง กก. | Surplus กก. | ย้อมเพิ่ม กก." class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></textarea></div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div><label class="block text-xs font-semibold text-slate-600 mb-1">งานทากาว (Latexing)</label><input type="text" id="newOrderLatexing" placeholder="ระบุวิธี/ความหนา" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
+                                <div><label class="block text-xs font-semibold text-slate-600 mb-1">Tuft bind</label><input type="text" id="newOrderTuftBind" placeholder="ระบุข้อกำหนด" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
+                                <div><label class="block text-xs font-semibold text-slate-600 mb-1">Sprouting / Label</label><input type="text" id="newOrderSproutingLabel" placeholder="การเก็บปลายไหม / ป้าย" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
+                            </div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">คำสั่งพิเศษถึงฝ่ายผลิต / QC</label><textarea id="newOrderProductionInstruction" rows="2" placeholder="ข้อควรระวัง มาตรฐานรับงาน หรือรายละเอียดพิเศษ" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></textarea></div>
+                        </div>
+                        <div class="border border-emerald-100 bg-white rounded-xl p-3 space-y-2">
+                            <div>
+                                <p class="text-xs font-bold text-emerald-800"><i class="fa-solid fa-list-check mr-1"></i> SPECIFICATIONS</p>
+                                <p class="text-[10px] text-slate-500 mt-0.5">ติ๊กรายการที่ต้องใช้ในการผลิต — จะแสดงในใบสั่งเปิดงานผลิต</p>
+                            </div>
+                            <!-- NEW (2026-09-12): แม่แบบ (Template) ลูกค้า/สินค้า — เลือกแล้วติ๊ก SPECIFICATIONS ให้
+                                 อัตโนมัติตามแม่แบบนั้น ลดเวลาคีย์ซ้ำสำหรับลูกค้า/สินค้าที่คุ้นเคยกัน — see
+                                 renderSpecTemplateOptions()/applySpecTemplate()/saveCurrentAsSpecTemplate() below. -->
+                            <div class="flex items-center gap-1.5 bg-white border border-emerald-200 rounded-lg p-1.5">
+                                <i class="fa-solid fa-bookmark text-emerald-500 text-xs ml-1"></i>
+                                <select id="newOrderSpecTemplateSelect" onchange="applySpecTemplate(this.value)" class="flex-grow px-2 py-1.5 bg-transparent text-xs focus:outline-none">
+                                    <option value="">-- เลือกแม่แบบ (ลูกค้า/สินค้า) --</option>
+                                </select>
+                                <button type="button" onclick="saveCurrentAsSpecTemplate()" title="บันทึกรายการที่ติ๊กไว้เป็นแม่แบบใหม่" class="shrink-0 px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-medium rounded-lg transition flex items-center gap-1">
+                                    <i class="fa-solid fa-floppy-disk"></i> บันทึกแม่แบบ
+                                </button>
+                                <button type="button" onclick="deleteSelectedSpecTemplate()" title="ลบแม่แบบที่เลือก" class="shrink-0 px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] rounded-lg transition">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                            <div id="newOrderSpecPanel" class="space-y-2"></div>
+                        </div>
+                    </div>
+                </details>
                 <div class="flex gap-2 pt-2">
                     <button type="button" onclick="closeNewOrderModal()" class="w-1/2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium text-xs rounded-xl transition">ยกเลิก</button>
-                    <button type="button" onclick="submitNewOrder()" class="w-1/2 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-xl transition shadow">เพิ่มรายการ</button>
+                    <button type="button" onclick="submitNewOrder()" class="w-1/2 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-xl transition shadow">บันทึกและเปิด Job ส่ง Planning</button>
+                </div>
                 </div>
                 </div>
                 </div>
 
-                <!-- NEW (2026-09-11): "รายการทั้งหมด (M/O, S/O)" — spreadsheet-style summary report,
-                     styled like an Excel/Google Sheets grid (gridlines, frozen header row, frozen
-                     row-number column on the left — see renderSalesReportTables()). M/O and S/O get their
-                     own separate table each, per the user's preference, using the same core fields already
-                     captured on the "เพิ่ม M/O, S/O ใหม่" form above. -->
-                <div id="salesSubTab-report" class="hidden bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-6">
+                <!-- REDESIGNED (2026-09-30): "รายการทั้งหมด (M/O, S/O)" — ผู้ใช้ขอให้ปรับหน้านี้ให้เหมือน
+                     รูปตัวอย่างจากเว็บ "ต้นทุนโครงการแผนกดีไซน์" — เปลี่ยนจาก 4 ตารางแยกตามตลาด (M/O
+                     ต่างประเทศ/ในประเทศ, S/O ต่างประเทศ/ในประเทศ) + 2 ตาราง fallback "ยังไม่ระบุตลาด" (เดิม)
+                     มาเป็น "1 ตารางต่อประเภทรายการ" (แท็บ M/O / S/O) + dropdown กรองตลาด "แสดง: ทั้งหมด/
+                     ต่างประเทศ/ในประเทศ/ยังไม่ระบุตลาด" ตามรูป (ยังไม่ตัดข้อมูล "ยังไม่ระบุตลาด" ออก — แค่ย้าย
+                     มาเป็นตัวเลือกใน dropdown แทนที่จะเป็นตารางแยก) คอลัมน์ปรับตามรูป: เลขที่ M/O, วันเปิด,
+                     ลูกค้า, PROJECT/PO (=เลขที่ PO ลูกค้าเดิม, เปลี่ยนแค่ชื่อคอลัมน์), SALE (=order.salesName),
+                     รายการ (จำนวนแถวขนาดที่กรอกไว้), ตร.ม., วันกำหนดส่ง, สถานะ (ใช้สถานะการผลิตเดิม ไม่เพิ่ม
+                     สถานะยืนยันการส่งแยกต่างหากตามที่ผู้ใช้ยืนยัน) และปุ่มจัดการ: ยืนยันส่ง (=markOrderShipped
+                     เดิม)/ใบ M/O A3 (=printManufacturingOrderForm/printSampleOrder เดิม)/แก้ไข
+                     (=openOrderDetailModal เดิม)/ลบ (=promptDeleteProductionOrder เดิม) — ไม่มีคอลัมน์
+                     "ยอดขาย" ตามที่ผู้ใช้ยืนยันว่าระบบยังไม่เก็บข้อมูลราคา — see renderSalesReportTables(). -->
+                <div id="salesSubTab-report" class="hidden bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-4">
                     <div class="flex items-center justify-between flex-wrap gap-2">
                         <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i class="fa-solid fa-table text-indigo-600"></i> สรุปรายการ M/O, S/O ทั้งหมด</h3>
                         <div class="flex flex-wrap items-center gap-1.5">
@@ -1121,170 +1159,27 @@
                         <!-- injected via JS -->
                     </div>
 
-                    <!-- NEW (2026-09-11): M/O and S/O each split into their own ต่างประเทศ/ในประเทศ table
-                         (4 tables total) per the user's request — the ตลาด column is dropped from each
-                         since it's now implied by which table a row is in. renderSalesReportTable() below
-                         is the one shared row-renderer all 4 (plus the 2 "ยังไม่ระบุตลาด" fallback tables)
-                         call, so the column layout only has to be maintained in one place. -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div>
-                            <h4 class="font-bold text-indigo-700 text-xs uppercase mb-2 flex items-center gap-1.5">
-                                <i class="fa-solid fa-file-invoice"></i> M/O ต่างประเทศ
-                                <span id="salesReportCount-MO-export" class="text-[11px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full border border-indigo-200">0</span>
-                            </h4>
-                            <div class="overflow-auto border border-slate-300 rounded-lg max-h-[380px]">
-                                <table class="min-w-full text-xs border-collapse">
-                                    <thead class="sticky top-0 z-10">
-                                        <tr class="bg-slate-100">
-                                            <th class="sticky left-0 top-0 z-20 bg-slate-200 border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-500 w-10">#</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">วันที่เปิด</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ M/O</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600">ชื่อลูกค้า</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ PO ลูกค้า</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">กำหนดส่ง</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">ตร.ม.</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">จำนวนชิ้น</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 whitespace-nowrap">สถานะ</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 w-14">ดู</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="salesReportBody-MO-export"></tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 class="font-bold text-indigo-700 text-xs uppercase mb-2 flex items-center gap-1.5">
-                                <i class="fa-solid fa-file-invoice"></i> M/O ในประเทศ
-                                <span id="salesReportCount-MO-domestic" class="text-[11px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full border border-indigo-200">0</span>
-                            </h4>
-                            <div class="overflow-auto border border-slate-300 rounded-lg max-h-[380px]">
-                                <table class="min-w-full text-xs border-collapse">
-                                    <thead class="sticky top-0 z-10">
-                                        <tr class="bg-slate-100">
-                                            <th class="sticky left-0 top-0 z-20 bg-slate-200 border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-500 w-10">#</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">วันที่เปิด</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ M/O</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600">ชื่อลูกค้า</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ PO ลูกค้า</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">กำหนดส่ง</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">ตร.ม.</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">จำนวนชิ้น</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 whitespace-nowrap">สถานะ</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 w-14">ดู</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="salesReportBody-MO-domestic"></tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 class="font-bold text-amber-700 text-xs uppercase mb-2 flex items-center gap-1.5">
-                                <i class="fa-solid fa-file-invoice"></i> S/O ต่างประเทศ
-                                <span id="salesReportCount-SO-export" class="text-[11px] bg-amber-50 text-amber-700 font-semibold px-2 py-0.5 rounded-full border border-amber-200">0</span>
-                            </h4>
-                            <div class="overflow-auto border border-slate-300 rounded-lg max-h-[380px]">
-                                <table class="min-w-full text-xs border-collapse">
-                                    <thead class="sticky top-0 z-10">
-                                        <tr class="bg-slate-100">
-                                            <th class="sticky left-0 top-0 z-20 bg-slate-200 border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-500 w-10">#</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">วันที่เปิด</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ S/O</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600">ชื่อลูกค้า</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ PO ลูกค้า</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">กำหนดส่ง</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">ตร.ม.</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">จำนวนชิ้น</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 whitespace-nowrap">สถานะ</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 w-14">ดู</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="salesReportBody-SO-export"></tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 class="font-bold text-amber-700 text-xs uppercase mb-2 flex items-center gap-1.5">
-                                <i class="fa-solid fa-file-invoice"></i> S/O ในประเทศ
-                                <span id="salesReportCount-SO-domestic" class="text-[11px] bg-amber-50 text-amber-700 font-semibold px-2 py-0.5 rounded-full border border-amber-200">0</span>
-                            </h4>
-                            <div class="overflow-auto border border-slate-300 rounded-lg max-h-[380px]">
-                                <table class="min-w-full text-xs border-collapse">
-                                    <thead class="sticky top-0 z-10">
-                                        <tr class="bg-slate-100">
-                                            <th class="sticky left-0 top-0 z-20 bg-slate-200 border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-500 w-10">#</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">วันที่เปิด</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ S/O</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600">ชื่อลูกค้า</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ PO ลูกค้า</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">กำหนดส่ง</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">ตร.ม.</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">จำนวนชิ้น</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 whitespace-nowrap">สถานะ</th>
-                                            <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 w-14">ดู</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="salesReportBody-SO-domestic"></tbody>
-                                </table>
-                            </div>
+                    <!-- CHANGED (2026-09-30): "รายงานแผนกขาย แยกต่างประเทศและในประเทศ ทั้ง M/O และ S/O" —
+                         ผู้ใช้ขอให้เห็นตลาดต่างประเทศ/ในประเทศพร้อมกันทั้งสองฝั่ง แทนที่ dropdown "แสดง:"
+                         (ทั้งหมด/ต่างประเทศ/ในประเทศ/ยังไม่ระบุตลาด) ที่เพิ่งเพิ่มไปก่อนหน้านี้ในรอบเดียวกัน —
+                         จึงเอา #salesReportMarketFilter ออก เหลือแค่แท็บ M/O/S/O (setSalesReportOrderType()
+                         ไม่เปลี่ยน) ส่วนตารางด้านล่างเปลี่ยนจาก 1 ตาราง (#salesReportBody) เป็นหลายตารางที่
+                         มองเห็นพร้อมกันเสมอ ต่อคอนเทนเนอร์ #salesReportMarketSections — สร้างทั้งหมดใน JS โดย
+                         renderSalesReportTables()/renderSalesReportMarketSectionHtml() ด้านล่าง เพื่อให้ตาราง
+                         "ยังไม่ระบุตลาด" แสดงเฉพาะตอนมีรายการเท่านั้น -->
+                    <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200 pb-2.5">
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="setSalesReportOrderType('MO')" id="salesReportTypeTabBtn-MO" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition">
+                                M/O <span id="salesReportTypeCount-MO" class="bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+                            </button>
+                            <button onclick="setSalesReportOrderType('SO')" id="salesReportTypeTabBtn-SO" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                                S/O <span id="salesReportTypeCount-SO" class="bg-slate-300/50 px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Fallback tables — only shown (see renderSalesReportTables()) if an M/O or S/O
-                         exists with no ตลาด chosen at all (e.g. old data from before the ตลาด toggle
-                         existed), so a record like that is never silently dropped from the report. -->
-                    <div id="salesReportFallbackWrap-MO" class="hidden">
-                        <h4 class="font-bold text-slate-500 text-xs uppercase mb-2 flex items-center gap-1.5">
-                            <i class="fa-solid fa-circle-question"></i> M/O — ยังไม่ระบุตลาด
-                            <span id="salesReportCount-MO-none" class="text-[11px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full border border-slate-300">0</span>
-                        </h4>
-                        <div class="overflow-auto border border-slate-300 rounded-lg max-h-[380px]">
-                            <table class="min-w-full text-xs border-collapse">
-                                <thead class="sticky top-0 z-10">
-                                    <tr class="bg-slate-100">
-                                        <th class="sticky left-0 top-0 z-20 bg-slate-200 border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-500 w-10">#</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">วันที่เปิด</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ M/O</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600">ชื่อลูกค้า</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ PO ลูกค้า</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">กำหนดส่ง</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">ตร.ม.</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">จำนวนชิ้น</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 whitespace-nowrap">สถานะ</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 w-14">ดู</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="salesReportBody-MO-none"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div id="salesReportFallbackWrap-SO" class="hidden">
-                        <h4 class="font-bold text-slate-500 text-xs uppercase mb-2 flex items-center gap-1.5">
-                            <i class="fa-solid fa-circle-question"></i> S/O — ยังไม่ระบุตลาด
-                            <span id="salesReportCount-SO-none" class="text-[11px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full border border-slate-300">0</span>
-                        </h4>
-                        <div class="overflow-auto border border-slate-300 rounded-lg max-h-[380px]">
-                            <table class="min-w-full text-xs border-collapse">
-                                <thead class="sticky top-0 z-10">
-                                    <tr class="bg-slate-100">
-                                        <th class="sticky left-0 top-0 z-20 bg-slate-200 border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-500 w-10">#</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">วันที่เปิด</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ S/O</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600">ชื่อลูกค้า</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ PO ลูกค้า</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">กำหนดส่ง</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">ตร.ม.</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">จำนวนชิ้น</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 whitespace-nowrap">สถานะ</th>
-                                        <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 w-14">ดู</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="salesReportBody-SO-none"></tbody>
-                            </table>
-                        </div>
+                    <div id="salesReportMarketSections" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        <!-- injected via JS: renderSalesReportTables() -->
                     </div>
                 </div>
             </div>
@@ -11813,9 +11708,6 @@
 
         let boardViewMode = 'kanban'; // 'kanban' | 'calendar' — see setBoardViewMode()
         let productionCalendarMonthKey = null; // 'YYYY-MM'; lazily set to the current month on first render
-        // Legend order follows the same department sequence computeOrderTimelineSegments() assigns
-        // dates in (start → planning → design → dyeing → weaving → finishing → ready_to_ship).
-        const PRODUCTION_CALENDAR_STAGE_ORDER = ['planning', 'design', 'dyeing', 'weaving', 'finishing'];
 
         function setBoardViewMode(mode) {
             boardViewMode = (mode === 'calendar') ? 'calendar' : 'kanban';
@@ -11857,55 +11749,28 @@
             renderProductionCalendar();
         }
 
-        // Builds { 'YYYY-MM-DD': [{ order, orderIndex, stage }] } for every day in [rangeStart, rangeEnd]
-        // (inclusive UTC Date objects) that at least one of the given orders has a planned segment
-        // covering — reuses computeOrderTimelineSegments() as-is so the calendar can never drift out of
-        // sync with what the Gantt timeline shows for the same order.
-        function buildProductionCalendarDayMap(ordersWithIndex, rangeStart, rangeEnd) {
-            // Keyed by day -> { [orderIndex]: entry } while building, so that when two adjacent
-            // stage segments share a boundary date for the SAME order (computeOrderTimelineSegments
-            // chains them so one segment's end === the next segment's start), the later segment
-            // (processed after, since segments come back in chronological stage order) simply
-            // overwrites the earlier one instead of both being recorded — this is what previously
-            // caused the same M/O,S/O code to appear twice in one day cell. "รอส่ง" (ready_to_ship)
-            // items are excluded entirely — they're not a real production department and shouldn't
-            // show on this calendar.
-            const dayMapByOrder = {};
+        // CHANGED (2026-09-30): "ปฏิทินรายเดือน ให้เหลือแค่กำหนดส่งพรม ตามแผนกไม่ต้อง" — ผู้ใช้ขอให้ปฏิทิน
+        // แสดงเฉพาะวันกำหนดส่งพรม (order.dueDate) เท่านั้น ไม่ต้องแสดงว่าวันนั้น M/O อยู่แผนกไหน (ของเดิม
+        // ใช้ buildProductionCalendarDayMap() อิง computeOrderTimelineSegments() วาด chip สีตามแผนก) — จึง
+        // ลบฟังก์ชันนั้นและ PRODUCTION_CALENDAR_STAGE_ORDER ออก เหลือแค่ buildProductionCalendarDueDateMap()
+        // ด้านล่างเป็นแหล่งข้อมูลเดียวของปฏิทินนี้.
+        //
+        // Builds { 'YYYY-MM-DD': [{order, orderIndex}] } straight from order.dueDate (via
+        // normalizeDateString/parseDateOnly — skips a due date that survives normalizeDateString's
+        // fallback as truthy-but-unparseable text instead of crashing; see
+        // claude/timeline-daysbetweenutc-null-crash-fix.md).
+        function buildProductionCalendarDueDateMap(ordersWithIndex, rangeStart, rangeEnd) {
+            const map = {};
             ordersWithIndex.forEach(({ order, orderIndex }) => {
-                computeOrderTimelineSegments(order).forEach(seg => {
-                    if (!seg.stage) return; // the initial "order opened" point has no department yet
-                    let displayStage = seg.stage;
-                    if (seg.stageSkipped) {
-                        // This segment's end date isn't really a target date FOR `seg.stage` — it's just
-                        // the next department that happened to have a plan date filled in, borrowed
-                        // because one or more departments in between never got one (e.g. only "แผนก
-                        // วางแผน" was filled in, so the gap all the way to the due date used to widen
-                        // into one long borrowed "รอส่ง" segment that then got hidden entirely, leaving
-                        // no info — or, before that, painted the wrong color for days the order has
-                        // already moved past). Trust the order's own tracked current stage for this
-                        // undated stretch instead of the borrowed label, so the calendar reflects where
-                        // the order actually is, not just the next date someone happened to fill in.
-                        displayStage = getEffectiveStage(order) || seg.stage;
-                    }
-                    if (!displayStage || displayStage === 'ready_to_ship' || displayStage === 'shipped') return; // รอส่ง/ส่งแล้ว are not shown on this calendar
-                    let cursor = parseDateOnly(seg.start);
-                    const segEnd = parseDateOnly(seg.end);
-                    if (!cursor || !segEnd) return;
-                    if (cursor < rangeStart) cursor = rangeStart;
-                    const cappedEnd = segEnd > rangeEnd ? rangeEnd : segEnd;
-                    while (cursor <= cappedEnd) {
-                        const key = formatDateKeyUTC(cursor);
-                        if (!dayMapByOrder[key]) dayMapByOrder[key] = {};
-                        dayMapByOrder[key][orderIndex] = { order, orderIndex, stage: displayStage };
-                        cursor = addDaysUTC(cursor, 1);
-                    }
-                });
+                const dueDateNorm = normalizeDateString(order.dueDate);
+                if (!dueDateNorm) return;
+                const dueDate = parseDateOnly(dueDateNorm);
+                if (!dueDate || dueDate < rangeStart || dueDate > rangeEnd) return;
+                const key = formatDateKeyUTC(dueDate);
+                if (!map[key]) map[key] = [];
+                map[key].push({ order, orderIndex });
             });
-            const dayMap = {};
-            Object.keys(dayMapByOrder).forEach(key => {
-                dayMap[key] = Object.values(dayMapByOrder[key]);
-            });
-            return dayMap;
+            return map;
         }
 
         // Renders ONE order-type's month grid into gridId — same per-type split as
@@ -11927,7 +11792,7 @@
                 ordersWithIndex.push({ order, orderIndex });
             });
 
-            const dayMap = buildProductionCalendarDayMap(ordersWithIndex, gridStart, gridEnd);
+            const dueDateMap = buildProductionCalendarDueDateMap(ordersWithIndex, gridStart, gridEnd);
             const todayKey = formatDateKeyUTC(new Date());
             const totalCells = daysBetweenUTC(gridStart, gridEnd) + 1;
 
@@ -11937,23 +11802,30 @@
                 const dateKey = formatDateKeyUTC(d);
                 const inMonth = d.getUTCMonth() === monthIndex;
                 const isToday = dateKey === todayKey;
-                const entries = (dayMap[dateKey] || []).sort((a, b) => String(a.order.moSo).localeCompare(String(b.order.moSo)));
+
+                // CHANGED (2026-09-30): "ให้เหลือแค่กำหนดส่งพรม ตามแผนกไม่ต้อง" — เนื้อหาหลักของแต่ละช่องวันที่
+                // ตอนนี้คือรายชื่อ M/O, S/O ที่ครบกำหนดส่งวันนั้น (ไม่มี chip สีตามแผนกอีกต่อไป).
+                const dueEntries = (dueDateMap[dateKey] || []).sort((a, b) => String(a.order.moSo).localeCompare(String(b.order.moSo)));
+                const hasDue = dueEntries.length > 0;
 
                 const MAX_VISIBLE = 4;
-                const visibleEntries = entries.slice(0, MAX_VISIBLE);
-                const hiddenCount = entries.length - visibleEntries.length;
+                const visibleEntries = dueEntries.slice(0, MAX_VISIBLE);
+                const hiddenCount = dueEntries.length - visibleEntries.length;
 
-                const chipsHtml = visibleEntries.map(({ order, orderIndex: idx, stage }) => {
-                    const colorCls = (STAGE_COLORS[stage] && STAGE_COLORS[stage].solid) || 'bg-slate-400 border-slate-400';
-                    const tooltip = `${STAGE_LABELS[stage] || stage}: ${order.moSo}${order.customerName ? ' — ' + order.customerName : ''}`;
-                    return `<button onclick="openOrderDetailModal(${idx}, '${stage}')" title="${escapeHtml(tooltip)}" class="w-full text-left ${colorCls.split(' ')[0]} text-white text-[9px] leading-tight rounded px-1 py-0.5 truncate hover:opacity-80 transition">${escapeHtml(order.moSo)}</button>`;
+                const chipsHtml = visibleEntries.map(({ order, orderIndex: idx }) => {
+                    const tooltip = `กำหนดส่งพรม: ${order.moSo}${order.customerName ? ' — ' + order.customerName : ''}`;
+                    return `<button onclick="openOrderDetailModal(${idx})" title="${escapeHtml(tooltip)}" class="w-full text-left bg-rose-500 text-white text-[9px] leading-tight rounded px-1 py-0.5 truncate hover:opacity-80 transition">${escapeHtml(order.moSo)}</button>`;
                 }).join('');
                 const moreHtml = hiddenCount > 0 ? `<div class="text-[9px] text-slate-400 px-1">+${hiddenCount} เพิ่มเติม</div>` : '';
+                const dueBadgeHtml = hasDue
+                    ? `<span class="inline-flex items-center gap-0.5 text-[9px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1 leading-tight"><i class="fa-solid fa-flag text-[8px]"></i>${dueEntries.length}</span>`
+                    : '';
 
                 cellsHtml += `
-                    <div class="min-h-[92px] border-b border-r border-slate-100 p-1 space-y-0.5 ${inMonth ? 'bg-white' : 'bg-slate-50/60'}">
-                        <div class="px-0.5">
+                    <div class="min-h-[92px] border-b border-r border-slate-100 p-1 space-y-0.5 ${inMonth ? 'bg-white' : 'bg-slate-50/60'} ${hasDue ? 'ring-1 ring-inset ring-rose-300' : ''}">
+                        <div class="px-0.5 flex items-center gap-1">
                             <span class="text-[10px] inline-flex items-center justify-center ${isToday ? 'w-4 h-4 rounded-full bg-indigo-600 text-white font-bold' : (inMonth ? 'text-slate-500 font-semibold' : 'text-slate-300')}">${d.getUTCDate()}</span>
+                            ${dueBadgeHtml}
                         </div>
                         ${chipsHtml}
                         ${moreHtml}
@@ -11994,12 +11866,14 @@
             renderProductionCalendarSection('MO', 'productionCalendarGrid-MO', 'productionCalendarMoCountBadge', gridStart, gridEnd, month - 1, searchTerm);
             renderProductionCalendarSection('SO', 'productionCalendarGrid-SO', 'productionCalendarSoCountBadge', gridStart, gridEnd, month - 1, searchTerm);
 
+            // CHANGED (2026-09-30): legend เดิมไล่สีตามแผนก (PRODUCTION_CALENDAR_STAGE_ORDER) — ลบออก
+            // ตามที่ผู้ใช้ขอ "ตามแผนกไม่ต้อง" เหลือแค่คำอธิบายเดียวว่าสีแดง = วันกำหนดส่งพรม
             if (legendEl) {
-                legendEl.innerHTML = PRODUCTION_CALENDAR_STAGE_ORDER.map(stage => `
-                    <span class="flex items-center gap-1.5">
-                        <span class="w-2.5 h-2.5 rounded ${((STAGE_COLORS[stage] && STAGE_COLORS[stage].solid) || 'bg-slate-400').split(' ')[0]}"></span>${escapeHtml(STAGE_LABELS[stage] || stage)}
+                legendEl.innerHTML = `
+                    <span class="flex items-center gap-1.5 text-rose-600 font-semibold">
+                        <i class="fa-solid fa-flag text-[10px]"></i>วันกำหนดส่งพรม — คลิกที่รายการเพื่อดู/แก้ไข M/O, S/O
                     </span>
-                `).join('');
+                `;
             }
         }
 
@@ -12109,6 +11983,12 @@
         // ไว้ เวลากรอกให้ติ๊กกรอกข้อมูล ถึงจะแสดง" — the old single "เสร็จแล้ว" tickbox is gone. Now there's
         // a "กรอกข้อมูล" checkbox that reveals the real fields (ผู้ดำเนินการ / วันที่ได้รับแบบคืน) right on
         // the card; "เสร็จแล้ว" itself is derived automatically once both are filled in (recomputeDesignDone()).
+        // UPDATED (2026-09-30): "แผนกดีไซน์/ขยายลาย ไม่ต้องคีย์รายการ ให้กดผ่านได้เลย" — บังคับกรอก
+        // ผู้ดำเนินการ/วันที่คืนแบบก่อนถึงจะผ่านได้ ไม่ตรงกับหน้างานจริง จึงเพิ่มปุ่ม "ผ่าน" เป็นปุ่มหลักที่กดผ่าน
+        // ได้ทันทีโดยไม่ต้องกรอกอะไรก่อน (เรียก markDesignPassed() ซึ่งเติมค่า default ให้ทั้งสองช่องแล้วเรียก
+        // updateOrderField() ตามปกติ — ยังผ่าน recomputeDesignDone()/stampActualFinish() เหมือนเดิมทุกประการ)
+        // ส่วนติ๊ก "กรอกข้อมูล" เดิมยังอยู่ไว้เผื่ออยากบันทึกชื่อผู้ดำเนินการ/วันที่จริงแยกต่างหาก (ตัวเลือกเสริม
+        // ไม่ใช่ข้อบังคับอีกต่อไป).
         function buildDesignOrderCard(order, orderIndex) {
             const card = document.createElement('div');
             const cardWarning = getDeadlineWarning(order);
@@ -12149,15 +12029,47 @@
                 </div>
                 ${design.done ? `<p class="text-[10px] text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>ข้อมูลครบ — เสร็จแล้ว</p>` : ''}
             ` : '';
+            const passButtonHtml = !design.done ? `
+                <button onclick="markDesignPassed(${orderIndex})" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 rounded-lg transition flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-check"></i> ผ่าน
+                </button>
+            ` : `
+                <p class="text-[10px] text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>ผ่านแล้ว${design.doneBy ? ` — ${escapeHtml(design.doneBy)}` : ''}</p>
+            `;
             const bodyHtml = `
-                <label class="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" ${design.entering ? 'checked' : ''} onchange="updateOrderField(${orderIndex}, 'design.entering', this.checked)" class="rounded"> กรอกข้อมูลดีไซน์/ขยายลาย</label>
-                ${detailFieldsHtml}
+                ${passButtonHtml}
+                <details class="group">
+                    <summary class="flex items-center gap-1 text-[11px] text-slate-500 cursor-pointer select-none [&::-webkit-details-marker]:hidden" style="list-style: none">
+                        <i class="fa-solid fa-chevron-right text-[9px] transition-transform group-open:rotate-90"></i>
+                        กรอกรายละเอียดเพิ่มเติม (ถ้ามี)
+                    </summary>
+                    <div class="pt-1.5 space-y-1.5">
+                        <label class="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" ${design.entering ? 'checked' : ''} onchange="updateOrderField(${orderIndex}, 'design.entering', this.checked)" class="rounded"> กรอกข้อมูลดีไซน์/ขยายลาย</label>
+                        ${detailFieldsHtml}
+                    </div>
+                </details>
                 ${planDateHtml}
                 ${deadlineWarningHtml ? `<div>${deadlineWarningHtml}</div>` : ''}
             `;
 
             card.innerHTML = headerHtml + `<div class="space-y-2">${bodyHtml}</div>`;
             return card;
+        }
+
+        // NEW (2026-09-30): "แผนกดีไซน์/ขยายลาย ไม่ต้องคีย์รายการ ให้กดผ่านได้เลย" — ปุ่ม "ผ่าน" หลักบนการ์ด
+        // buildDesignOrderCard() เรียกฟังก์ชันนี้ ซึ่งเติมค่า default ให้ design.doneBy/designReceivedDate
+        // (เฉพาะช่องที่ยังว่าง เพื่อไม่ทับข้อมูลที่กรอกไว้แล้วถ้ามี) แล้วเรียก updateOrderField() ตามปกติทั้งสอง
+        // ช่อง — จึงยังคงผ่าน recomputeDesignDone()/stampActualFinish() และ hook อื่นๆ ใน updateOrderField()
+        // เหมือนเดิมทุกประการ (design.done ยังคงเป็นค่าที่ derived เสมอ ไม่เคย set ตรงๆ ที่นี่).
+        function markDesignPassed(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            if (!(order.design && order.design.doneBy)) {
+                updateOrderField(orderIndex, 'design.doneBy', 'ผ่านแล้ว');
+            }
+            if (!order.designReceivedDate) {
+                updateOrderField(orderIndex, 'designReceivedDate', formatDateKeyUTC(new Date()));
+            }
         }
 
         // NEW (2026-09-11): "แจ้งเตือน (รอส่ง)" board card — same non-currentStage pattern as
@@ -13955,51 +13867,107 @@
             sel.value = current;
         }
 
-        // NEW (2026-09-11): "รายการทั้งหมด (M/O, S/O)" spreadsheet-style report — split into 4 tables
-        // (M/O ต่างประเทศ / M/O ในประเทศ / S/O ต่างประเทศ / S/O ในประเทศ), each sorted by วันที่เปิด so the
-        // list reads the same order a Google Sheet log would accumulate in. Reuses the same
-        // productionOrders data + helpers (detectOrderTypeFromMoSo, getEffectiveStage, STAGE_LABELS) as
-        // every other view — this is purely a different layout on data that's already correct everywhere
-        // else, not a second source of truth. Any M/O, S/O with no ตลาด chosen at all falls into the
-        // "ยังไม่ระบุตลาด" table for its type instead of silently disappearing from the report.
+        // REDESIGNED (2026-09-30): "รายการทั้งหมด (M/O, S/O)" — ผู้ใช้ขอปรับให้เหมือนรูปตัวอย่างจากเว็บ
+        // "ต้นทุนโครงการแผนกดีไซน์": 1 ตารางต่อประเภทรายการ (แท็บ M/O / S/O — see
+        // setSalesReportOrderType()) แทนที่ 4 ตารางแยกตลาดเดิม + dropdown กรองตลาด "ทั้งหมด/ต่างประเทศ/
+        // ในประเทศ/ยังไม่ระบุตลาด" (#salesReportMarketFilter) แทนตาราง fallback แยกเดิม — ไม่มีข้อมูลไหนถูก
+        // ตัดทิ้ง แค่ย้ายมาเป็นตัวกรองแทน. คอลัมน์ "PROJECT / PO" คือ order.customerPO เดิม (เปลี่ยนแค่ชื่อ
+        // คอลัมน์ — ระบบยังไม่มีช่อง "ชื่อโปรเจกต์" แยกต่างหาก ตามที่ผู้ใช้ยืนยัน), "สถานะ" ใช้สถานะการผลิตเดิม
+        // (STAGE_LABELS[getEffectiveStage(order)]) ไม่ใช่สถานะยืนยันการส่งแยกใหม่ — ปุ่ม "ยืนยันส่ง" จึงผูกกับ
+        // markOrderShipped() ที่มีอยู่แล้ว (บันทึกว่าส่งมอบแล้ว) แทนการสร้าง flow ใหม่ซ้ำซ้อนกับ "ยืนยันส่งแล้ว"
+        // ที่มีอยู่แล้วในหน้า QC/Shipping. ไม่มีคอลัมน์ "ยอดขาย" ($) เพราะระบบยังไม่เก็บข้อมูลราคา/หน่วยต่อ
+        // M/O เลย (ผู้ใช้ยืนยันให้ข้ามไปก่อน แทนที่จะเพิ่มฟีเจอร์ราคาใหม่). ปุ่ม "ใบ M/O A3"/"แก้ไข"/"ลบ" ผูกกับ
+        // printManufacturingOrderForm()/printSampleOrder(), openOrderDetailModal(), promptDeleteProductionOrder()
+        // ที่มีอยู่แล้วทั้งหมด — เป็นการจัดหน้าใหม่ ไม่ใช่ฟีเจอร์ใหม่.
         function renderSalesReportRow(order, rowNumber) {
             const orderIndex = productionOrders.indexOf(order);
             const statusLabel = STAGE_LABELS[getEffectiveStage(order)] || '-';
             const openDateOnly = normalizeDateString(order.openDate) || order.openDate || '-';
+            const isMo = (order.orderType || detectOrderTypeFromMoSo(order.moSo)) === 'MO';
+            const itemCount = Array.isArray(order.sizeItems) && order.sizeItems.length > 0
+                ? order.sizeItems.length
+                : (order.totalPieces ? 1 : 0);
+            const alreadyShipped = getEffectiveStage(order) === 'shipped';
             const rowBg = rowNumber % 2 === 0 ? 'bg-slate-50/70' : 'bg-white';
             const rowNumBg = rowNumber % 2 === 0 ? 'bg-slate-100' : 'bg-slate-50';
             return `
                 <tr class="${rowBg} hover:bg-indigo-50/40">
                     <td class="sticky left-0 z-[5] ${rowNumBg} border border-slate-300 px-2 py-1.5 text-center text-slate-500 font-medium">${rowNumber + 1}</td>
-                    <td class="border border-slate-300 px-2 py-1.5 whitespace-nowrap">${escapeHtml(openDateOnly)}</td>
                     <td class="border border-slate-300 px-2 py-1.5 font-mono font-semibold ${orderTypeTextClass(order.orderType)} whitespace-nowrap">${escapeHtml(order.moSo || '-')}</td>
+                    <td class="border border-slate-300 px-2 py-1.5 whitespace-nowrap">${escapeHtml(openDateOnly)}</td>
                     <td class="border border-slate-300 px-2 py-1.5">${escapeHtml(order.customerName || '-')}</td>
                     <td class="border border-slate-300 px-2 py-1.5 whitespace-nowrap">${escapeHtml(order.customerPO || '-')}</td>
-                    <td class="border border-slate-300 px-2 py-1.5 whitespace-nowrap">${escapeHtml(order.dueDate || '-')}</td>
+                    <td class="border border-slate-300 px-2 py-1.5 whitespace-nowrap">${escapeHtml(order.salesName || '-')}</td>
+                    <td class="border border-slate-300 px-2 py-1.5 text-right whitespace-nowrap">${itemCount}</td>
                     <td class="border border-slate-300 px-2 py-1.5 text-right whitespace-nowrap">${escapeHtml(String(order.totalSqm || 0))}</td>
-                    <td class="border border-slate-300 px-2 py-1.5 text-right whitespace-nowrap">${escapeHtml(String(order.totalPieces || 0))}</td>
+                    <td class="border border-slate-300 px-2 py-1.5 whitespace-nowrap">${escapeHtml(order.dueDate || '-')}</td>
                     <td class="border border-slate-300 px-2 py-1.5 text-center whitespace-nowrap">${escapeHtml(statusLabel)}</td>
-                    <td class="border border-slate-300 px-2 py-1.5 text-center whitespace-nowrap">
-                        <button onclick="openOrderDetailModal(${orderIndex})" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-[11px] font-medium"><i class="fa-solid fa-eye"></i> ดู</button>
-                        <button onclick="printProductionWorkOrder(${orderIndex})" title="พิมพ์ใบสั่งเปิดงานผลิต (PDF)" class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800 text-[11px] font-medium ml-2"><i class="fa-solid fa-print"></i> พิมพ์</button>
-                        ${(order.orderType || detectOrderTypeFromMoSo(order.moSo)) === 'SO' ? `<button onclick="printSampleOrder(${orderIndex})" title="พิมพ์ใบ Sample Order (S/O) (PDF)" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-800 text-[11px] font-medium ml-2"><i class="fa-solid fa-file-lines"></i> Sample Order</button>` : ''}
-                        ${(order.orderType || detectOrderTypeFromMoSo(order.moSo)) === 'MO' ? `<button onclick="printManufacturingOrderForm(${orderIndex})" title="พิมพ์ใบ M/O (PDF, A3 แนวนอน)" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-800 text-[11px] font-medium ml-2"><i class="fa-solid fa-scroll"></i> M/O</button>` : ''}
+                    <td class="border border-slate-300 px-2 py-1.5 text-center whitespace-nowrap space-x-1">
+                        <button onclick="markOrderShipped(${orderIndex})" ${alreadyShipped ? 'disabled' : ''} title="ยืนยันว่าส่งมอบแล้ว" class="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-medium transition ${alreadyShipped ? 'border-slate-200 text-slate-300 cursor-not-allowed' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'}"><i class="fa-solid fa-truck-fast"></i> ยืนยันส่ง</button>
+                        <button onclick="${isMo ? `printManufacturingOrderForm(${orderIndex})` : `printSampleOrder(${orderIndex})`}" title="${isMo ? 'พิมพ์ใบ M/O (PDF, A3 แนวนอน)' : 'พิมพ์ใบ Sample Order (S/O) (PDF)'}" class="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-[11px] font-medium transition"><i class="fa-solid fa-scroll"></i> ใบ ${isMo ? 'M/O A3' : 'Sample Order'}</button>
+                        <button onclick="openOrderDetailModal(${orderIndex})" title="ดู/แก้ไขรายละเอียด" class="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 text-[11px] font-medium transition"><i class="fa-solid fa-pen"></i> แก้ไข</button>
+                        <button onclick="promptDeleteProductionOrder(${orderIndex})" title="ลบรายการนี้ทิ้ง" class="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-medium transition"><i class="fa-solid fa-trash"></i> ลบ</button>
                     </td>
                 </tr>
             `;
         }
-        function renderSalesReportTable(bodyId, countId, list, emptyMessage) {
-            const tbody = document.getElementById(bodyId);
-            const countEl = document.getElementById(countId);
-            if (!tbody) return;
-            if (countEl) countEl.textContent = list.length;
-            if (list.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" class="border border-slate-300 px-2 py-4 text-center text-slate-400">${emptyMessage}</td></tr>`;
-                return;
-            }
-            tbody.innerHTML = list.map((order, i) => renderSalesReportRow(order, i)).join('');
+        // CHANGED (2026-09-30): "รายงานแผนกขาย แยกต่างประเทศและในประเทศ ทั้ง M/O และ S/O" — replaces the
+        // single renderSalesReportTable() helper (one table, filtered by the now-removed
+        // #salesReportMarketFilter dropdown) with one table PER MARKET, always visible together — see
+        // renderSalesReportTables() below, which calls this once per market section.
+        function renderSalesReportMarketSectionHtml(sectionKey, label, iconCls, colorCls, list, emptyMessage, extraWrapperCls) {
+            const bodyId = `salesReportBody-${sectionKey}`;
+            const rowsHtml = list.length === 0
+                ? `<tr><td colspan="11" class="border border-slate-300 px-2 py-4 text-center text-slate-400">${escapeHtml(emptyMessage)}</td></tr>`
+                : list.map((order, i) => renderSalesReportRow(order, i)).join('');
+            return `
+                <div class="${extraWrapperCls || ''}">
+                    <h4 class="flex items-center gap-1.5 text-xs font-bold ${colorCls} mb-1.5">
+                        <i class="fa-solid ${iconCls}"></i> ${escapeHtml(label)}
+                        <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full text-[10px] font-semibold">${list.length}</span>
+                    </h4>
+                    <div class="overflow-auto border border-slate-300 rounded-lg max-h-[480px]">
+                        <table class="min-w-full text-xs border-collapse">
+                            <thead class="sticky top-0 z-10">
+                                <tr class="bg-slate-100">
+                                    <th class="sticky left-0 top-0 z-20 bg-slate-200 border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-500 w-10">#</th>
+                                    <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">เลขที่ M/O, S/O</th>
+                                    <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">วันเปิด</th>
+                                    <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600">ลูกค้า</th>
+                                    <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">PROJECT / PO</th>
+                                    <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">SALE</th>
+                                    <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">รายการ</th>
+                                    <th class="border border-slate-300 px-2 py-1.5 text-right font-semibold text-slate-600 whitespace-nowrap">ตร.ม.</th>
+                                    <th class="border border-slate-300 px-2 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">วันกำหนดส่ง</th>
+                                    <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 whitespace-nowrap">สถานะ</th>
+                                    <th class="border border-slate-300 px-2 py-1.5 text-center font-semibold text-slate-600 whitespace-nowrap">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="${bodyId}">${rowsHtml}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+        // 'MO' | 'SO' — which single table is currently shown, see setSalesReportOrderType().
+        let salesReportActiveOrderType = 'MO';
+        function setSalesReportOrderType(type) {
+            salesReportActiveOrderType = (type === 'SO') ? 'SO' : 'MO';
+            renderSalesReportTables();
+        }
+        function updateSalesReportTypeTabStyle() {
+            const activeClasses = ['bg-indigo-600', 'text-white', 'shadow-sm'];
+            const inactiveClasses = ['bg-slate-100', 'text-slate-600', 'hover:bg-slate-200'];
+            ['MO', 'SO'].forEach(type => {
+                const btn = document.getElementById(`salesReportTypeTabBtn-${type}`);
+                if (!btn) return;
+                if (type === salesReportActiveOrderType) { btn.classList.remove(...inactiveClasses); btn.classList.add(...activeClasses); }
+                else { btn.classList.remove(...activeClasses); btn.classList.add(...inactiveClasses); }
+            });
         }
         function renderSalesReportTables() {
+            updateSalesReportTypeTabStyle();
+
             const searchInputEl = document.getElementById('salesReportSearchInput');
             const searchTerm = (searchInputEl ? searchInputEl.value : '').trim().toLowerCase();
 
@@ -14018,22 +13986,33 @@
             };
             const emptyMsg = searchTerm ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : 'ยังไม่มีรายการ';
 
+            // แท็บ M/O, S/O แสดงจำนวนรวมของประเภทนั้น (กรองแค่คำค้นหา ไม่กรองตามตลาด) เหมือนรูปตัวอย่าง
+            // "M/O (183)".
             ['MO', 'SO'].forEach(type => {
-                const ofType = productionOrders.filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === type && matchesSearch(o));
-
-                const exportList = ofType.filter(o => o.market === 'export').sort(sortByOpenDateThenMoSo);
-                const domesticList = ofType.filter(o => o.market === 'domestic').sort(sortByOpenDateThenMoSo);
-                const noneList = ofType.filter(o => o.market !== 'export' && o.market !== 'domestic').sort(sortByOpenDateThenMoSo);
-
-                renderSalesReportTable(`salesReportBody-${type}-export`, `salesReportCount-${type}-export`, exportList, emptyMsg);
-                renderSalesReportTable(`salesReportBody-${type}-domestic`, `salesReportCount-${type}-domestic`, domesticList, emptyMsg);
-                renderSalesReportTable(`salesReportBody-${type}-none`, `salesReportCount-${type}-none`, noneList, emptyMsg);
-
-                // "ยังไม่ระบุตลาด" fallback table only takes up space on screen when there's actually
-                // something in it — an order created before the ตลาด toggle existed, most likely.
-                const fallbackWrap = document.getElementById(`salesReportFallbackWrap-${type}`);
-                if (fallbackWrap) fallbackWrap.classList.toggle('hidden', noneList.length === 0);
+                const count = productionOrders.filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === type && matchesSearch(o)).length;
+                const countEl = document.getElementById(`salesReportTypeCount-${type}`);
+                if (countEl) countEl.textContent = count;
             });
+
+            // CHANGED (2026-09-30): "รายงานแผนกขาย แยกต่างประเทศและในประเทศ ทั้ง M/O และ S/O" — เดิมกรองด้วย
+            // #salesReportMarketFilter dropdown แล้วเรนเดอร์ตารางเดียว ตอนนี้แบ่งตามตลาดล่วงหน้าแล้วเรนเดอร์
+            // ทุกตารางพร้อมกัน (export/domestic เสมอ, "ยังไม่ระบุตลาด" เฉพาะตอนมีรายการ) — ไม่มีข้อมูลไหนถูก
+            // ตัดทิ้ง เหมือนหลักการเดิม.
+            const ofType = productionOrders
+                .filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === salesReportActiveOrderType && matchesSearch(o))
+                .sort(sortByOpenDateThenMoSo);
+            const exportList = ofType.filter(o => o.market === 'export');
+            const domesticList = ofType.filter(o => o.market === 'domestic');
+            const unspecifiedList = ofType.filter(o => o.market !== 'export' && o.market !== 'domestic');
+
+            let sectionsHtml =
+                renderSalesReportMarketSectionHtml('export', 'ตลาดต่างประเทศ (Export)', 'fa-earth-asia', 'text-sky-600', exportList, emptyMsg) +
+                renderSalesReportMarketSectionHtml('domestic', 'ตลาดในประเทศ (Domestic)', 'fa-house-flag', 'text-emerald-600', domesticList, emptyMsg);
+            if (unspecifiedList.length > 0) {
+                sectionsHtml += renderSalesReportMarketSectionHtml('none', 'ยังไม่ระบุตลาด', 'fa-circle-question', 'text-amber-600', unspecifiedList, emptyMsg, 'xl:col-span-2');
+            }
+            const sectionsContainer = document.getElementById('salesReportMarketSections');
+            if (sectionsContainer) sectionsContainer.innerHTML = sectionsHtml;
 
             // NEW (2026-09-12): ยอดตร.ม. รับเข้า/ส่งออกทั้งหมด — ใช้ตัวกรองค้นหาเดียวกับตารางด้านล่าง
             // (matchesSearch) ทั้งหมด (ไม่แยก M/O, S/O) ตามที่แผนกขายขอมาว่า "แสดงในแท็บแผนกขาย".
