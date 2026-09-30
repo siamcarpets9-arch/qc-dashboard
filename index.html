@@ -6616,6 +6616,21 @@
             return m[2].split('+').map(n => `${prefix}${n.trim()}/${year}`.trim());
         }
 
+        // FIX (2026-09-30): matches an order.moSo against the Excel's (already label-stripped) M/O
+        // key. Some orders in the system are typed WITH the "M/O"/"S/O" label baked directly into
+        // order.moSo itself (the new-order form's own placeholder shows this convention — "เช่น M/O:
+        // 6902-01, S/O: 45001" — so not every order was typed the same way), while the imported cell's
+        // label is always stripped before this point. Matching plain normalizeMoSoKey(order.moSo)
+        // against a label-stripped key would silently miss every such order (reported as "นำเข้าได้ 0
+        // รายการ" — 0 matched). Stripping the SAME label from order.moSo before comparing makes the
+        // match work regardless of which convention a given order happened to use, without weakening
+        // matching for orders that never had the label to begin with (stripping is then a no-op).
+        function normalizeDyeingMoSoMatchKey(moSo) {
+            let s = String(moSo || '').trim();
+            s = s.replace(/^(M\/O|S\/O|MO|SO)[\s:.]*/i, '').trim();
+            return normalizeMoSoKey(s);
+        }
+
         // Reads every date-named sheet (e.g. "1-9-2026") of the รายงานการผลิตแผนกย้อม Excel format and
         // groups its data rows by normalized M/O, S/O key. Ditto marks (a cell that is exactly '"')
         // carry forward the last non-ditto value in that column — the dyeing department's own
@@ -6712,7 +6727,7 @@
                     }
                     const rows = moSoKeys.map(key => {
                         const group = byMoSo[key];
-                        const orderIndex = productionOrders.findIndex(o => normalizeMoSoKey(o.moSo) === key);
+                        const orderIndex = productionOrders.findIndex(o => normalizeDyeingMoSoMatchKey(o.moSo) === key);
                         const totalKgInFile = group.rows.reduce((s, r) => s + (Number(r.kg) || 0), 0);
                         const distinctColors = new Set(group.rows.map(r => normalizeDyeColorCodeKey(r.colorCode))).size;
                         const canAutoTransfer = orderIndex !== -1 && productionOrders[orderIndex].currentStage === 'dyeing' &&
@@ -6773,7 +6788,7 @@
 
             Object.keys(byMoSo).forEach(key => {
                 const group = byMoSo[key];
-                const orderIndex = productionOrders.findIndex(o => normalizeMoSoKey(o.moSo) === key);
+                const orderIndex = productionOrders.findIndex(o => normalizeDyeingMoSoMatchKey(o.moSo) === key);
                 if (orderIndex === -1) return; // unmatched — already flagged in the preview, nothing to do
                 const order = productionOrders[orderIndex];
                 if (!order.dyeing) order.dyeing = {};
