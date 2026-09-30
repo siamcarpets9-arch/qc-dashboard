@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -330,6 +328,13 @@
                      M/O โดยอัตโนมัติ — ดู openImportWeavingModal()/handleWeavingExcelFile(). -->
                 <button onclick="openImportWeavingModal()" class="bg-white/10 hover:bg-white/20 text-white font-medium px-3 py-2 rounded-xl backdrop-blur-sm transition duration-200 text-sm flex items-center gap-1.5">
                     <i class="fa-solid fa-file-excel"></i> นำเข้าข้อมูลทอ
+                </button>
+                <!-- NEW (2026-09-30): อ่านไฟล์ Excel รายงานการผลิตแผนกย้อม (มี sheet แยกตามวันที่) ที่แผนก
+                     ย้อมกรอกอยู่แล้ว แล้วนำเข้าเป็นรายการ "บันทึกสั่งย้อม" (dyeOrderLog) ต่อ M/O, S/O โดย
+                     อัตโนมัติ พร้อมโอนไปแผนกทอให้อัตโนมัติเมื่อย้อมครบตามแผนที่วางไว้ — ดู
+                     openImportDyeingModal()/handleDyeingExcelFile()/confirmDyeingImport(). -->
+                <button onclick="openImportDyeingModal()" class="bg-white/10 hover:bg-white/20 text-white font-medium px-3 py-2 rounded-xl backdrop-blur-sm transition duration-200 text-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-excel"></i> นำเข้ารายงานย้อม
                 </button>
                 <!-- NEW (2026-09e): global "แจ้งปัญหา" entry point, reachable from every tab (not just
                      the order detail modal) — reporting a problem (e.g. ไหมด่าง) shouldn't require
@@ -2939,6 +2944,32 @@
             <div id="importWeavingPreview" class="overflow-y-auto flex-grow -mr-1 pr-1 space-y-1.5 hidden"></div>
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button id="importWeavingConfirmBtn" onclick="confirmWeavingImport()" class="hidden flex bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-xl shadow transition duration-200 text-sm items-center gap-1.5">
+                    <i class="fa-solid fa-check"></i> ยืนยันนำเข้า
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW (2026-09-30): "นำเข้ารายงานย้อม" — reads the dyeing department's existing daily-report .xlsx
+         (one sheet per date, e.g. "1-9-2026") entirely in the browser via SheetJS, matches each
+         M/O, S/O (splitting combined-order cells) against productionOrders, and merges the execution
+         details into order.dyeing.dyeOrderLog — the same log behind the "แผนกย้อม (KPI)" report — then
+         auto-transfers to แผนกทอ when a color plan is fully covered. See handleDyeingExcelFile() /
+         aggregateDyeingImport() / confirmDyeingImport(). -->
+    <div id="importDyeingModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden p-6 space-y-3 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-file-excel text-violet-600 mr-2"></i>นำเข้ารายงานย้อมจากไฟล์ Excel รายวัน</h3>
+                <button onclick="closeImportDyeingModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-500">เลือกไฟล์ Excel "รายงานการผลิตแผนกย้อม" ไฟล์เดียวกับที่แผนกย้อมกรอกอยู่ทุกวัน (มี sheet แยกตามวันที่ เช่น 1-9-2026) ระบบจะอ่านทุก sheet ที่ชื่อเป็นวันที่ให้อัตโนมัติ รวมรายละเอียดสี/Lot/Hang/น้ำหนักที่ย้อมได้จริงเข้าบันทึกสั่งย้อม (KPI) ต่อ M/O, S/O — และถ้าย้อมครบตามแผนที่วางไว้ทุกสีแล้ว จะโอนงานไปแผนกทอให้อัตโนมัติโดยไม่ต้องกดผ่านเอง — นำเข้าไฟล์เดิมซ้ำได้โดยไม่นับซ้ำ</p>
+            <input type="file" id="importDyeingFileInput" accept=".xlsx,.xls" onchange="handleDyeingExcelFile(this)" class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-violet-50 file:text-violet-700 file:text-xs file:font-medium hover:file:bg-violet-100 cursor-pointer">
+            <div id="importDyeingStatus" class="text-xs text-slate-500 hidden"></div>
+            <div id="importDyeingPreview" class="overflow-y-auto flex-grow -mr-1 pr-1 space-y-1.5 hidden"></div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button id="importDyeingConfirmBtn" onclick="confirmDyeingImport()" class="hidden flex bg-violet-600 hover:bg-violet-700 text-white font-medium px-4 py-2 rounded-xl shadow transition duration-200 text-sm items-center gap-1.5">
                     <i class="fa-solid fa-check"></i> ยืนยันนำเข้า
                 </button>
             </div>
@@ -6450,6 +6481,378 @@
             showToast(`ส่งรายการสี ${colors.length} รายการเข้าบันทึกสั่งย้อม (KPI) แล้ว`, 'fa-droplet', 'text-violet-500');
         }
 
+        // =========================================================================================
+        // NEW (2026-09-30): "นำเข้ารายงานย้อม" — reads the dyeing department's own daily-report .xlsx
+        // ("รายงานการผลิตแผนกย้อม", one sheet per date, e.g. "1-9-2026") entirely client-side with
+        // SheetJS, matches each M/O, S/O against productionOrders (splitting combined-order cells like
+        // "M/O 129+137/26"), and merges the execution details (Colour No./Colour code/Yarn Type/Lot/
+        // Hang/นน.โอนจริง/วันที่ย้อมเสร็จจริง/หมายเหตุ) straight into order.dyeing.dyeOrderLog — the SAME
+        // array that already backs the "แผนกย้อม (KPI)" report, so nothing new is invented. Then, per
+        // the user's explicit choice, checks whether every color Planning ordered (order.dyeing.
+        // colorOrders, net of ไหม Surplus) is now fully covered by actualTransferKg on file, and if so
+        // auto-transfers the order straight to แผนกทอ (reusing transferOrderStage(), so it gets all the
+        // same side effects a manual "โอนไปแผนกทอ" click would — SC-FOS actual-finish stamp, LINE notify,
+        // toast, mascot). Modeled directly on the existing "นำเข้าข้อมูลทอ" weaving-import feature
+        // (openImportWeavingModal/handleWeavingExcelFile/aggregateWeavingImport/confirmWeavingImport
+        // above) — same file-picker → parse → preview with matched/unmatched badges → confirm flow.
+        //
+        // Column layout of the "รายงานการผลิตแผนกย้อม" template (fixed; data rows start at row index 3
+        // of each date sheet): A=ลำดับ, B=Order NO., C=Yarn Type, D=Lot No, E=Colour No., F=Colour code,
+        // G=Hang, H=Batch No, I=Meas. (kg.), J=Remark. A row with a blank ลำดับ is a footer/summary row
+        // (ยอดรวม/จำนวนสี) and is skipped. A cell that is exactly the ditto mark '"' means "same value as
+        // the row above in this column" — carried forward per column. "Batch No" has no clean existing
+        // home in dyeOrderLog's schema (it is NOT the same thing as dyeTubNo, a much-smaller-scale
+        // physical dye-vat number) so it is folded into "remark" as supplementary detail instead of
+        // being dropped.
+        // =========================================================================================
+
+        // Normalizes a colour-code string for matching between Planning's plan (order.dyeing.
+        // colorOrders) and Dyeing's execution log (order.dyeing.dyeOrderLog) — same
+        // trim/uppercase/strip-whitespace approach as normalizeMoSoKey(), just for color codes instead.
+        function normalizeDyeColorCodeKey(v) {
+            return String(v || '').trim().toUpperCase().replace(/\s+/g, '');
+        }
+
+        // Planning's per-color dye-order plan, reduced to "how many kg does Dyeing still need to
+        // actually dye" per color — a color fully (or partially) covered by ไหม Surplus already in
+        // stock needs that much less fresh dyeing. Summed by normalized color code in case Planning
+        // ever lists the same color code on more than one row.
+        function getDyeingRequiredKgByColor(order) {
+            const rows = ((order.dyeing || {}).colorOrders) || [];
+            const map = new Map();
+            rows.forEach(r => {
+                const key = normalizeDyeColorCodeKey(r.colorCode);
+                if (!key) return;
+                const kg = Number(r.kg) || 0;
+                const required = r.useSurplus ? Math.max(0, kg - (Number(r.surplusKg) || 0)) : kg;
+                map.set(key, (map.get(key) || 0) + required);
+            });
+            return map;
+        }
+
+        // Sums actualTransferKg already on file per color across the WHOLE dyeOrderLog (hand-typed
+        // entries and imported-from-Excel entries alike) — "how many kg has Dyeing actually dyed for
+        // this color so far".
+        function getDyeingActualKgByColor(order) {
+            const rows = ((order.dyeing || {}).dyeOrderLog) || [];
+            const map = new Map();
+            rows.forEach(r => {
+                const key = normalizeDyeColorCodeKey(r.colorCode);
+                if (!key) return;
+                map.set(key, (map.get(key) || 0) + (Number(r.actualTransferKg) || 0));
+            });
+            return map;
+        }
+
+        // "ย้อมครบตามแผนหรือยัง" — true only when EVERY color Planning ordered (net of ไหม Surplus) has
+        // at least that much actualTransferKg logged. No plan on file yet (colorOrders empty) is "not
+        // decidable" — never auto-transfer an order nobody has planned colors for.
+        function isDyeingFullyDyedVsPlan(order) {
+            const required = getDyeingRequiredKgByColor(order);
+            if (required.size === 0) return false;
+            const actual = getDyeingActualKgByColor(order);
+            let allCovered = true;
+            required.forEach((reqKg, key) => {
+                if (reqKg > 0 && (actual.get(key) || 0) < reqKg - 0.01) allCovered = false;
+            });
+            return allCovered;
+        }
+
+        // Derives order.dyeing.percent/colorsOrdered/colorsCompleted from the colorOrders-vs-
+        // dyeOrderLog comparison above — used by recomputeStagePercent() ONLY when order.dyeing.items
+        // is empty (i.e. this order isn't using the older manual per-color items list), so the two
+        // completion-tracking methods never fight over the same %.
+        function recomputeDyeingPercentFromColorOrders(order) {
+            const dyeing = order.dyeing || {};
+            const rows = Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders : [];
+            if (rows.length === 0) return; // nothing planned yet — leave percent as-is (0 by default)
+            const required = getDyeingRequiredKgByColor(order);
+            const actual = getDyeingActualKgByColor(order);
+            let totalRequired = 0, totalDone = 0, completedColors = 0;
+            required.forEach((reqKg, key) => {
+                totalRequired += reqKg;
+                totalDone += Math.min(actual.get(key) || 0, reqKg);
+                if (reqKg > 0 && (actual.get(key) || 0) >= reqKg - 0.01) completedColors++;
+            });
+            dyeing.percent = totalRequired > 0 ? Math.round((totalDone / totalRequired) * 100) : 0;
+            dyeing.colorsOrdered = required.size;
+            dyeing.colorsCompleted = completedColors;
+        }
+
+        let pendingDyeingImport = null; // { byMoSo } — set by handleDyeingExcelFile(), consumed by confirmDyeingImport()
+
+        function openImportDyeingModal() {
+            pendingDyeingImport = null;
+            const fileInput = document.getElementById('importDyeingFileInput');
+            if (fileInput) fileInput.value = '';
+            const status = document.getElementById('importDyeingStatus');
+            const preview = document.getElementById('importDyeingPreview');
+            const confirmBtn = document.getElementById('importDyeingConfirmBtn');
+            status.classList.add('hidden'); status.textContent = '';
+            preview.classList.add('hidden'); preview.innerHTML = '';
+            confirmBtn.classList.add('hidden');
+            document.getElementById('importDyeingModal').classList.remove('hidden');
+        }
+
+        function closeImportDyeingModal() {
+            document.getElementById('importDyeingModal').classList.add('hidden');
+        }
+
+        // Splits one combined "Order NO." cell from the รายงานการผลิตแผนกย้อม Excel format into its
+        // separate M/O, S/O keys — e.g. "M/O 129+137/26" → ["129/26", "137/26"], "S/O SC 0360+0361/26"
+        // → ["SC 0360/26", "SC 0361/26"], "M/O TH126+127/26" → ["TH126/26", "TH127/26"]. The leading
+        // "M/O "/"S/O " text is a label only, never part of order.moSo itself (confirmed against how
+        // M/O text is already typed/matched elsewhere in the app, e.g. normalizeMoSoKey()) — stripped
+        // before matching, never reattached.
+        function splitDyeingOrderNoCell(raw) {
+            let s = String(raw || '').trim();
+            if (!s) return [];
+            s = s.replace(/^(M\/O|S\/O|MO|SO)[\s:.]*/i, '').trim();
+            if (!s) return [];
+            const m = s.match(/^([A-Za-z]*\s*)(\d+(?:\s*\+\s*\d+)*)\s*\/\s*(\d+)$/);
+            if (!m) return [s]; // doesn't match the "prefix+numbers/year" pattern — treat as one already-clean key
+            const prefix = m[1] || '';
+            const year = m[3];
+            return m[2].split('+').map(n => `${prefix}${n.trim()}/${year}`.trim());
+        }
+
+        // Reads every date-named sheet (e.g. "1-9-2026") of the รายงานการผลิตแผนกย้อม Excel format and
+        // groups its data rows by normalized M/O, S/O key. Ditto marks (a cell that is exactly '"')
+        // carry forward the last non-ditto value in that column — the dyeing department's own
+        // convention for "same as the row above". A combined-order row (one dye batch shared by
+        // several M/O, S/O) credits its FULL kg to every M/O, S/O in the group, per the user's explicit
+        // choice — one physical hang really was dyed for all of them together, not split between them.
+        function aggregateDyeingImport(workbook) {
+            const dateSheetNames = workbook.SheetNames.filter(n => /^\d{1,2}-\d{1,2}-\d{2,4}$/.test(n.trim()));
+            const byMoSo = {};
+            let sheetsRead = 0;
+            dateSheetNames.forEach(sheetName => {
+                const ws = workbook.Sheets[sheetName];
+                const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+                const dateCell = aoa[0] ? aoa[0][8] : null;
+                let dateKey = null;
+                if (dateCell instanceof Date && !isNaN(dateCell)) {
+                    dateKey = formatDateKeyUTC(dateCell);
+                } else {
+                    // Fallback if the title row's date cell wasn't a real date — parse straight from the
+                    // sheet name instead (same best-effort fallback as the weaving import).
+                    const m = sheetName.trim().match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
+                    if (m) {
+                        const d = m[1], mo = m[2];
+                        let y = m[3];
+                        if (y.length === 2) y = '20' + y;
+                        dateKey = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    }
+                }
+                if (!dateKey) return; // can't tell what date this sheet is — skip rather than guess wrong
+                sheetsRead++;
+
+                const lastValue = {}; // ditto-mark carry-forward, per column index
+                const carryForward = (row, col) => {
+                    const cell = row[col];
+                    if (cell !== null && cell !== undefined && String(cell).trim() === '"') {
+                        return lastValue[col] !== undefined ? lastValue[col] : '';
+                    }
+                    const v = (cell === null || cell === undefined) ? '' : String(cell).trim();
+                    if (v !== '') lastValue[col] = v;
+                    return v;
+                };
+
+                for (let i = 3; i < aoa.length; i++) {
+                    const row = aoa[i] || [];
+                    const seq = row[0];
+                    if (seq === null || seq === undefined || String(seq).trim() === '' || isNaN(Number(seq))) continue; // footer/blank row — no real ลำดับ number
+
+                    const orderNoRaw = carryForward(row, 1);
+                    const yarnType = carryForward(row, 2);
+                    const lotNo = carryForward(row, 3);
+                    const colorNo = carryForward(row, 4);
+                    const colorCode = carryForward(row, 5);
+                    const hang = carryForward(row, 6);
+                    const batchNo = carryForward(row, 7);
+                    const kg = Number(row[8]) || 0;
+                    const remark = (row[9] !== null && row[9] !== undefined) ? String(row[9]).trim() : '';
+
+                    splitDyeingOrderNoCell(orderNoRaw).forEach(disp => {
+                        const key = normalizeMoSoKey(disp);
+                        if (!key) return;
+                        if (!byMoSo[key]) byMoSo[key] = { moSoDisplay: disp, rows: [] };
+                        byMoSo[key].rows.push({ dateKey, sheetName, colorNo, colorCode, yarnType, lotNo, hang, batchNo, kg, remark });
+                    });
+                }
+            });
+            return { byMoSo, sheetsRead };
+        }
+
+        function handleDyeingExcelFile(input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            const status = document.getElementById('importDyeingStatus');
+            const preview = document.getElementById('importDyeingPreview');
+            const confirmBtn = document.getElementById('importDyeingConfirmBtn');
+            status.classList.remove('hidden');
+            status.textContent = 'กำลังอ่านไฟล์...';
+            preview.classList.add('hidden'); preview.innerHTML = '';
+            confirmBtn.classList.add('hidden');
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const { byMoSo, sheetsRead } = aggregateDyeingImport(workbook);
+                    const moSoKeys = Object.keys(byMoSo);
+                    if (sheetsRead === 0) {
+                        status.textContent = 'ไม่พบ sheet ที่ชื่อเป็นวันที่ (เช่น 1-9-2026) ในไฟล์นี้ — ตรวจสอบว่าเป็นไฟล์รายงานการผลิตแผนกย้อมที่ถูกต้อง';
+                        return;
+                    }
+                    if (moSoKeys.length === 0) {
+                        status.textContent = `อ่าน ${sheetsRead} วันจากไฟล์แล้ว แต่ไม่พบแถวข้อมูล M/O, S/O เลย — ตรวจสอบรูปแบบไฟล์`;
+                        return;
+                    }
+                    const rows = moSoKeys.map(key => {
+                        const group = byMoSo[key];
+                        const orderIndex = productionOrders.findIndex(o => normalizeMoSoKey(o.moSo) === key);
+                        const totalKgInFile = group.rows.reduce((s, r) => s + (Number(r.kg) || 0), 0);
+                        const distinctColors = new Set(group.rows.map(r => normalizeDyeColorCodeKey(r.colorCode))).size;
+                        const canAutoTransfer = orderIndex !== -1 && productionOrders[orderIndex].currentStage === 'dyeing' &&
+                            Array.isArray((productionOrders[orderIndex].dyeing || {}).colorOrders) && productionOrders[orderIndex].dyeing.colorOrders.length > 0;
+                        return { key, moSoDisplay: group.moSoDisplay, orderIndex, totalKgInFile, distinctColors, canAutoTransfer };
+                    }).sort((a, b) => a.moSoDisplay.localeCompare(b.moSoDisplay));
+
+                    const matchedCount = rows.filter(r => r.orderIndex !== -1).length;
+                    const unmatchedRows = rows.filter(r => r.orderIndex === -1);
+
+                    status.textContent = `อ่านข้อมูลจาก ${sheetsRead} วัน พบ ${rows.length} M/O, S/O — ตรงกับระบบ ${matchedCount} รายการ${unmatchedRows.length > 0 ? `, ไม่พบในระบบ ${unmatchedRows.length} รายการ (จะข้ามให้อัตโนมัติ)` : ''}`;
+
+                    preview.classList.remove('hidden');
+                    preview.innerHTML = rows.map(r => {
+                        const foundBadge = r.orderIndex !== -1
+                            ? `<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> พบในระบบ${r.canAutoTransfer ? ' · ครบแผนแล้วจะโอนแผนกทอให้อัตโนมัติ' : ''}</span>`
+                            : `<span class="text-rose-500"><i class="fa-solid fa-circle-exclamation"></i> ไม่พบ M/O, S/O นี้ในระบบ</span>`;
+                        return `<div class="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                            <div><span class="font-semibold text-slate-700">${escapeHtml(r.moSoDisplay)}</span>
+                                <span class="text-slate-400 ml-1">${r.distinctColors} สี, รวม ${r.totalKgInFile.toFixed(2)} กก.</span></div>
+                            ${foundBadge}
+                        </div>`;
+                    }).join('');
+
+                    if (matchedCount > 0) {
+                        pendingDyeingImport = { byMoSo };
+                        confirmBtn.classList.remove('hidden');
+                    } else {
+                        pendingDyeingImport = null;
+                    }
+                } catch (err) {
+                    console.error('Error reading dyeing Excel file:', err);
+                    status.textContent = 'อ่านไฟล์ไม่สำเร็จ — ตรวจสอบว่าเป็นไฟล์ .xlsx ที่ไม่เสียหาย';
+                }
+            };
+            reader.onerror = () => { status.textContent = 'อ่านไฟล์ไม่สำเร็จ'; };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Merges parsed dyeing-report rows into order.dyeing.dyeOrderLog — the SAME log that already
+        // backs the "แผนกย้อม (KPI)" report — upserting by a stable per-row identity (_importKey: date +
+        // color + hang + lot + batch) so re-importing the same file twice never double-counts. Prefers
+        // filling an existing "planned" row Planning already pushed via sendDyeingColorListToKpiLog()
+        // (same color, not yet executed) before creating a brand-new (isExtra) row, so a normal
+        // hand-off + import doesn't leave a duplicate row for the same color. After merging, re-derives
+        // order.dyeing.percent (recomputeStagePercent → recomputeDyeingPercentFromColorOrders when this
+        // order has no manual items[] list) and checks actual-vs-planned kg per color — per the user's
+        // explicit choice, auto-transfers straight to แผนกทอ the instant every planned color is fully
+        // covered, reusing transferOrderStage() so it gets every side effect a manual click would. Only
+        // for an order still sitting in currentStage === 'dyeing' with a real color plan on file —
+        // nothing to compare against (no colorOrders) never triggers an auto-transfer, though its data
+        // still gets imported.
+        function confirmDyeingImport() {
+            if (!pendingDyeingImport) return;
+            const { byMoSo } = pendingDyeingImport;
+            const matched = [];
+            const autoTransferred = [];
+
+            Object.keys(byMoSo).forEach(key => {
+                const group = byMoSo[key];
+                const orderIndex = productionOrders.findIndex(o => normalizeMoSoKey(o.moSo) === key);
+                if (orderIndex === -1) return; // unmatched — already flagged in the preview, nothing to do
+                const order = productionOrders[orderIndex];
+                if (!order.dyeing) order.dyeing = {};
+                if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
+                const log = order.dyeing.dyeOrderLog;
+                const usedThisRound = new Set();
+
+                group.rows.forEach(r => {
+                    const colorKey = normalizeDyeColorCodeKey(r.colorCode);
+                    const importKey = `${r.dateKey}|${colorKey}|${normalizeDyeColorCodeKey(r.hang)}|${normalizeDyeColorCodeKey(r.lotNo)}|${normalizeDyeColorCodeKey(r.batchNo)}`;
+                    // "Batch No" has no clean existing home in dyeOrderLog's schema (it is NOT the same
+                    // thing as dyeTubNo, a much-smaller-scale physical dye-vat number) — folded into
+                    // remark as supplementary detail instead of being dropped.
+                    const remarkParts = [];
+                    if (r.batchNo) remarkParts.push(`Batch ${r.batchNo}`);
+                    if (r.remark) remarkParts.push(r.remark);
+                    const mergedRemark = remarkParts.join(' · ');
+
+                    let idx = log.findIndex((row, i) => row._importKey === importKey && !usedThisRound.has(i));
+                    if (idx === -1) {
+                        idx = log.findIndex((row, i) => !usedThisRound.has(i) && !row._importKey &&
+                            normalizeDyeColorCodeKey(row.colorCode) === colorKey && !row.actualDate);
+                    }
+                    if (idx !== -1) {
+                        const row = log[idx];
+                        row.colorNo = r.colorNo || row.colorNo || '';
+                        row.colorCode = r.colorCode || row.colorCode || '';
+                        row.yarnType = r.yarnType || row.yarnType || '';
+                        row.lotNo = r.lotNo || row.lotNo || '';
+                        row.hang = r.hang || row.hang || '';
+                        row.actualTransferKg = Number(r.kg) || 0;
+                        row.actualDate = r.dateKey;
+                        row.remark = mergedRemark || row.remark || '';
+                        row._importKey = importKey;
+                        usedThisRound.add(idx);
+                    } else {
+                        log.push({
+                            isExtra: true, orderDate: r.dateKey, colorNo: r.colorNo || '', colorCode: r.colorCode || '',
+                            yarnType: r.yarnType || '', lotNo: r.lotNo || '', orderKg: 0, dyeTubNo: '',
+                            requisitionKg: 0, actualTransferKg: Number(r.kg) || 0,
+                            plannedDate: '', actualDate: r.dateKey, dueDate: order.dueDate || '',
+                            hang: r.hang || '', remark: mergedRemark, _importKey: importKey
+                        });
+                        usedThisRound.add(log.length - 1);
+                    }
+                });
+
+                recomputeStagePercent(order, 'dyeing');
+                persistOrderChange(order);
+                matched.push(order.moSo);
+
+                if (order.currentStage === 'dyeing' && isDyeingFullyDyedVsPlan(order)) {
+                    transferOrderStage(orderIndex, 'dyeing', 'weaving');
+                    autoTransferred.push(order.moSo);
+                }
+            });
+
+            renderProductionBoard();
+            renderProductionTimeline();
+            renderProductionOverview();
+            if (document.getElementById('dyeingKpiSplitContainer')) renderDyeOrderLogTable();
+
+            const status = document.getElementById('importDyeingStatus');
+            const preview = document.getElementById('importDyeingPreview');
+            const confirmBtn = document.getElementById('importDyeingConfirmBtn');
+            confirmBtn.classList.add('hidden');
+            preview.classList.add('hidden');
+            status.classList.remove('hidden');
+            if (matched.length > 0) {
+                status.innerHTML = `<span class="text-emerald-600 font-medium"><i class="fa-solid fa-circle-check"></i> นำเข้าสำเร็จ ${matched.length} M/O, S/O</span>` +
+                    (autoTransferred.length > 0 ? `<br><span class="text-violet-600"><i class="fa-solid fa-arrow-right"></i> โอนไปแผนกทออัตโนมัติ ${autoTransferred.length} รายการ: ${autoTransferred.map(escapeHtml).join(', ')}</span>` : '');
+                showToast(`นำเข้ารายงานย้อมสำเร็จ ${matched.length} M/O, S/O${autoTransferred.length > 0 ? ` (โอนแผนกทออัตโนมัติ ${autoTransferred.length} รายการ)` : ''}`, 'fa-droplet', 'text-violet-500');
+            } else {
+                status.textContent = 'ไม่มี M/O, S/O ที่นำเข้าได้ (ไม่พบในระบบทั้งหมด)';
+            }
+            pendingDyeingImport = null;
+            document.getElementById('importDyeingFileInput').value = '';
+        }
+
         // NEW (2026-09-16): ใบสั่งจ้างทอ (weaving subcontract order) — printed only for จ้างทอภายนอก
         // (external weaving), mirroring buildDyeingOrderPrintHTML's own layout/pattern per the user's
         // explicit choice ("รูปแบบเดียวกับใบสั่งจ้างย้อมนอกบริษัท"): same header/info-table/signature-row
@@ -7850,7 +8253,15 @@
             const items = s.items || [];
 
             if (stage === 'dyeing') {
-                if (items.length === 0) return;
+                if (items.length === 0) {
+                    // NEW (2026-09-30): no manual per-color items[] entered for this order — derive %
+                    // instead from Planning's colorOrders plan vs. dyeOrderLog's actual kg (see
+                    // recomputeDyeingPercentFromColorOrders(), fed by the new "นำเข้ารายงานย้อม" import
+                    // as well as any hand-typed dyeOrderLog entries). Orders that still use the older
+                    // manual items[] list are untouched — this only fires when items[] is empty.
+                    recomputeDyeingPercentFromColorOrders(order);
+                    return;
+                }
                 // In external mode (ไหมสั่งย้อมนอกบริษัท) each item is still one color, but tracked by
                 // กิโล ordered/received instead of the internal ชิ้น-based qty/completedQty.
                 const orderedField = s.mode === 'external' ? 'weightKgOrdered' : 'qty';
