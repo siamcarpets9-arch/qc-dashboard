@@ -11907,17 +11907,40 @@
             `;
 
             let mainHtml = '';
+            // REDESIGNED (2026-09-30): "แผนกวางแผน...ให้กดเข้า คีย์แค่ จำนวนสีสั่งย้อม ย้อมภายในบริษัท/นอก
+            // บริษัท ทอภายในบริษัท/นอกบริษัท" — the old "คำนวณสเปคแล้ว"/"ลงแผนงานแล้ว" checkboxes are gone
+            // (user's explicit choice: "ตัดช่องติ๊กเดิมออก เหลือแค่ฟิลด์ใหม่") — replaced with exactly the
+            // 3 things Planning needs to key on this card: จำนวนสีสั่งย้อม (order.colorsCount, already a
+            // real field — see submitNewOrder()), การย้อม (internal/external — existing setDyeingMode()),
+            // and การทอ (internal/external — existing setWeavingMode(), newly surfaced here; it used to be
+            // choosable only from the Order Detail modal's Planning section). The detailed per-color-code
+            // dye plan (renderDyeingColorOrdersHtml — code/kg/surplus) is still here but tucked inside a
+            // collapsible, since it's optional extra detail beyond "just key the count" — see
+            // computePlanningNextStage()/passPlanningOrder() for the routing this now drives.
             if (stage === 'planning') {
                 const d = order.dyeing || {};
+                const w = order.weaving || {};
                 mainHtml = `
-                    <label class="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" ${order.planning.specDone ? 'checked' : ''} onchange="updateOrderField(${orderIndex}, 'planning.specDone', this.checked)" class="rounded"> คำนวณสเปคแล้ว</label>
-                    <label class="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" ${order.planning.planEntered ? 'checked' : ''} onchange="updateOrderField(${orderIndex}, 'planning.planEntered', this.checked)" class="rounded"> ลงแผนงานแล้ว</label>
-                    <div class="pt-1.5 mt-0.5 border-t border-slate-100 space-y-1.5">
-                        <p class="text-[10px] font-semibold text-slate-500">การย้อมไหม</p>
-                        ${renderStageModeToggleHtml(orderIndex, 'dyeing', d.mode, 'ย้อมในบริษัท', 'ไหมสั่งย้อมนอกบริษัท')}
-                        ${renderDyeingColorOrdersHtml(order, orderIndex, true)}
-                        ${dyeingFullyCoveredBySurplus(order) ? `<p class="text-[10px] text-teal-600 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>ไหม surplus ครอบคลุมทุกสีแล้ว — โอนตรงไปแผนกทอได้เลย</p>` : ''}
+                    <div>
+                        <label class="block text-[10px] text-slate-500 mb-0.5">จำนวนสีสั่งย้อม</label>
+                        <input type="number" min="0" step="1" value="${order.colorsCount || ''}" onchange="updateOrderField(${orderIndex}, 'colorsCount', Number(this.value))" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs">
                     </div>
+                    <div class="pt-1.5 mt-0.5 border-t border-slate-100 space-y-1.5">
+                        <p class="text-[10px] font-semibold text-slate-500">การย้อม</p>
+                        ${renderStageModeToggleHtml(orderIndex, 'dyeing', d.mode, 'ย้อมในบริษัท', 'ย้อมนอกบริษัท')}
+                    </div>
+                    <div class="pt-1.5 mt-0.5 border-t border-slate-100 space-y-1.5">
+                        <p class="text-[10px] font-semibold text-slate-500">การทอ</p>
+                        ${renderStageModeToggleHtml(orderIndex, 'weaving', w.mode, 'ทอในบริษัท', 'ทอนอกบริษัท')}
+                    </div>
+                    ${dyeingFullyCoveredBySurplus(order) ? `<p class="text-[10px] text-teal-600 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>ไหม surplus ครอบคลุมทุกสีแล้ว</p>` : ''}
+                    <details class="group pt-1">
+                        <summary class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer select-none [&::-webkit-details-marker]:hidden" style="list-style: none">
+                            <i class="fa-solid fa-chevron-right text-[9px] transition-transform group-open:rotate-90"></i>
+                            รายละเอียดสีที่สั่งย้อม (ถ้ามี)
+                        </summary>
+                        <div class="pt-1.5">${renderDyeingColorOrdersHtml(order, orderIndex, true)}</div>
+                    </details>
                 `;
             } else if (stage === 'dyeing' && order.dyeing.mode === 'external') {
                 mainHtml = `<p class="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold w-fit"><i class="fa-solid fa-truck-ramp-box"></i> ไหมสั่งย้อมนอกบริษัท</p>`;
@@ -11942,6 +11965,25 @@
                     <p class="text-[10px] ${yarnOk ? 'text-emerald-600' : 'text-amber-600'}"><i class="fa-solid ${yarnOk ? 'fa-circle-check' : 'fa-circle-exclamation'} mr-1"></i>${yarnOk ? 'ไหมครบสำหรับทอแล้ว' : 'ไหมยังไม่ครบสำหรับทอ'}</p>
                     ${totalYarnColors > 0 ? `<p class="text-[10px] text-slate-500"><i class="fa-solid fa-palette mr-1"></i>ไหม: รับมาแล้ว ${yarnColorsReceived}/${totalYarnColors} สี (เหลือ ${yarnColorsRemaining} สี)</p>` : ''}
                 `;
+            } else if (stage === 'finishing' && order.weaving.mode === 'external') {
+                // NEW (2026-09-30): "ถ้าได้การทอจากภายนอกให้เข้าแผนกทากาวตกแต่งได้เลย" — Planning now routes
+                // external-weave orders straight past the Weaving column into Finishing (see
+                // computePlanningNextStage()) — this is the same read-only summary the Weaving Kanban card
+                // used to show for these orders (see the 'weaving' + external branch above, kept as-is for
+                // any order already sitting there from before this change), just surfaced here instead so
+                // Finishing can see the subcontract job status without hunting through a column the order
+                // no longer visits. Editable fields for this job (ส่งผ้า+ไหมวันที่/กำหนดส่ง/ผล QC/วันที่ได้รับ
+                // พรมคืน) are in this card's "แก้ไข" (order detail) — see renderOrderDetailStageSection()'s
+                // finishing-stage branch.
+                const ext = order.weaving.external || {};
+                const qcBadge = ext.qcResult === 'pass'
+                    ? '<span class="text-emerald-600"><i class="fa-solid fa-circle-check mr-1"></i>QC ผ่าน</span>'
+                    : (ext.qcResult === 'fail' ? '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark mr-1"></i>QC ไม่ผ่าน</span>' : '<span class="text-slate-400">รอผล QC</span>');
+                mainHtml = `
+                    <p class="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold w-fit"><i class="fa-solid fa-truck-ramp-box"></i> รับงานจ้างทอภายนอก (ข้ามแผนกทอ)</p>
+                    <p class="text-[10px] text-slate-500">ส่งผ้า+ไหม: ${escapeHtml(ext.sentDate || '-')}${ext.vendorDueDate ? ` • กำหนดส่ง: ${escapeHtml(ext.vendorDueDate)}` : ''}</p>
+                    <p class="text-[10px]">${qcBadge}${ext.receivedDate ? ` • ได้รับพรม: ${escapeHtml(ext.receivedDate)}` : ''}</p>
+                `;
             }
 
             const deadlineWarningHtml = renderDeadlineWarningBadge(order);
@@ -11955,15 +11997,14 @@
             let footerHtml = '';
             if (stage === 'finishing') {
                 footerHtml = `<button onclick="markOrderReadyToShip(${orderIndex})" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-1.5 rounded-lg shadow transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-truck-fast"></i> ยืนยันงานเสร็จ พร้อมส่ง</button>`;
-            } else if (stage === 'planning' && dyeingFullyCoveredBySurplus(order)) {
-                // NEW (2026-09-16): skip Dyeing entirely when ไหม surplus already covers every planned
-                // color (see dyeingFullyCoveredBySurplus()) — the normal "โอนไปแผนกย้อม" path stays
-                // available underneath as a plain text link, in case Planning wants to route it through
-                // Dyeing anyway (e.g. to keep that department's records complete even with nothing to dye).
-                footerHtml = `
-                    <button onclick="transferPlanningDirectToWeaving(${orderIndex})" class="w-full bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium py-1.5 rounded-lg shadow transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-forward"></i> โอนตรงไปแผนกทอ (ข้ามแผนกย้อม)</button>
-                    <button onclick="transferOrderStage(${orderIndex}, 'planning', 'dyeing')" class="w-full mt-1.5 text-[10px] text-slate-400 hover:text-indigo-600 underline text-center">หรือโอนไปแผนกย้อมตามปกติ</button>
-                `;
+            } else if (stage === 'planning') {
+                // REDESIGNED (2026-09-30): single "ผ่าน" button that routes automatically based on the
+                // dye/weave choices above — see computePlanningNextStage()/passPlanningOrder(). Replaces
+                // the old two-button "skip Dyeing via surplus, or go through it anyway" choice: that
+                // manual override is gone now that routing also depends on the (also-new) dye/weave
+                // external choices, per the user's "ตัดช่องติ๊กเดิมออก เหลือแค่ฟิลด์ใหม่" simplification.
+                const nextStage = computePlanningNextStage(order);
+                footerHtml = `<button onclick="passPlanningOrder(${orderIndex})" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium py-1.5 rounded-lg shadow transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-check"></i> ผ่าน → แผนก${STAGE_LABELS[nextStage]}</button>`;
             } else {
                 const toStage = NEXT_STAGE[stage];
                 footerHtml = `<button onclick="transferOrderStage(${orderIndex}, '${stage}', '${toStage}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium py-1.5 rounded-lg shadow transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-arrow-right"></i> โอนงานไปแผนก${STAGE_LABELS[toStage]}</button>`;
@@ -12734,6 +12775,41 @@
             // NEW (2026-09-29): if that department finished LATE against its Baseline Plan and no Delay
             // Reason is on file yet, prompt for one now — see notifyMissingDelayReasonAfterCompletion().
             notifyMissingDelayReasonAfterCompletion(orderIndex, fromStage);
+        }
+
+        // NEW (2026-09-30): "แผนกวางแผน...ย้อมภายในบริษัท ไปที่แผนกย้อม ย้อมภายนอกบริษัท ทอภายในบริษัท
+        // หรือทอภายนอกบริษัท ถ้าได้การทอจากภายนอกให้เข้าแผนกทากาวตกแต่งได้เลย" — Planning's single "ผ่าน"
+        // button (buildOrderCard's 'planning' footer) needs to know which department to send the order to,
+        // since that's no longer always "แผนกย้อม" (Dyeing). Two independent skip rules, both decided
+        // already at this point (dyeing mode / weaving mode / surplus coverage are all set on this same
+        // card):
+        //   - Dyeing is skipped when it's an external dye job (order.dyeing.mode === 'external' — a
+        //     subcontractor does it, nothing for our Dyeing department to do) OR when ไหม surplus already
+        //     covers every planned color (dyeingFullyCoveredBySurplus() — pre-existing rule, unchanged).
+        //   - Weaving is skipped when it's an external weave job (order.weaving.mode === 'external') — the
+        //     subcontractor weaves it, so the order goes straight to Finishing; the job's own tracking
+        //     (sent/received dates, QC result) now lives in the Finishing section instead of a Weaving
+        //     column the order never visits — see renderOrderDetailStageSection()'s finishing-stage branch
+        //     and buildOrderCard()'s new 'finishing' + external mainHtml branch.
+        // Both rules apply independently, so all 3 destinations are reachable depending on the combination
+        // (e.g. external dye + internal weave still visits Weaving; internal dye + external weave visits
+        // neither Dyeing nor Weaving and lands straight in Finishing).
+        function computePlanningNextStage(order) {
+            const dyeSkipped = (order.dyeing && order.dyeing.mode === 'external') || dyeingFullyCoveredBySurplus(order);
+            if (!dyeSkipped) return 'dyeing';
+            if (order.weaving && order.weaving.mode === 'external') return 'finishing';
+            return 'weaving';
+        }
+
+        // The Planning card's single "ผ่าน" action — computes where this order goes (see
+        // computePlanningNextStage() above) and transfers it there via the same transferOrderStage() every
+        // other department's "โอนงาน" button already uses, so stamping/notifications/mascot all fire
+        // identically regardless of which stage got skipped.
+        function passPlanningOrder(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            const nextStage = computePlanningNextStage(order);
+            transferOrderStage(orderIndex, 'planning', nextStage);
         }
 
         // NEW (2026-09-16): "ถ้าใช้ไหม Surplus ทอให้กดโอนไปแผนกทอได้เลยโดยไม่ต้องผ่านแผนกย้อม" — true only
@@ -15264,6 +15340,21 @@
                         </div>
                     </div>
                     ${renderWeavingDailyLogHtml(order)}
+                `;
+            } else if (stage === 'finishing' && order.weaving.mode === 'external') {
+                // NEW (2026-09-30): "ถ้าได้การทอจากภายนอกให้เข้าแผนกทากาวตกแต่งได้เลย" — Planning now skips
+                // the Weaving stage entirely for external-weave orders (see computePlanningNextStage()), so
+                // the job-tracking fields that used to live in the Weaving section's isWeavingExternal
+                // branch above (ส่งผ้า+ไหมวันที่/กำหนดส่ง/ผล QC/วันที่ได้รับพรมคืน — renderWeavingExternalJobHtml)
+                // are surfaced here in Finishing too, since that's the department that now actually needs
+                // them (nothing else stops the order in a Weaving column to fill them in). Left in place
+                // under the Weaving tab as well (harmless, and covers any order already sitting there from
+                // before this change) — this is additive, not a move, despite how the user described it.
+                weavingChecks = `
+                    <div class="mb-2">
+                        <p class="text-[11px] font-bold text-amber-700 mb-1"><i class="fa-solid fa-truck-ramp-box mr-1"></i>งานจ้างทอภายนอก (ข้ามแผนกทอ)</p>
+                        ${renderWeavingExternalJobHtml(order, orderIndex)}
+                    </div>
                 `;
             }
 
