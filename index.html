@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -6518,9 +6520,16 @@
         // stock needs that much less fresh dyeing. Summed by normalized color code in case Planning
         // ever lists the same color code on more than one row.
         function getDyeingRequiredKgByColor(order) {
-            const rows = ((order.dyeing || {}).colorOrders) || [];
+            const dyeing = (order && order.dyeing) || {};
+            const rows = Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders : [];
             const map = new Map();
             rows.forEach(r => {
+                // FIX (2026-09-30): a row that isn't a plain object (a stray null/string from historical
+                // or hand-edited Sheet data) must never throw here — this runs unconditionally on every
+                // order load (see recomputeStagePercent → recomputeDyeingPercentFromColorOrders), so one
+                // malformed row anywhere would otherwise abort the WHOLE productionOrders sync fetch
+                // (fetchOrdersFromGoogleSheet's normalizeOrder(o) map is one try/catch for all rows).
+                if (!r || typeof r !== 'object') return;
                 const key = normalizeDyeColorCodeKey(r.colorCode);
                 if (!key) return;
                 const kg = Number(r.kg) || 0;
@@ -6534,9 +6543,11 @@
         // entries and imported-from-Excel entries alike) — "how many kg has Dyeing actually dyed for
         // this color so far".
         function getDyeingActualKgByColor(order) {
-            const rows = ((order.dyeing || {}).dyeOrderLog) || [];
+            const dyeing = (order && order.dyeing) || {};
+            const rows = Array.isArray(dyeing.dyeOrderLog) ? dyeing.dyeOrderLog : [];
             const map = new Map();
             rows.forEach(r => {
+                if (!r || typeof r !== 'object') return; // see the same guard's comment in getDyeingRequiredKgByColor()
                 const key = normalizeDyeColorCodeKey(r.colorCode);
                 if (!key) return;
                 map.set(key, (map.get(key) || 0) + (Number(r.actualTransferKg) || 0));
@@ -6548,14 +6559,19 @@
         // at least that much actualTransferKg logged. No plan on file yet (colorOrders empty) is "not
         // decidable" — never auto-transfer an order nobody has planned colors for.
         function isDyeingFullyDyedVsPlan(order) {
-            const required = getDyeingRequiredKgByColor(order);
-            if (required.size === 0) return false;
-            const actual = getDyeingActualKgByColor(order);
-            let allCovered = true;
-            required.forEach((reqKg, key) => {
-                if (reqKg > 0 && (actual.get(key) || 0) < reqKg - 0.01) allCovered = false;
-            });
-            return allCovered;
+            try {
+                const required = getDyeingRequiredKgByColor(order);
+                if (required.size === 0) return false;
+                const actual = getDyeingActualKgByColor(order);
+                let allCovered = true;
+                required.forEach((reqKg, key) => {
+                    if (reqKg > 0 && (actual.get(key) || 0) < reqKg - 0.01) allCovered = false;
+                });
+                return allCovered;
+            } catch (e) {
+                console.error('isDyeingFullyDyedVsPlan failed — treating as not fully covered:', e);
+                return false;
+            }
         }
 
         // Derives order.dyeing.percent/colorsOrdered/colorsCompleted from the colorOrders-vs-
@@ -6563,20 +6579,32 @@
         // is empty (i.e. this order isn't using the older manual per-color items list), so the two
         // completion-tracking methods never fight over the same %.
         function recomputeDyeingPercentFromColorOrders(order) {
-            const dyeing = order.dyeing || {};
-            const rows = Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders : [];
-            if (rows.length === 0) return; // nothing planned yet — leave percent as-is (0 by default)
-            const required = getDyeingRequiredKgByColor(order);
-            const actual = getDyeingActualKgByColor(order);
-            let totalRequired = 0, totalDone = 0, completedColors = 0;
-            required.forEach((reqKg, key) => {
-                totalRequired += reqKg;
-                totalDone += Math.min(actual.get(key) || 0, reqKg);
-                if (reqKg > 0 && (actual.get(key) || 0) >= reqKg - 0.01) completedColors++;
-            });
-            dyeing.percent = totalRequired > 0 ? Math.round((totalDone / totalRequired) * 100) : 0;
-            dyeing.colorsOrdered = required.size;
-            dyeing.colorsCompleted = completedColors;
+            // FIX (2026-09-30): this is called unconditionally from recomputeStagePercent() for every
+            // order normalized on every load (see normalizeOrder()'s migratedFlags block) — and
+            // fetchOrdersFromGoogleSheet() runs normalizeOrder() inside a SINGLE try/catch wrapped
+            // around the whole productionOrders.map(...) call. An uncaught error for even one order's
+            // malformed dyeing data would silently abort the ENTIRE sync fetch for every order (caught,
+            // logged, productionOrders left unchanged) — which is exactly what looked like "the app
+            // doesn't connect to Google Sheets anymore" after this feature shipped. Never let a bad
+            // shape here escape past this function.
+            try {
+                const dyeing = order.dyeing || {};
+                const rows = Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders : [];
+                if (rows.length === 0) return; // nothing planned yet — leave percent as-is (0 by default)
+                const required = getDyeingRequiredKgByColor(order);
+                const actual = getDyeingActualKgByColor(order);
+                let totalRequired = 0, totalDone = 0, completedColors = 0;
+                required.forEach((reqKg, key) => {
+                    totalRequired += reqKg;
+                    totalDone += Math.min(actual.get(key) || 0, reqKg);
+                    if (reqKg > 0 && (actual.get(key) || 0) >= reqKg - 0.01) completedColors++;
+                });
+                dyeing.percent = totalRequired > 0 ? Math.round((totalDone / totalRequired) * 100) : 0;
+                dyeing.colorsOrdered = required.size;
+                dyeing.colorsCompleted = completedColors;
+            } catch (e) {
+                console.error('recomputeDyeingPercentFromColorOrders failed — leaving dyeing.percent unchanged for this order:', e, order && order.moSo);
+            }
         }
 
         let pendingDyeingImport = null; // { byMoSo } — set by handleDyeingExcelFile(), consumed by confirmDyeingImport()
@@ -6807,9 +6835,9 @@
                     if (r.remark) remarkParts.push(r.remark);
                     const mergedRemark = remarkParts.join(' · ');
 
-                    let idx = log.findIndex((row, i) => row._importKey === importKey && !usedThisRound.has(i));
+                    let idx = log.findIndex((row, i) => row && row._importKey === importKey && !usedThisRound.has(i));
                     if (idx === -1) {
-                        idx = log.findIndex((row, i) => !usedThisRound.has(i) && !row._importKey &&
+                        idx = log.findIndex((row, i) => row && !usedThisRound.has(i) && !row._importKey &&
                             normalizeDyeColorCodeKey(row.colorCode) === colorKey && !row.actualDate);
                     }
                     if (idx !== -1) {
