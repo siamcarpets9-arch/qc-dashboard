@@ -6777,18 +6777,26 @@
         }
 
         // Merges parsed dyeing-report rows into order.dyeing.dyeOrderLog — the SAME log that already
-        // backs the "แผนกย้อม (KPI)" report — upserting by a stable per-row identity (_importKey: date +
-        // color + hang + lot + batch) so re-importing the same file twice never double-counts. Prefers
-        // filling an existing "planned" row Planning already pushed via sendDyeingColorListToKpiLog()
-        // (same color, not yet executed) before creating a brand-new (isExtra) row, so a normal
-        // hand-off + import doesn't leave a duplicate row for the same color. After merging, re-derives
-        // order.dyeing.percent (recomputeStagePercent → recomputeDyeingPercentFromColorOrders when this
-        // order has no manual items[] list) and checks actual-vs-planned kg per color — per the user's
-        // explicit choice, auto-transfers straight to แผนกทอ the instant every planned color is fully
-        // covered, reusing transferOrderStage() so it gets every side effect a manual click would. Only
-        // for an order still sitting in currentStage === 'dyeing' with a real color plan on file —
-        // nothing to compare against (no colorOrders) never triggers an auto-transfer, though its data
-        // still gets imported.
+        // backs the "แผนกย้อม (KPI)" report. After merging, re-derives order.dyeing.percent
+        // (recomputeStagePercent → recomputeDyeingPercentFromColorOrders when this order has no manual
+        // items[] list) and checks actual-vs-planned kg per color — per the user's explicit choice,
+        // auto-transfers straight to แผนกทอ the instant every planned color is fully covered, reusing
+        // transferOrderStage() so it gets every side effect a manual click would. Only for an order still
+        // sitting in currentStage === 'dyeing' with a real color plan on file — nothing to compare
+        // against (no colorOrders) never triggers an auto-transfer, though its data still gets imported.
+        //
+        // UPDATED (2026-10-01): "รายงานควรไปอยู่ที่บันทึกสั่งย้อม ถ้ามีย้อมเพิ่มจะไปอยู่ที่หน้าย้อมเพิ่ม
+        // ช่วยรวมการย้อมของแต่ละ M/O, S/O แยกตาม Code สีให้ด้วย" — two changes from the original row-per-
+        // batch design: (1) a row only counts as "ย้อมเพิ่ม" (isExtra) when the Excel's OWN Remark column
+        // says so — never just because no matching planned row was found, which used to route every
+        // first-time import into "ย้อมเพิ่ม" by mistake; everything else defaults into "บันทึกสั่งย้อม".
+        // (2) every raw Excel row for the SAME color code (within the same regular/"ย้อมเพิ่ม"
+        // classification and the same calendar month) is first consolidated into ONE merged entry —
+        // summing kg across every date/batch — before the upsert, instead of creating a separate
+        // dyeOrderLog row per individual date+batch. Per-batch Batch No detail is kept in the merged
+        // row's remark so nothing is silently lost. Grouping stays within one calendar month (not just
+        // one color) so importing next month's file can never silently overwrite this month's already-
+        // recorded total for a color that happens to keep being dyed into the following month.
         function confirmDyeingImport() {
             if (!pendingDyeingImport) return;
             const { byMoSo } = pendingDyeingImport;
@@ -6805,52 +6813,95 @@
                 const log = order.dyeing.dyeOrderLog;
                 const usedThisRound = new Set();
 
+                // Consolidate raw rows by colorKey|isExtra|month before touching dyeOrderLog at all.
+                const colorGroups = {};
                 group.rows.forEach(r => {
                     const colorKey = normalizeDyeColorCodeKey(r.colorCode);
-                    const importKey = `${r.dateKey}|${colorKey}|${normalizeDyeColorCodeKey(r.hang)}|${normalizeDyeColorCodeKey(r.lotNo)}|${normalizeDyeColorCodeKey(r.batchNo)}`;
+                    if (!colorKey) return; // nothing to key this batch's dyeing to
+                    const isExtraRow = /ย้อมเพิ่ม/.test(r.remark || '');
+                    const monthKey = String(r.dateKey || '').slice(0, 7); // "YYYY-MM"
+                    const gKey = `${colorKey}|${isExtraRow ? 1 : 0}|${monthKey}`;
+                    if (!colorGroups[gKey]) {
+                        colorGroups[gKey] = {
+                            colorKey, isExtra: isExtraRow, monthKey, colorNo: '', colorCode: '', yarnType: '',
+                            lotNo: '', hang: '', dyeTubNo: '', batchNos: [], extraRemarks: [], dates: [],
+                            kg: 0, requisitionKg: null, orderKg: null
+                        };
+                    }
+                    const g = colorGroups[gKey];
+                    if (r.colorNo) g.colorNo = r.colorNo;
+                    if (r.colorCode) g.colorCode = r.colorCode;
+                    if (r.yarnType) g.yarnType = r.yarnType;
+                    if (r.lotNo) g.lotNo = r.lotNo;
+                    if (r.hang) g.hang = r.hang;
+                    if (r.dyeTubNo) g.dyeTubNo = r.dyeTubNo;
+                    if (r.batchNo && !g.batchNos.includes(String(r.batchNo))) g.batchNos.push(String(r.batchNo));
+                    if (r.remark) {
+                        // "ย้อมเพิ่ม" itself is already encoded as isExtra (which tab the row lands in) —
+                        // strip it out of the free-text remark so it isn't shown twice.
+                        const extra = r.remark.replace(/ย้อมเพิ่ม/g, '').trim();
+                        if (extra && !g.extraRemarks.includes(extra)) g.extraRemarks.push(extra);
+                    }
+                    if (r.dateKey) g.dates.push(r.dateKey);
+                    g.kg += Number(r.kg) || 0;
+                    // NEW (2026-10-01): the new sheet layout carries its own "นน.โอนจากใบเบิก" and
+                    // "นน.ในใบสั่งย้อม" values — summed across the merged batches, but only when at least
+                    // one of them actually has a value (the old layout never does), so re-importing an
+                    // old-layout file never clobbers a value the dyeing staff already typed by hand.
+                    if (r.requisitionKg !== null && r.requisitionKg !== undefined && !isNaN(r.requisitionKg)) {
+                        g.requisitionKg = (g.requisitionKg || 0) + Number(r.requisitionKg);
+                    }
+                    if (r.orderKg !== null && r.orderKg !== undefined && !isNaN(r.orderKg)) {
+                        g.orderKg = (g.orderKg || 0) + Number(r.orderKg);
+                    }
+                });
+
+                Object.values(colorGroups).forEach(g => {
+                    const sortedDates = g.dates.slice().sort();
+                    const orderDate = sortedDates[0] || '';
+                    const actualDate = sortedDates[sortedDates.length - 1] || '';
+                    const remarkParts = [];
                     // "Batch No" has no clean existing home in dyeOrderLog's schema (it is NOT the same
                     // thing as dyeTubNo, a much-smaller-scale physical dye-vat number) — folded into
-                    // remark as supplementary detail instead of being dropped.
-                    const remarkParts = [];
-                    if (r.batchNo) remarkParts.push(`Batch ${r.batchNo}`);
-                    if (r.remark) remarkParts.push(r.remark);
+                    // remark as supplementary detail instead of being dropped, now listing every batch
+                    // this merged color/month row covers.
+                    if (g.batchNos.length > 0) remarkParts.push(`Batch ${g.batchNos.join(', ')}`);
+                    remarkParts.push(...g.extraRemarks);
                     const mergedRemark = remarkParts.join(' · ');
-                    // NEW (2026-10-01): the new sheet layout carries its own "นน.โอนจากใบเบิก" and
-                    // "นน.ในใบสั่งย้อม" values — only overwrite dyeOrderLog's existing requisitionKg/orderKg
-                    // when the imported row actually has one (the old layout never does), so re-importing
-                    // an old-layout file never clobbers a value the dyeing staff already typed by hand in
-                    // the "บันทึกสั่งย้อม" table.
-                    const hasRequisitionKg = r.requisitionKg !== null && r.requisitionKg !== undefined && !isNaN(r.requisitionKg);
-                    const hasOrderKg = r.orderKg !== null && r.orderKg !== undefined && !isNaN(r.orderKg);
+                    const importKey = `${g.colorKey}|${g.isExtra ? 1 : 0}|${g.monthKey}`;
+                    const hasRequisitionKg = g.requisitionKg !== null;
+                    const hasOrderKg = g.orderKg !== null;
 
                     let idx = log.findIndex((row, i) => row && row._importKey === importKey && !usedThisRound.has(i));
                     if (idx === -1) {
                         idx = log.findIndex((row, i) => row && !usedThisRound.has(i) && !row._importKey &&
-                            normalizeDyeColorCodeKey(row.colorCode) === colorKey && !row.actualDate);
+                            !!row.isExtra === g.isExtra && normalizeDyeColorCodeKey(row.colorCode) === g.colorKey && !row.actualDate);
                     }
                     if (idx !== -1) {
                         const row = log[idx];
-                        row.colorNo = r.colorNo || row.colorNo || '';
-                        row.colorCode = r.colorCode || row.colorCode || '';
-                        row.yarnType = r.yarnType || row.yarnType || '';
-                        row.lotNo = r.lotNo || row.lotNo || '';
-                        row.hang = r.hang || row.hang || '';
-                        row.dyeTubNo = r.dyeTubNo || row.dyeTubNo || '';
-                        row.actualTransferKg = Number(r.kg) || 0;
-                        if (hasRequisitionKg) row.requisitionKg = Number(r.requisitionKg) || 0;
-                        if (hasOrderKg) row.orderKg = Number(r.orderKg) || 0;
-                        row.actualDate = r.dateKey;
+                        row.colorNo = g.colorNo || row.colorNo || '';
+                        row.colorCode = g.colorCode || row.colorCode || '';
+                        row.yarnType = g.yarnType || row.yarnType || '';
+                        row.lotNo = g.lotNo || row.lotNo || '';
+                        row.hang = g.hang || row.hang || '';
+                        row.dyeTubNo = g.dyeTubNo || row.dyeTubNo || '';
+                        row.isExtra = g.isExtra;
+                        row.actualTransferKg = g.kg;
+                        if (hasRequisitionKg) row.requisitionKg = g.requisitionKg;
+                        if (hasOrderKg) row.orderKg = g.orderKg;
+                        if (!row.orderDate) row.orderDate = orderDate;
+                        row.actualDate = actualDate;
                         row.remark = mergedRemark || row.remark || '';
                         row._importKey = importKey;
                         usedThisRound.add(idx);
                     } else {
                         log.push({
-                            isExtra: true, orderDate: r.dateKey, colorNo: r.colorNo || '', colorCode: r.colorCode || '',
-                            yarnType: r.yarnType || '', lotNo: r.lotNo || '',
-                            orderKg: hasOrderKg ? (Number(r.orderKg) || 0) : 0, dyeTubNo: r.dyeTubNo || '',
-                            requisitionKg: hasRequisitionKg ? (Number(r.requisitionKg) || 0) : 0, actualTransferKg: Number(r.kg) || 0,
-                            plannedDate: '', actualDate: r.dateKey, dueDate: order.dueDate || '',
-                            hang: r.hang || '', remark: mergedRemark, _importKey: importKey
+                            isExtra: g.isExtra, orderDate, colorNo: g.colorNo, colorCode: g.colorCode,
+                            yarnType: g.yarnType, lotNo: g.lotNo,
+                            orderKg: hasOrderKg ? g.orderKg : 0, dyeTubNo: g.dyeTubNo || '',
+                            requisitionKg: hasRequisitionKg ? g.requisitionKg : 0, actualTransferKg: g.kg,
+                            plannedDate: '', actualDate, dueDate: order.dueDate || '',
+                            hang: g.hang || '', remark: mergedRemark, _importKey: importKey
                         });
                         usedThisRound.add(log.length - 1);
                     }
