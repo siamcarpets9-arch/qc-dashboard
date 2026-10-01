@@ -6930,7 +6930,8 @@
                             orderKg: hasOrderKg ? g.orderKg : 0, dyeTubNo: g.dyeTubNo || '',
                             requisitionKg: hasRequisitionKg ? g.requisitionKg : 0, actualTransferKg: g.kg,
                             plannedDate: '', actualDate, dueDate: order.dueDate || '',
-                            hang: g.hang || '', remark: mergedRemark, _importKey: importKey
+                            hang: g.hang || '', remark: mergedRemark, _importKey: importKey,
+                            isDamaged: false // no source in the Excel report — stays a manual flag, see toggleDyeOrderLogDamaged()
                         });
                         usedThisRound.add(log.length - 1);
                     }
@@ -17341,17 +17342,182 @@
             renderDyeOrderLogTable();
         }
 
+        // NEW (2026-10-02): a third value, 'summary', toggles in the "สรุปรายเดือน" sub-page
+        // (dyeingKpiSummarySection) in place of the บันทึกสั่งย้อม/ย้อมเพิ่ม table
+        // (dyeingKpiOrderLogSection) — see renderDyeingSummaryTab(). currentDyeingKpiTab === 'summary'
+        // is harmless everywhere else that reads it (addDyeOrderLogFromSelect/importDyeingKpiOrderLog's
+        // `=== 'extra'` checks just fall through to the regular/false case), since the controls that
+        // read it live inside the now-hidden order-log section and can't be reached while on 'summary'.
         function setDyeingKpiTab(tab) {
-            currentDyeingKpiTab = tab === 'extra' ? 'extra' : 'regular';
+            currentDyeingKpiTab = (tab === 'extra' || tab === 'summary') ? tab : 'regular';
             const activeCls = "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition";
             const inactiveCls = "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
             document.getElementById('dyeingKpiTabRegularBtn').className = currentDyeingKpiTab === 'regular' ? activeCls : inactiveCls;
             document.getElementById('dyeingKpiTabExtraBtn').className = currentDyeingKpiTab === 'extra' ? activeCls : inactiveCls;
+            const summaryBtn = document.getElementById('dyeingKpiTabSummaryBtn');
+            if (summaryBtn) summaryBtn.className = currentDyeingKpiTab === 'summary' ? activeCls : inactiveCls;
+
+            const orderLogSection = document.getElementById('dyeingKpiOrderLogSection');
+            const summarySection = document.getElementById('dyeingKpiSummarySection');
+            if (orderLogSection) orderLogSection.classList.toggle('hidden', currentDyeingKpiTab === 'summary');
+            if (summarySection) summarySection.classList.toggle('hidden', currentDyeingKpiTab !== 'summary');
+
             const titleEl = document.getElementById('dyeingKpiSectionTitle');
-            titleEl.innerHTML = currentDyeingKpiTab === 'extra'
-                ? '<i class="fa-solid fa-droplet-slash mr-2 text-indigo-600"></i> ย้อมเพิ่ม'
-                : '<i class="fa-solid fa-droplet mr-2 text-indigo-600"></i> บันทึกสั่งย้อม';
-            renderDyeOrderLogTable();
+            if (titleEl) {
+                titleEl.innerHTML = currentDyeingKpiTab === 'extra'
+                    ? '<i class="fa-solid fa-droplet-slash mr-2 text-indigo-600"></i> ย้อมเพิ่ม'
+                    : '<i class="fa-solid fa-droplet mr-2 text-indigo-600"></i> บันทึกสั่งย้อม';
+            }
+
+            if (currentDyeingKpiTab === 'summary') {
+                renderDyeingSummaryTab();
+            } else {
+                renderDyeOrderLogTable();
+            }
+        }
+
+        // ============================================================================================
+        // "สรุปรายเดือน" sub-tab — "ช่วยทำสรุป ไหมแต่ละชนิดที่เบิกใช้ต่อเดือน สรุปย้อมเพิ่ม ย้อมขาด
+        // ย้อมเสีย แล้วเพิ่ม กรองเลขที่ M/O,S/O กรองวันที่ กรองเดือนให้ด้วย" — independent of the
+        // regular/extra toggle above: pools EVERY dyeOrderLog row (both ปกติ and ย้อมเพิ่ม) across all
+        // orders, since the point is a cross-cutting monthly view, then the three filters narrow that
+        // pool. Confirmed with the user beforehand: "ย้อมขาด" = นน.โอนจริง < นน.โอนจากใบเบิก (reuses
+        // existing fields, no new one needed); "ย้อมเสีย" has no existing data source at all, so it's
+        // the new isDamaged manual checkbox (see DYEING_ORDER_THEAD_HTML/toggleDyeOrderLogDamaged).
+        // Date-range filtering and the yarn table's month bucketing both key off actualDate
+        // (วันที่ย้อมเสร็จจริง) — the date a batch is actually known to have been dyed, as opposed to
+        // orderDate which is when the order was merely received.
+        // ============================================================================================
+
+        function dyeingSummaryFilteredRows() {
+            const moSoFilter = (document.getElementById('dyeingSummaryMoSoFilter') || {}).value || '';
+            const monthFilter = (document.getElementById('dyeingSummaryMonthFilter') || {}).value || '';
+            const dateFrom = (document.getElementById('dyeingSummaryDateFrom') || {}).value || '';
+            const dateTo = (document.getElementById('dyeingSummaryDateTo') || {}).value || '';
+            const moSoNeedle = moSoFilter.trim().toLowerCase();
+
+            const all = [];
+            productionOrders.forEach(order => {
+                const log = Array.isArray((order.dyeing || {}).dyeOrderLog) ? order.dyeing.dyeOrderLog : [];
+                log.forEach(item => all.push({ order, item }));
+            });
+
+            const filtered = all.filter(({ order, item }) => {
+                if (moSoNeedle && !String(order.moSo || '').toLowerCase().includes(moSoNeedle)) return false;
+                const actualNorm = normalizeDateString(item.actualDate);
+                if (monthFilter && (!actualNorm || actualNorm.slice(0, 7) !== monthFilter)) return false;
+                if (dateFrom && (!actualNorm || actualNorm < dateFrom)) return false;
+                if (dateTo && (!actualNorm || actualNorm > dateTo)) return false;
+                return true;
+            });
+
+            return { all, filtered };
+        }
+
+        function resetDyeingSummaryFilters() {
+            ['dyeingSummaryMoSoFilter', 'dyeingSummaryMonthFilter', 'dyeingSummaryDateFrom', 'dyeingSummaryDateTo'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            renderDyeingSummaryTab();
+        }
+
+        function renderDyeingSummaryTab() {
+            const monthSelect = document.getElementById('dyeingSummaryMonthFilter');
+            const { all, filtered } = dyeingSummaryFilteredRows();
+
+            // Populate the month dropdown from whatever months actually appear in the data (by
+            // actualDate), preserving the current selection if it's still available.
+            if (monthSelect) {
+                const currentVal = monthSelect.value;
+                const months = Array.from(new Set(all.map(({ item }) => {
+                    const norm = normalizeDateString(item.actualDate);
+                    return norm ? norm.slice(0, 7) : null;
+                }).filter(Boolean))).sort().reverse();
+                monthSelect.innerHTML = '<option value="">ทั้งหมด</option>' +
+                    months.map(m => `<option value="${m}">${escapeHtml(formatBucketLabel(m, 'month'))}</option>`).join('');
+                if (months.includes(currentVal)) monthSelect.value = currentVal;
+            }
+
+            const countEl = document.getElementById('dyeingSummaryFilteredCount');
+            if (countEl) countEl.textContent = `แสดง ${filtered.length} จาก ${all.length} รายการ`;
+
+            // --- 3 KPI tiles: ย้อมเพิ่ม / ย้อมขาด / ย้อมเสีย -------------------------------------------
+            const extraRows = filtered.filter(r => !!r.item.isExtra);
+            const extraKg = extraRows.reduce((s, r) => s + (Number(r.item.actualTransferKg) || 0), 0);
+
+            const shortageRows = filtered.filter(r => (Number(r.item.requisitionKg) || 0) > (Number(r.item.actualTransferKg) || 0));
+            const shortageKg = shortageRows.reduce((s, r) => s + ((Number(r.item.requisitionKg) || 0) - (Number(r.item.actualTransferKg) || 0)), 0);
+
+            const damagedRows = filtered.filter(r => !!r.item.isDamaged);
+            const damagedKg = damagedRows.reduce((s, r) => s + (Number(r.item.actualTransferKg) || 0), 0);
+
+            const tile = (label, icon, colorCls, count, kg) => `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+                    <p class="text-[11px] text-slate-500 font-medium mb-1"><i class="fa-solid ${icon} mr-1.5 ${colorCls}"></i> ${label}</p>
+                    <p class="text-2xl font-bold ${colorCls}">${count} <span class="text-xs font-medium text-slate-400">รายการ</span></p>
+                    <p class="text-xs text-slate-500 mt-0.5">${kg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.</p>
+                </div>
+            `;
+            const statusCardsEl = document.getElementById('dyeingSummaryStatusCards');
+            if (statusCardsEl) {
+                statusCardsEl.innerHTML =
+                    tile('ย้อมเพิ่ม', 'fa-droplet-slash', 'text-violet-600', extraRows.length, extraKg) +
+                    tile('ย้อมขาด (โอนจริง &lt; เบิก)', 'fa-triangle-exclamation', 'text-amber-600', shortageRows.length, shortageKg) +
+                    tile('ย้อมเสีย', 'fa-xmark', 'text-rose-600', damagedRows.length, damagedKg);
+            }
+
+            // --- สรุปไหมแต่ละชนิดที่เบิกใช้ต่อเดือน (grouped by month + yarnType) ---------------------
+            const groups = {};
+            filtered.forEach(({ item }) => {
+                const monthKey = bucketKeyForDate(item.actualDate, 'month');
+                if (!monthKey) return;
+                const yarnType = String(item.yarnType || '').trim() || '(ไม่ระบุชนิดไหม)';
+                const gKey = `${monthKey}|${yarnType}`;
+                if (!groups[gKey]) groups[gKey] = { monthKey, yarnType, count: 0, requisitionKg: 0, actualTransferKg: 0 };
+                groups[gKey].count += 1;
+                groups[gKey].requisitionKg += Number(item.requisitionKg) || 0;
+                groups[gKey].actualTransferKg += Number(item.actualTransferKg) || 0;
+            });
+            const rows = Object.values(groups).sort((a, b) => b.monthKey.localeCompare(a.monthKey) || a.yarnType.localeCompare(b.yarnType));
+
+            const yarnTableEl = document.getElementById('dyeingSummaryYarnTable');
+            if (yarnTableEl) {
+                if (rows.length === 0) {
+                    yarnTableEl.innerHTML = '<p class="text-[11px] text-slate-400 py-6 text-center">ไม่มีข้อมูลสำหรับตัวกรองนี้</p>';
+                } else {
+                    yarnTableEl.innerHTML = `
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">เดือน</th>
+                                        <th class="px-3 py-2 text-left">ชนิดไหม</th>
+                                        <th class="px-3 py-2 text-right">จำนวนรายการ</th>
+                                        <th class="px-3 py-2 text-right">นน.โอนจากใบเบิกรวม (Kg.)</th>
+                                        <th class="px-3 py-2 text-right">นน.โอนจริงรวม (Kg.)</th>
+                                        <th class="px-3 py-2 text-right">ส่วนต่าง (Kg.)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    ${rows.map(r => {
+                                        const diff = r.requisitionKg - r.actualTransferKg;
+                                        return `
+                                        <tr class="hover:bg-slate-50/80">
+                                            <td class="px-3 py-1.5 font-semibold text-indigo-700 whitespace-nowrap">${escapeHtml(formatBucketLabel(r.monthKey, 'month'))}</td>
+                                            <td class="px-3 py-1.5">${escapeHtml(r.yarnType)}</td>
+                                            <td class="px-3 py-1.5 text-right">${r.count}</td>
+                                            <td class="px-3 py-1.5 text-right">${r.requisitionKg.toFixed(2)}</td>
+                                            <td class="px-3 py-1.5 text-right">${r.actualTransferKg.toFixed(2)}</td>
+                                            <td class="px-3 py-1.5 text-right font-medium ${diff < 0 ? 'text-rose-600' : 'text-slate-600'}">${diff.toFixed(2)}</td>
+                                        </tr>
+                                    `;}).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+            }
         }
 
         let dyeingKpiPeriodGranularity = 'month';
@@ -17383,6 +17549,10 @@
             <th class="px-2 py-2 text-center">สรุปตามแผน</th>
             <th class="px-2 py-2 text-left">วันที่กำหนดส่ง</th>
             <th class="px-2 py-2 text-left">หมายเหตุ</th>
+            <!-- NEW (2026-10-02): "ย้อมเสีย" — no prior data source for this (user confirmed:
+                 "ยังไม่มีที่ไหนเก็บเลย ต้องเพิ่มช่องใหม่"), so it's a plain manually-toggled checkbox,
+                 feeding the "สรุปรายเดือน" tab's ย้อมเสีย KPI tile (renderDyeingSummaryTab()). -->
+            <th class="px-2 py-2 text-center">ย้อมเสีย?</th>
             <th class="px-2 py-2 text-center">ลบ</th>
         `;
 
@@ -17438,6 +17608,7 @@
                         <td class="px-2 py-1.5 text-center">${onTimeHtml}</td>
                         <td class="px-2 py-1.5">${dt(orderIndex, itemIndex, 'dueDate', item.dueDate)}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'remark', item.remark, 'w-24')}</td>
+                        <td class="px-2 py-1.5 text-center"><input type="checkbox" ${item.isDamaged ? 'checked' : ''} onchange="toggleDyeOrderLogDamaged(${orderIndex}, ${itemIndex})" class="w-4 h-4 accent-rose-600 cursor-pointer"></td>
                         <td class="px-2 py-1.5 text-center"><button type="button" onclick="removeDyeOrderLogItem(${orderIndex}, ${itemIndex})" class="text-rose-400 hover:text-rose-600 px-1"><i class="fa-solid fa-trash text-xs"></i></button></td>
                     </tr>
                 `;
@@ -17445,7 +17616,12 @@
 
             const moRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) !== 'SO');
             const soRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO');
-            renderSplitOrderTypeTables('dyeingKpiSplitContainer', DYEING_ORDER_THEAD_HTML, moRows.map(rowHtml).join(''), soRows.map(rowHtml).join(''), moRows.length, soRows.length, 18);
+            renderSplitOrderTypeTables('dyeingKpiSplitContainer', DYEING_ORDER_THEAD_HTML, moRows.map(rowHtml).join(''), soRows.map(rowHtml).join(''), moRows.length, soRows.length, 19);
+
+            // Keep "สรุปรายเดือน" in sync with any data change made from this table (editing a field,
+            // adding/removing a row, toggling ย้อมเสีย) even while that tab isn't the one showing —
+            // cheap (it's just an array scan) and means switching to it never shows stale numbers.
+            if (document.getElementById('dyeingKpiSummarySection')) renderDyeingSummaryTab();
         }
 
         function addDyeOrderLogFromSelect() {
@@ -17458,7 +17634,8 @@
             if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
             order.dyeing.dyeOrderLog.push({
                 isExtra: currentDyeingKpiTab === 'extra', orderDate: '', colorNo: '', colorCode: '', yarnType: '', lotNo: '', hang: '',
-                orderKg: 0, dyeTubNo: '', requisitionKg: 0, actualTransferKg: 0, plannedDate: '', actualDate: '', dueDate: '', remark: ''
+                orderKg: 0, dyeTubNo: '', requisitionKg: 0, actualTransferKg: 0, plannedDate: '', actualDate: '', dueDate: '', remark: '',
+                isDamaged: false
             });
             persistOrderChange(order);
             renderDyeOrderLogTable();
@@ -17477,6 +17654,20 @@
             if (!order || !order.dyeing || !Array.isArray(order.dyeing.dyeOrderLog) || !order.dyeing.dyeOrderLog[itemIndex]) return;
             order.dyeing.dyeOrderLog[itemIndex][field] = value;
             persistOrderChange(order);
+            // Keep "สรุปรายเดือน" (ย้อมขาด depends on requisitionKg/actualTransferKg, the yarn table on
+            // every field) in sync without redrawing the order-log table itself on every edit.
+            if (document.getElementById('dyeingKpiSummarySection')) renderDyeingSummaryTab();
+        }
+
+        // NEW (2026-10-02): "ย้อมเสีย" checkbox — no existing data source, purely a manual flag an
+        // operator ticks when a batch needs to be re-dyed. See DYEING_ORDER_THEAD_HTML's comment.
+        function toggleDyeOrderLogDamaged(orderIndex, itemIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order || !order.dyeing || !Array.isArray(order.dyeing.dyeOrderLog) || !order.dyeing.dyeOrderLog[itemIndex]) return;
+            const item = order.dyeing.dyeOrderLog[itemIndex];
+            item.isDamaged = !item.isDamaged;
+            persistOrderChange(order);
+            if (document.getElementById('dyeingKpiSummarySection')) renderDyeingSummaryTab();
         }
 
         // ============================================================================================
@@ -18489,7 +18680,9 @@
             { key: 'plannedDate', label: 'วันที่กำหนดเสร็จตามแผน', type: 'date' },
             { key: 'actualDate', label: 'วันที่ย้อมเสร็จจริง', type: 'date' },
             { key: 'dueDate', label: 'วันที่กำหนดส่ง', type: 'date' },
-            { key: 'remark', label: 'หมายเหตุ' }
+            { key: 'remark', label: 'หมายเหตุ' },
+            // NEW (2026-10-02): "ย้อมเสีย" manual flag — see DYEING_ORDER_THEAD_HTML's comment.
+            { key: 'isDamaged', label: 'ย้อมเสีย (TRUE/FALSE)', type: 'bool' }
         ];
 
         function exportDyeingKpiOrderLog() {
