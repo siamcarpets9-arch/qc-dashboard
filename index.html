@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -1715,31 +1713,80 @@
                         <button onclick="setDyeingKpiTab('extra')" id="dyeingKpiTabExtraBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                             <i class="fa-solid fa-droplet-slash"></i> ย้อมเพิ่ม
                         </button>
+                        <!-- NEW (2026-10-02): "ช่วยทำสรุป ไหมแต่ละชนิดที่เบิกใช้ต่อเดือน สรุปย้อมเพิ่ม ย้อมขาด
+                             ย้อมเสีย แล้วเพิ่ม กรองเลขที่ M/O,S/O กรองวันที่ กรองเดือนให้ด้วย" — see
+                             dyeingKpiSummarySection below / renderDyeingSummaryTab(). -->
+                        <button onclick="setDyeingKpiTab('summary')" id="dyeingKpiTabSummaryBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                            <i class="fa-solid fa-chart-column"></i> สรุปรายเดือน
+                        </button>
                     </div>
                 </div>
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div class="p-4 bg-indigo-50/50 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                        <h3 id="dyeingKpiSectionTitle" class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-droplet mr-2 text-indigo-600"></i> บันทึกสั่งย้อม</h3>
-                        <div class="flex flex-wrap items-center gap-1.5">
-                            <select id="dyeingKpiMoSoSelect" class="text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg"></select>
-                            <button onclick="addDyeOrderLogFromSelect()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5">
-                                <i class="fa-solid fa-plus-circle"></i> เพิ่มรายการ
-                            </button>
-                            <button onclick="exportDyeingKpiOrderLog()" type="button" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5">
-                                <i class="fa-solid fa-file-export"></i> ส่งออก Excel
-                            </button>
-                            <label class="shrink-0 bg-white border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-medium px-3 py-1.5 rounded-lg transition text-xs flex items-center gap-1.5 cursor-pointer">
-                                <i class="fa-solid fa-file-import"></i> นำเข้า Excel
-                                <input type="file" accept=".xlsx,.xls" class="hidden" onchange="importDyeingKpiOrderLog(this)">
-                            </label>
+                <div id="dyeingKpiOrderLogSection" class="space-y-4">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="p-4 bg-indigo-50/50 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <h3 id="dyeingKpiSectionTitle" class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-droplet mr-2 text-indigo-600"></i> บันทึกสั่งย้อม</h3>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <select id="dyeingKpiMoSoSelect" class="text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg"></select>
+                                <button onclick="addDyeOrderLogFromSelect()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5">
+                                    <i class="fa-solid fa-plus-circle"></i> เพิ่มรายการ
+                                </button>
+                                <button onclick="exportDyeingKpiOrderLog()" type="button" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5">
+                                    <i class="fa-solid fa-file-export"></i> ส่งออก Excel
+                                </button>
+                                <label class="shrink-0 bg-white border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-medium px-3 py-1.5 rounded-lg transition text-xs flex items-center gap-1.5 cursor-pointer">
+                                    <i class="fa-solid fa-file-import"></i> นำเข้า Excel
+                                    <input type="file" accept=".xlsx,.xls" class="hidden" onchange="importDyeingKpiOrderLog(this)">
+                                </label>
+                            </div>
+                        </div>
+                        <div class="p-3 flex flex-wrap items-center gap-2 border-b border-slate-100">
+                            <span class="text-[11px] text-slate-500 font-medium">สรุปยอดรวมตามช่วงเวลา:</span>
+                            <div id="dyeingKpiPeriodSelectWrap"></div>
+                        </div>
+                        <div id="dyeingKpiPeriodSummary" class="p-3 border-b border-slate-100"></div>
+                        <div id="dyeingKpiSplitContainer"></div>
+                    </div>
+                </div>
+
+                <!-- "สรุปรายเดือน" — monthly yarn-usage-by-type summary plus ย้อมเพิ่ม/ขาด/เสีย breakdown,
+                     with M/O,S/O text / date-range / month filters. See renderDyeingSummaryTab(). -->
+                <div id="dyeingKpiSummarySection" class="hidden space-y-4">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+                        <h3 class="font-bold text-slate-800 text-sm mb-3"><i class="fa-solid fa-filter mr-2 text-indigo-600"></i> ตัวกรอง</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-500 font-medium mb-1">ค้นหา M/O, S/O</label>
+                                <input type="text" id="dyeingSummaryMoSoFilter" oninput="renderDyeingSummaryTab()" placeholder="เช่น 172/26" class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 font-medium mb-1">เดือน</label>
+                                <select id="dyeingSummaryMonthFilter" onchange="renderDyeingSummaryTab()" class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                                    <option value="">ทั้งหมด</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 font-medium mb-1">จากวันที่ (ย้อมเสร็จจริง)</label>
+                                <input type="date" id="dyeingSummaryDateFrom" onchange="renderDyeingSummaryTab()" class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 font-medium mb-1">ถึงวันที่</label>
+                                <input type="date" id="dyeingSummaryDateTo" onchange="renderDyeingSummaryTab()" class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                        </div>
+                        <div class="mt-2 flex items-center justify-between">
+                            <span id="dyeingSummaryFilteredCount" class="text-[11px] text-slate-400"></span>
+                            <button type="button" onclick="resetDyeingSummaryFilters()" class="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium"><i class="fa-solid fa-rotate-left mr-1"></i> ล้างตัวกรอง</button>
                         </div>
                     </div>
-                    <div class="p-3 flex flex-wrap items-center gap-2 border-b border-slate-100">
-                        <span class="text-[11px] text-slate-500 font-medium">สรุปยอดรวมตามช่วงเวลา:</span>
-                        <div id="dyeingKpiPeriodSelectWrap"></div>
+
+                    <div id="dyeingSummaryStatusCards" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="p-4 bg-indigo-50/50 border-b border-slate-100">
+                            <h3 class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-scale-balanced mr-2 text-indigo-600"></i> สรุปไหมแต่ละชนิดที่เบิกใช้ต่อเดือน</h3>
+                        </div>
+                        <div id="dyeingSummaryYarnTable"></div>
                     </div>
-                    <div id="dyeingKpiPeriodSummary" class="p-3 border-b border-slate-100"></div>
-                    <div id="dyeingKpiSplitContainer"></div>
                 </div>
             </div>
 
@@ -3092,6 +3139,24 @@
         // toString() ("Mon Aug 31 2026 00:00:00 GMT+0700 ...") depending on the Apps Script code — handle both.
         function normalizeDateString(raw) {
             if (!raw) return '';
+
+            // A genuine Date object (e.g. a cell read back via readExcelAoaFromFile()'s
+            // XLSX.read(..., {cellDates:true}) during a "นำเข้า Excel" roundtrip import, such as
+            // บันทึกสั่งย้อม/การเบิกกาว/ประสิทธิภาพ) carries the same few-seconds floating-point
+            // rounding error as the dyeing/weaving report importers (see excelCellDateToDateKey()'s
+            // comment) — a date-only cell can land a hair before local midnight (e.g. 23:59:56 the
+            // previous day), which would otherwise read back one calendar day early however it's
+            // stringified. Round to the nearest minute and read LOCAL date parts directly, before
+            // falling through to the string-parsing branches below (which only see text).
+            if (raw instanceof Date) {
+                if (isNaN(raw.getTime())) return '';
+                const rounded = new Date(Math.round(raw.getTime() / 60000) * 60000);
+                const y = rounded.getFullYear();
+                const m = String(rounded.getMonth() + 1).padStart(2, '0');
+                const d = String(rounded.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+
             const str = String(raw).trim();
             if (!str) return '';
 
@@ -4399,6 +4464,39 @@
 
         function formatDateKeyUTC(dateObj) {
             return dateObj.toISOString().split('T')[0];
+        }
+
+        // Converts a Date object that came from a parsed Excel date CELL (XLSX.read with
+        // cellDates:true, e.g. aggregateDyeingImport()/aggregateWeavingImport() reading a "DATE"
+        // column or a title-row date cell) into a YYYY-MM-DD key — WITHOUT formatDateKeyUTC()'s
+        // toISOString()/UTC conversion, which silently shifts the date back by one full day for
+        // every such cell whenever the browser's local timezone is ahead of UTC (e.g. Thailand,
+        // UTC+7 — reported live as "รายการเป็นของวันที่ 30/9 แต่วันที่ขึ้นเป็นของวันที่ 29/9
+        // วันอื่นก็เป็นแบบนี้", confirmed systematic across every imported row, both dyeing and
+        // weaving).
+        //
+        // Root cause: a date-only Excel cell (e.g. 9/30/26, no time-of-day) carries no timezone of
+        // its own — it's just a calendar date. SheetJS's cellDates option turns that into a JS Date
+        // intended to represent LOCAL midnight of that calendar day, but the serial-number-to-
+        // milliseconds conversion carries a few seconds of floating-point error, which can round
+        // DOWN to just-before-local-midnight (e.g. 23:59:56 the previous day). Reading such a Date
+        // back with toISOString() (always UTC) does two things wrong at once: it reads the date as
+        // if the instant were UTC rather than local wall-clock time (shifting it by the full UTC
+        // offset — 7 hours in Thailand, enough to cross the day boundary every time), and on top of
+        // that inherits the few-seconds rounding error. Either effect alone can flip the date back
+        // a day; together they did so on every single imported row.
+        //
+        // Fix: round to the nearest minute first (absorbs the floating-point error), then read the
+        // date back out with LOCAL getters (getFullYear/getMonth/getDate) instead of UTC ones,
+        // since a date-only Excel cell was always meant as local wall-clock time, never a true UTC
+        // instant. Verified correct across UTC, Thailand (+7), US Pacific (-7/-8), and other zones.
+        function excelCellDateToDateKey(dateObj) {
+            if (!(dateObj instanceof Date) || isNaN(dateObj)) return null;
+            const rounded = new Date(Math.round(dateObj.getTime() / 60000) * 60000);
+            const y = rounded.getFullYear();
+            const m = String(rounded.getMonth() + 1).padStart(2, '0');
+            const d = String(rounded.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
         }
 
         const THAI_SHORT_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -6551,7 +6649,7 @@
                 const dateCell = aoa[0] ? aoa[0][8] : null;
                 let sheetDateKey = null;
                 if (dateCell instanceof Date && !isNaN(dateCell)) {
-                    sheetDateKey = formatDateKeyUTC(dateCell);
+                    sheetDateKey = excelCellDateToDateKey(dateCell);
                 } else {
                     // Fallback if the title row's date cell wasn't a real date — parse straight from the
                     // sheet name instead (same best-effort fallback as the weaving import).
@@ -6592,7 +6690,7 @@
                         const dateColIdx = colMap.date !== undefined ? colMap.date : 0;
                         const rowDate = row[dateColIdx];
                         if (!(rowDate instanceof Date) || isNaN(rowDate)) continue; // footer/blank row — no real date
-                        dateKey = formatDateKeyUTC(rowDate); // each row carries its own date in this layout
+                        dateKey = excelCellDateToDateKey(rowDate); // each row carries its own date in this layout
                         const getText = (field) => colMap[field] !== undefined ? carryForward(row, colMap[field]) : '';
                         const getNum = (field) => {
                             if (colMap[field] === undefined) return null;
@@ -8453,7 +8551,7 @@
                 const dateCell = aoa[1] ? aoa[1][2] : null;
                 let dateKey = null;
                 if (dateCell instanceof Date && !isNaN(dateCell)) {
-                    dateKey = formatDateKeyUTC(dateCell);
+                    dateKey = excelCellDateToDateKey(dateCell);
                 } else {
                     // Fallback if the "วันที่ :" cell wasn't a real date — parse straight from the sheet
                     // name instead (best-effort; the sheet name is sometimes typo'd, e.g. "-29" instead
