@@ -43,7 +43,7 @@
         .app-navigation-tabs { overflow-x: auto; flex-wrap: nowrap !important; scrollbar-width: thin; }
         .app-navigation-tabs button { white-space: nowrap; }
         .app-navigation-tabs button:hover { background: #e8f0f7; }
-        #tabOverviewBtn.bg-white, #tabBoardBtn.bg-white, #tabTimelineBtn.bg-white,
+        #tabOverviewBtn.bg-white, #tabBoardBtn.bg-white,
         #tabRecordsBtn.bg-white, #tabShippingBtn.bg-white, #tabShippedBtn.bg-white,
         #tabIssuesBtn.bg-white, #tabAnalyticsBtn.bg-white, #tabCentralBtn.bg-white {
             background: var(--brand-800) !important; color: #fff !important; box-shadow: none !important;
@@ -506,12 +506,6 @@
                 </button>
                 <button onclick="switchView('board')" id="tabBoardBtn" class="flex-1 md:flex-none px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-indigo-700 transition">
                     <i class="fa-solid fa-table-columns mr-1.5"></i> แผนผังการผลิต
-                </button>
-                <!-- NEW: Gantt-style timeline of every active M/O, S/O's planned dates across all
-                     departments in one chronological view — answers "ทำภาพรวมแผนการผลิต" by showing
-                     the whole production schedule at a glance instead of one order at a time. -->
-                <button onclick="switchView('timeline')" id="tabTimelineBtn" class="flex-1 md:flex-none px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-indigo-700 transition">
-                    <i class="fa-solid fa-timeline mr-1.5"></i> ไทม์ไลน์การผลิต
                 </button>
                 <button onclick="switchView('records')" id="tabRecordsBtn" class="flex-1 md:flex-none px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-indigo-700 transition">
                     <i class="fa-solid fa-list mr-1.5"></i> รายงาน QC ทั้งหมด
@@ -1886,94 +1880,14 @@
             </div>
         </div>
 
-        <!-- Production Timeline: Gantt-style view of every active M/O, S/O's plan across departments
-             in one chronological strip, built from order.planDates (ย้อม/ทอ/ตกแต่ง) and dueDate —
-             so a manager can see the whole production plan at a glance instead of opening each order
-             one by one. When a department has no plan date yet, its segment simply widens into the
-             next one rather than leaving a gap, since a bar can only be drawn between two known dates. -->
-        <div id="timelineViewContainer" class="hidden space-y-4">
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div>
-                    <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-timeline mr-2 text-indigo-600"></i> ไทม์ไลน์การผลิต — ทุกแผนกในหน้าเดียว</h3>
-                    <p class="text-[11px] text-slate-400 mt-1">แถบสีคือช่วงเวลาที่วางแผนไว้ของแต่ละแผนก เรียงจากกำหนดส่งใกล้สุดขึ้นก่อน คลิกที่ชื่อ M/O, S/O เพื่อเปิดดู/แก้ไขรายละเอียด</p>
-                </div>
-                <div class="relative w-full sm:w-72">
-                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 text-xs"><i class="fa-solid fa-search"></i></span>
-                    <input type="text" id="timelineSearchInput" oninput="renderProductionTimeline()" placeholder="ค้นหา M/O, S/O, ลูกค้า, PO... (กรองทั้งสองกรอบ)" class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-            </div>
-
-            <!-- NEW (2026-09-12): "ใช้แผน AI กับทุก M/O, S/O" — ตามคำขอ "ตอนนี้ทั้งหมดให้ยึด AI คิดให้ก่อน
-                 เดี๋ยวค่อยแก้ไขทีหลัง": กดครั้งเดียวให้ระบบคำนวณระยะเวลาแต่ละแผนกด้วยสูตร AI
-                 (computeProductionSuggestions()) ให้ทุก M/O, S/O ที่ยังไม่ส่งพร้อมกันทั้งหมด แทนที่ต้องเข้า
-                 ไปกดทีละใบใน "ข้อมูลแผนกวางแผน" — ใบไหนข้อมูล/กำลังผลิตยังไม่ครบ (คำนวณไม่ได้) จะข้ามแผนก
-                 นั้นไปเฉยๆ ไม่บล็อกทั้งใบ ทีหลังยังเข้าไปแก้เป็นรายแผนก/รายใบด้วยมือได้ตามปกติ (สลับกลับเป็น
-                 "กำหนดเอง (Manual)" ในข้อมูลแผนกวางแผนของ M/O นั้นๆ) — see applyAiPlanToAllOrders(). -->
-            <div class="bg-fuchsia-50/60 border border-fuchsia-100 rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <div>
-                    <p class="text-xs font-bold text-fuchsia-700 flex items-center gap-1.5"><i class="fa-solid fa-wand-magic-sparkles"></i> ให้ AI คิดแผนระยะเวลาให้ก่อนทั้งระบบ</p>
-                    <p class="text-[10px] text-slate-500 mt-0.5">คำนวณจำนวนวันแต่ละแผนกให้ทุก M/O, S/O ที่ยังไม่ส่งในคราวเดียว (ใบไหนคำนวณไม่ได้จะข้ามไป) — แก้ไขเป็นรายใบทีหลังได้ตามปกติ</p>
-                </div>
-                <button type="button" onclick="applyAiPlanToAllOrders()" class="shrink-0 bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> ใช้แผน AI กับทุก M/O, S/O
-                </button>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-slate-600">
-                <!-- NEW (2026-09-09): ดีไซน์/ขยายลาย + แผนกวางแผน added so all 5 QC departments have a
-                     distinct color on the timeline, not just the 3 that already had plan-date fields. -->
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-cyan-500 inline-block"></span> ดีไซน์/ขยายลาย</span>
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-blue-500 inline-block"></span> วางแผน</span>
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-violet-500 inline-block"></span> ย้อม</span>
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-teal-500 inline-block"></span> ทอ</span>
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-fuchsia-500 inline-block"></span> ตกแต่ง/บรรจุ</span>
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-orange-500 inline-block"></span> รอส่ง (หลังตกแต่งเสร็จ → กำหนดส่ง)</span>
-                <span class="flex items-center gap-1.5"><i class="fa-solid fa-flag text-slate-400"></i> กำหนดส่ง</span>
-                <span class="flex items-center gap-1.5 sm:ml-auto"><span class="w-0.5 h-3 bg-rose-400 inline-block"></span> วันนี้</span>
-            </div>
-
-            <!-- NEW (2026-09-09): split into two independent sections — M/O on top, S/O below — instead
-                 of one mixed table, same "separate box per order type" convention already used on the
-                 ภาพรวมการผลิต tab (overviewMoBoxContainer/overviewSoBoxContainer). Each section computes
-                 its own date range and is rendered independently by renderTimelineSection(); the global
-                 M/O, S/O switch at the top of the page still works here too — narrowing it to one type
-                 hides the other section entirely instead of just leaving it empty. -->
-            <div id="timelineMoSectionContainer" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div class="p-3 bg-indigo-50/50 border-b border-slate-100 flex items-center justify-between gap-2">
-                    <h4 class="font-bold text-indigo-900 text-xs"><i class="fa-solid fa-industry mr-1.5 text-indigo-600"></i> M/O — ไทม์ไลน์การผลิต</h4>
-                    <span id="timelineMoCountBadge" class="text-[11px] bg-indigo-100 text-indigo-800 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">0 M/O ในสายการผลิต</span>
-                </div>
-                <div id="timelineMoScrollWrapper" class="overflow-x-auto">
-                    <div id="timelineMoGrid" class="relative">
-                        <!-- header row + order rows injected via JS -->
-                    </div>
-                </div>
-                <div id="emptyTimelineMoState" class="hidden py-12 text-center">
-                    <div class="w-14 h-14 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
-                        <i class="fa-solid fa-timeline"></i>
-                    </div>
-                    <p class="text-slate-500 font-medium">ยังไม่มี M/O ในสายการผลิตที่จะแสดงในไทม์ไลน์</p>
-                </div>
-            </div>
-
-            <div id="timelineSoSectionContainer" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div class="p-3 bg-amber-50/50 border-b border-slate-100 flex items-center justify-between gap-2">
-                    <h4 class="font-bold text-amber-900 text-xs"><i class="fa-solid fa-swatchbook mr-1.5 text-amber-600"></i> S/O — ไทม์ไลน์การผลิต</h4>
-                    <span id="timelineSoCountBadge" class="text-[11px] bg-amber-100 text-amber-800 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">0 S/O ในสายการผลิต</span>
-                </div>
-                <div id="timelineSoScrollWrapper" class="overflow-x-auto">
-                    <div id="timelineSoGrid" class="relative">
-                        <!-- header row + order rows injected via JS -->
-                    </div>
-                </div>
-                <div id="emptyTimelineSoState" class="hidden py-12 text-center">
-                    <div class="w-14 h-14 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
-                        <i class="fa-solid fa-timeline"></i>
-                    </div>
-                    <p class="text-slate-500 font-medium">ยังไม่มี S/O ในสายการผลิตที่จะแสดงในไทม์ไลน์</p>
-                </div>
-            </div>
-        </div>
+        <!-- REMOVED (2026-10-01): the "ไทม์ไลน์การผลิต" Gantt tab was removed from the nav menu per
+             the user's request ("เอาไทม์ไลน์การผลิตออก"). The underlying helper functions
+             (computeOrderTimelineSegments/computeTimelineRange/renderTimelineSection/
+             renderProductionTimeline) are KEPT, unchanged — computeOrderTimelineSegments() is still used
+             by the production calendar (renderProductionCalendar()/buildProductionCalendarDayMap()), and
+             the render functions are already null-safe (`if (!grid) return 0;` / `if (containerEl) ...`)
+             so leaving their many existing call sites in place is harmless now that this container and
+             tabTimelineBtn no longer exist — they simply become no-ops. -->
 
         <!-- Records View: the full QC audit trail (every department's inspection records), plus a
              company-wide weekly summary report (counts + pass rate for the last 8 weeks). -->
@@ -4003,7 +3917,6 @@
             const tabs = {
                 overview: { btn: 'tabOverviewBtn', container: 'overviewViewContainer' },
                 board: { btn: 'tabBoardBtn', container: 'boardViewContainer' },
-                timeline: { btn: 'tabTimelineBtn', container: 'timelineViewContainer' },
                 records: { btn: 'tabRecordsBtn', container: 'recordsViewContainer' },
                 shipping: { btn: 'tabShippingBtn', container: 'shippingViewContainer' },
                 shipped: { btn: 'tabShippedBtn', container: 'shippedViewContainer' },
@@ -4030,7 +3943,6 @@
             if (view === 'shipping') { renderShippingTable(qcData); renderMarkNosSubview(); }
             if (view === 'overview') renderProductionOverview();
             if (view === 'board') renderProductionBoard();
-            if (view === 'timeline') renderProductionTimeline();
             if (view === 'shipped') renderQcShippedArchive();
             if (view === 'issues') renderIssuesTable();
             if (view === 'analytics') renderAnalyticsDashboard();
@@ -6551,9 +6463,26 @@
         // รายการ" — 0 matched). Stripping the SAME label from order.moSo before comparing makes the
         // match work regardless of which convention a given order happened to use, without weakening
         // matching for orders that never had the label to begin with (stripping is then a no-op).
+        //
+        // FIX (2026-10-02): "ทำไมรายงานย้อม มาแต่ M/O TH, M/O ปกติไม่มา — S/O ก็เหมือนกัน มาแต่ S/O D,
+        // S/O SC" — regular (non-lettered) M/O, S/O numbers are stored in the system ZERO-PADDED (e.g.
+        // "M/O 0176/26"), but the dyeing department's Excel report is hand-typed WITHOUT the padding
+        // ("M/O 176/26") — confirmed via screenshots of both sides for the same order. TH/D/SC-prefixed
+        // orders happened to import fine only because those particular order numbers aren't zero-padded
+        // in the system, so both sides already read identically; every zero-padded order silently
+        // mismatched. splitDyeingOrderNoCell() already strips leading zeros on the Excel side (added
+        // 2026-10-01 for a hand-typed-leading-zero case), but this function never did the same on the
+        // order side — so "0176/26" (order) was never equal to "176/26" (Excel) even after that fix.
+        // Stripping leading zeros here too, the same way, makes the match symmetric regardless of which
+        // side (or neither, or both) happens to carry the padding.
         function normalizeDyeingMoSoMatchKey(moSo) {
             let s = String(moSo || '').trim();
             s = s.replace(/^(M\/O|S\/O|MO|SO)[\s:.]*/i, '').trim();
+            const m = s.match(/^([A-Za-z]*\s*)(\d+)\s*\/\s*(\d+)$/);
+            if (m) {
+                const prefix = m[1] || '';
+                s = `${prefix}${String(Number(m[2]))}/${m[3]}`.trim();
+            }
             return normalizeMoSoKey(s);
         }
 
