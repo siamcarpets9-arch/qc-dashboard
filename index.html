@@ -6534,7 +6534,12 @@
             if (!m) return [s]; // doesn't match the "prefix+numbers/year" pattern — treat as one already-clean key
             const prefix = m[1] || '';
             const year = m[3];
-            return m[2].split('+').map(n => `${prefix}${n.trim()}/${year}`.trim());
+            // FIX (2026-10-01): strip any leading zeros off each number before rebuilding the key (e.g.
+            // "0172/26" -> "172/26"). M/O numbers are never meant to carry leading zeros, but a hand-typed
+            // report (see the new "DATE, Order NO., ... นน.โอนจากใบเบิก, นน.โอนจริง, ส่วนต่าง" layout added
+            // this session) can introduce them — without this fix a row typed as "M/O 0172/26" would never
+            // match the real order "172/26" and would silently show as "ไม่พบในระบบ" in the import preview.
+            return m[2].split('+').map(n => `${prefix}${String(Number(n.trim()))}/${year}`.trim());
         }
 
         // FIX (2026-09-30): matches an order.moSo against the Excel's (already label-stripped) M/O
@@ -6558,6 +6563,53 @@
         // convention for "same as the row above". A combined-order row (one dye batch shared by
         // several M/O, S/O) credits its FULL kg to every M/O, S/O in the group, per the user's explicit
         // choice — one physical hang really was dyed for all of them together, not split between them.
+        //
+        // UPDATED (2026-10-01): "ต่อไปจะทำตารางแบบนี้ ให้เอาของวันที่ 29/9 เข้าอย่างเดียวก่อน" — the
+        // dyeing department introduced a second, simpler sheet layout they intend to use going forward
+        // (first seen on a reformatted "29-9-2026" sheet): no "ลำดับ" running-number column (the row's
+        // own date sits in column A instead, repeated per row rather than once per sheet), headers one
+        // row higher (row 2, not row 3), no Hang/Remark columns, and extra columns lifted straight from
+        // the existing "บันทึกสั่งย้อม" KPI table's own fields ("นน.โอนจากใบเบิก" -> requisitionKg,
+        // "นน.โอนจริง" -> actualTransferKg) plus a "ส่วนต่าง..." column that's just their difference, not
+        // imported since it's cheap to recompute on render (see renderDyeOrderLogTable()). Detected PER
+        // SHEET (by checking whether row 2's first cell reads literally "DATE"), never globally, so one
+        // workbook can freely mix old-layout sheets for already-reported days and new-layout sheets going
+        // forward.
+        //
+        // UPDATED AGAIN (2026-10-01, same day): "มีเพิ่มช่องอีก" — the department added two MORE columns
+        // ("นน.ในใบสั่งย้อม" -> orderKg, "หมายเลขตู้ย้อม" -> dyeTubNo, both also pre-existing
+        // "บันทึกสั่งย้อม" fields) in between Batch No and นน.โอนจากใบเบิก, the second time this layout
+        // has grown in as many messages. Reading the NEW layout by a fixed column position would break
+        // again the next time a column is added or reordered, so it's now read by matching each header
+        // CELL'S TEXT (mapNewDyeingLayoutColumns()) instead of its position — any column recognized by
+        // name is picked up wherever it sits, an unrecognized one is simply ignored, and the old layout
+        // (which has no header-text signature worth relying on) is untouched by this and still uses fixed
+        // positions as before.
+        function mapNewDyeingLayoutColumns(headerRow) {
+            const map = {};
+            (headerRow || []).forEach((cell, i) => {
+                const h = String(cell || '').trim();
+                if (!h) return;
+                const hl = h.toLowerCase();
+                if (map.date === undefined && hl === 'date') map.date = i;
+                else if (map.orderNo === undefined && hl.includes('order')) map.orderNo = i;
+                else if (map.yarnType === undefined && hl.includes('yarn')) map.yarnType = i;
+                else if (map.lotNo === undefined && hl.includes('lot')) map.lotNo = i;
+                else if (map.colorNo === undefined && hl.includes('col.no')) map.colorNo = i;
+                else if (map.colorCode === undefined && hl.includes('col.code')) map.colorCode = i;
+                else if (map.hang === undefined && hl === 'hang') map.hang = i;
+                else if (map.batchNo === undefined && hl.includes('batch')) map.batchNo = i;
+                else if (map.orderKg === undefined && h.includes('ในใบสั่งย้อม')) map.orderKg = i;
+                else if (map.dyeTubNo === undefined && h.includes('ตู้ย้อม')) map.dyeTubNo = i;
+                else if (map.requisitionKg === undefined && h.includes('โอนจากใบเบิก')) map.requisitionKg = i;
+                else if (map.actualKg === undefined && h.includes('โอนจริง')) map.actualKg = i;
+                else if (map.remark === undefined && (hl.includes('remark') || h.includes('หมายเหตุ'))) map.remark = i;
+                // "ส่วนต่าง..." (difference, however it's worded) is intentionally never mapped — always
+                // recomputed on render, never imported.
+            });
+            return map;
+        }
+
         function aggregateDyeingImport(workbook) {
             const dateSheetNames = workbook.SheetNames.filter(n => /^\d{1,2}-\d{1,2}-\d{2,4}$/.test(n.trim()));
             const byMoSo = {};
@@ -6566,9 +6618,9 @@
                 const ws = workbook.Sheets[sheetName];
                 const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
                 const dateCell = aoa[0] ? aoa[0][8] : null;
-                let dateKey = null;
+                let sheetDateKey = null;
                 if (dateCell instanceof Date && !isNaN(dateCell)) {
-                    dateKey = formatDateKeyUTC(dateCell);
+                    sheetDateKey = formatDateKeyUTC(dateCell);
                 } else {
                     // Fallback if the title row's date cell wasn't a real date — parse straight from the
                     // sheet name instead (same best-effort fallback as the weaving import).
@@ -6577,11 +6629,16 @@
                         const d = m[1], mo = m[2];
                         let y = m[3];
                         if (y.length === 2) y = '20' + y;
-                        dateKey = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        sheetDateKey = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                     }
                 }
-                if (!dateKey) return; // can't tell what date this sheet is — skip rather than guess wrong
+                if (!sheetDateKey) return; // can't tell what date this sheet is — skip rather than guess wrong
                 sheetsRead++;
+
+                // Row 2's first cell literally reading "DATE" is the new layout's signature — the old
+                // layout's row 2 is a sub-header ('', 'Dyeing date', <date>, ...) whose first cell is blank.
+                const isNewLayout = String((aoa[1] || [])[0] || '').trim().toUpperCase() === 'DATE';
+                const colMap = isNewLayout ? mapNewDyeingLayoutColumns(aoa[1]) : {};
 
                 const lastValue = {}; // ditto-mark carry-forward, per column index
                 const carryForward = (row, col) => {
@@ -6594,26 +6651,57 @@
                     return v;
                 };
 
-                for (let i = 3; i < aoa.length; i++) {
+                const startRow = isNewLayout ? 2 : 3; // new layout's headers sit one row higher
+                for (let i = startRow; i < aoa.length; i++) {
                     const row = aoa[i] || [];
-                    const seq = row[0];
-                    if (seq === null || seq === undefined || String(seq).trim() === '' || isNaN(Number(seq))) continue; // footer/blank row — no real ลำดับ number
+                    let dateKey = sheetDateKey;
+                    let orderNoRaw, yarnType, lotNo, colorNo, colorCode, hang, batchNo, kg, remark, requisitionKg, orderKg, dyeTubNo;
 
-                    const orderNoRaw = carryForward(row, 1);
-                    const yarnType = carryForward(row, 2);
-                    const lotNo = carryForward(row, 3);
-                    const colorNo = carryForward(row, 4);
-                    const colorCode = carryForward(row, 5);
-                    const hang = carryForward(row, 6);
-                    const batchNo = carryForward(row, 7);
-                    const kg = Number(row[8]) || 0;
-                    const remark = (row[9] !== null && row[9] !== undefined) ? String(row[9]).trim() : '';
+                    if (isNewLayout) {
+                        const dateColIdx = colMap.date !== undefined ? colMap.date : 0;
+                        const rowDate = row[dateColIdx];
+                        if (!(rowDate instanceof Date) || isNaN(rowDate)) continue; // footer/blank row — no real date
+                        dateKey = formatDateKeyUTC(rowDate); // each row carries its own date in this layout
+                        const getText = (field) => colMap[field] !== undefined ? carryForward(row, colMap[field]) : '';
+                        const getNum = (field) => {
+                            if (colMap[field] === undefined) return null;
+                            const v = row[colMap[field]];
+                            return (v === null || v === undefined || v === '') ? null : Number(v);
+                        };
+                        orderNoRaw = getText('orderNo');
+                        yarnType = getText('yarnType');
+                        lotNo = getText('lotNo');
+                        colorNo = getText('colorNo');
+                        colorCode = getText('colorCode');
+                        hang = getText('hang'); // '' when this sheet has no Hang column
+                        batchNo = getText('batchNo');
+                        requisitionKg = getNum('requisitionKg');
+                        orderKg = getNum('orderKg');
+                        dyeTubNo = getText('dyeTubNo');
+                        kg = getNum('actualKg') || 0; // "นน.โอนจริง" — same meaning as the old layout's bare kg
+                        remark = getText('remark'); // '' when this sheet has no Remark column
+                    } else {
+                        const seq = row[0];
+                        if (seq === null || seq === undefined || String(seq).trim() === '' || isNaN(Number(seq))) continue; // footer/blank row — no real ลำดับ number
+                        orderNoRaw = carryForward(row, 1);
+                        yarnType = carryForward(row, 2);
+                        lotNo = carryForward(row, 3);
+                        colorNo = carryForward(row, 4);
+                        colorCode = carryForward(row, 5);
+                        hang = carryForward(row, 6);
+                        batchNo = carryForward(row, 7);
+                        requisitionKg = null; // not present in the old layout
+                        orderKg = null; // not present in the old layout
+                        dyeTubNo = ''; // not present in the old layout
+                        kg = Number(row[8]) || 0;
+                        remark = (row[9] !== null && row[9] !== undefined) ? String(row[9]).trim() : '';
+                    }
 
                     splitDyeingOrderNoCell(orderNoRaw).forEach(disp => {
                         const key = normalizeMoSoKey(disp);
                         if (!key) return;
                         if (!byMoSo[key]) byMoSo[key] = { moSoDisplay: disp, rows: [] };
-                        byMoSo[key].rows.push({ dateKey, sheetName, colorNo, colorCode, yarnType, lotNo, hang, batchNo, kg, remark });
+                        byMoSo[key].rows.push({ dateKey, sheetName, colorNo, colorCode, yarnType, lotNo, hang, batchNo, kg, remark, requisitionKg, orderKg, dyeTubNo });
                     });
                 }
             });
@@ -6727,6 +6815,13 @@
                     if (r.batchNo) remarkParts.push(`Batch ${r.batchNo}`);
                     if (r.remark) remarkParts.push(r.remark);
                     const mergedRemark = remarkParts.join(' · ');
+                    // NEW (2026-10-01): the new sheet layout carries its own "นน.โอนจากใบเบิก" and
+                    // "นน.ในใบสั่งย้อม" values — only overwrite dyeOrderLog's existing requisitionKg/orderKg
+                    // when the imported row actually has one (the old layout never does), so re-importing
+                    // an old-layout file never clobbers a value the dyeing staff already typed by hand in
+                    // the "บันทึกสั่งย้อม" table.
+                    const hasRequisitionKg = r.requisitionKg !== null && r.requisitionKg !== undefined && !isNaN(r.requisitionKg);
+                    const hasOrderKg = r.orderKg !== null && r.orderKg !== undefined && !isNaN(r.orderKg);
 
                     let idx = log.findIndex((row, i) => row && row._importKey === importKey && !usedThisRound.has(i));
                     if (idx === -1) {
@@ -6740,7 +6835,10 @@
                         row.yarnType = r.yarnType || row.yarnType || '';
                         row.lotNo = r.lotNo || row.lotNo || '';
                         row.hang = r.hang || row.hang || '';
+                        row.dyeTubNo = r.dyeTubNo || row.dyeTubNo || '';
                         row.actualTransferKg = Number(r.kg) || 0;
+                        if (hasRequisitionKg) row.requisitionKg = Number(r.requisitionKg) || 0;
+                        if (hasOrderKg) row.orderKg = Number(r.orderKg) || 0;
                         row.actualDate = r.dateKey;
                         row.remark = mergedRemark || row.remark || '';
                         row._importKey = importKey;
@@ -6748,8 +6846,9 @@
                     } else {
                         log.push({
                             isExtra: true, orderDate: r.dateKey, colorNo: r.colorNo || '', colorCode: r.colorCode || '',
-                            yarnType: r.yarnType || '', lotNo: r.lotNo || '', orderKg: 0, dyeTubNo: '',
-                            requisitionKg: 0, actualTransferKg: Number(r.kg) || 0,
+                            yarnType: r.yarnType || '', lotNo: r.lotNo || '',
+                            orderKg: hasOrderKg ? (Number(r.orderKg) || 0) : 0, dyeTubNo: r.dyeTubNo || '',
+                            requisitionKg: hasRequisitionKg ? (Number(r.requisitionKg) || 0) : 0, actualTransferKg: Number(r.kg) || 0,
                             plannedDate: '', actualDate: r.dateKey, dueDate: order.dueDate || '',
                             hang: r.hang || '', remark: mergedRemark, _importKey: importKey
                         });
@@ -17195,6 +17294,10 @@
             <th class="px-2 py-2 text-right">หมายเลขตู้ย้อม</th>
             <th class="px-2 py-2 text-right">นน.โอนจากใบเบิก (Kg.)</th>
             <th class="px-2 py-2 text-right">นน.โอนจริง (Kg.)</th>
+            <!-- NEW (2026-10-01): "ส่วนต่าง" — matching the new "DATE, Order NO., ..., นน.โอนจากใบเบิก,
+                 นน.โอนจริง, ส่วนต่าง" sheet layout. Always derived (นน.โอนจากใบเบิก − นน.โอนจริง), never
+                 imported or hand-typed — see renderDyeOrderLogTable()'s rowHtml. -->
+            <th class="px-2 py-2 text-right">ส่วนต่าง (Kg.)</th>
             <th class="px-2 py-2 text-left">วันที่กำหนดเสร็จตามแผน</th>
             <th class="px-2 py-2 text-left">วันที่ย้อมเสร็จจริง</th>
             <th class="px-2 py-2 text-center">สรุปตามแผน</th>
@@ -17249,6 +17352,7 @@
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'dyeTubNo', item.dyeTubNo, 'w-10')}</td>
                         <td class="px-2 py-1.5">${n(orderIndex, itemIndex, 'requisitionKg', item.requisitionKg)}</td>
                         <td class="px-2 py-1.5">${n(orderIndex, itemIndex, 'actualTransferKg', item.actualTransferKg)}</td>
+                        <td class="px-2 py-1.5 text-right font-medium ${(Number(item.requisitionKg) || 0) - (Number(item.actualTransferKg) || 0) < 0 ? 'text-rose-600' : 'text-slate-600'}">${((Number(item.requisitionKg) || 0) - (Number(item.actualTransferKg) || 0)).toFixed(3)}</td>
                         <td class="px-2 py-1.5">${dt(orderIndex, itemIndex, 'plannedDate', item.plannedDate)}</td>
                         <td class="px-2 py-1.5">${dt(orderIndex, itemIndex, 'actualDate', item.actualDate)}</td>
                         <td class="px-2 py-1.5 text-center">${onTimeHtml}</td>
@@ -17261,7 +17365,7 @@
 
             const moRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) !== 'SO');
             const soRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO');
-            renderSplitOrderTypeTables('dyeingKpiSplitContainer', DYEING_ORDER_THEAD_HTML, moRows.map(rowHtml).join(''), soRows.map(rowHtml).join(''), moRows.length, soRows.length, 17);
+            renderSplitOrderTypeTables('dyeingKpiSplitContainer', DYEING_ORDER_THEAD_HTML, moRows.map(rowHtml).join(''), soRows.map(rowHtml).join(''), moRows.length, soRows.length, 18);
         }
 
         function addDyeOrderLogFromSelect() {
