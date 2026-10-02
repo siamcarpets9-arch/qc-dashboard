@@ -5249,6 +5249,47 @@
             finishing: PACKAGING_DEPARTMENT
         };
 
+        // Reverse of STAGE_QC_DEPT (QC department name -> production stage) — see
+        // checkAndAutoTransferToQcDept() below.
+        const QC_DEPT_STAGE = Object.fromEntries(Object.entries(STAGE_QC_DEPT).map(([stage, dept]) => [dept, stage]));
+
+        // Pipeline order, earliest first — the only thing that matters for "forward-only" comparisons
+        // below (how FAR apart two stages are, or which stage counts as "external"/non-pipeline, is
+        // irrelevant here; design isn't a gating stage so it's deliberately not in this list).
+        const STAGE_ORDER = ['planning', 'dyeing', 'weaving', 'finishing'];
+
+        // NEW (2026-10-02): "ให้เลขที่ M/O,S/O ที่รายงาน QC ตรวจแต่ละแผนกไปแสดงที่หน้าภาพรวมการผลิต ถ้าตรวจ
+        // ที่ทอ ให้เลื่อนไปแผนกทออัตโนมัติ หรือที่ย้อมให้เลื่อนไปแผนกย้อมอัตโนมัติ" — confirmed with the user to
+        // cover ALL 4 pipeline departments (not just ย้อม/ทอ), and to be FORWARD-ONLY: a QC record logged
+        // for a department strictly AHEAD of the order's current stage means production has clearly
+        // reached that far already (even if the order's own stage field was never updated — the whole
+        // point, per "บางทีแต่ละแผนกไม่ UPDATE ข้อมูล") so jump the order straight there. A QC record for a
+        // department the order has ALREADY passed (e.g. a backdated/corrected ย้อม record added after the
+        // order moved on to ตกแต่ง) must NEVER move the order backward — confirmed explicitly with the
+        // user ("ไม่เลื่อนย้อนหลัง") since that would undo real progress over what's likely just a late or
+        // corrected paperwork entry.
+        // Called from saveQCItem() after every QC record save (new or edit) — never on delete, since
+        // removing a record is never evidence that work reached some stage. Returns the destination
+        // stage key on an actual transfer, or null, so the caller can fold it into its own save toast
+        // (transferOrderStage() is called with suppressToast=true here for exactly that reason — see
+        // its own comment).
+        function checkAndAutoTransferToQcDept(moSo, qcDept) {
+            const key = (moSo || '').trim();
+            if (!key) return null;
+            const targetStage = QC_DEPT_STAGE[qcDept];
+            if (!targetStage) return null; // not a pipeline department (e.g. ดีไซน์/ขยายลาย) — nothing to transfer to
+            const orderIndex = productionOrders.findIndex(o => (o.moSo || '').trim() === key);
+            if (orderIndex === -1) return null; // QC logged against an M/O, S/O that isn't (or isn't yet) a real production order here
+            const order = productionOrders[orderIndex];
+            const currentIdx = STAGE_ORDER.indexOf(order.currentStage);
+            const targetIdx = STAGE_ORDER.indexOf(targetStage);
+            // order.currentStage not one of the 4 pipeline stages (shouldn't normally happen), or the QC'd
+            // department is the order's current stage or one it already passed — never move backward.
+            if (currentIdx === -1 || targetIdx <= currentIdx) return null;
+            transferOrderStage(orderIndex, order.currentStage, targetStage, true);
+            return targetStage;
+        }
+
         // Finds the most recent QC record for a given M/O, S/O + department (a later re-check always
         // supersedes an older one for the same M/O, S/O — same rule used elsewhere in this file).
         function getLatestQcForDept(moSo, dept) {
@@ -13127,7 +13168,14 @@
         // button. Any department can now transfer an order onward regardless of how much of its own
         // checklist/detail data has been filled in; the % complete is still tracked and shown elsewhere
         // as information, it just no longer blocks the click.
-        function transferOrderStage(orderIndex, fromStage, toStage) {
+        // NEW (2026-10-02): optional trailing `suppressToast` — true only from
+        // checkAndAutoTransferToQcDept() (saveQCItem()'s auto-transfer), which needs to fold its own
+        // "เลื่อนไปแผนก..." wording into the SAME toast as the QC-save confirmation (showToast() is a
+        // single-slot UI element — two calls in the same tick just means the second one silently wins,
+        // and the user never sees that the record actually saved — see the month-filter fix's comment
+        // just above saveQCItem() for the same reasoning). Every other existing call site omits this
+        // argument and keeps showing its own "โอนงาน...แล้ว" toast exactly as before.
+        function transferOrderStage(orderIndex, fromStage, toStage, suppressToast) {
             const order = productionOrders[orderIndex];
             if (!order) return;
 
@@ -13138,7 +13186,9 @@
             persistOrderChange(order);
             incrementTransferCount();
             rerenderOrderViews(orderIndex);
-            showToast(`โอนงาน "${order.moSo}" ไปแผนก${STAGE_LABELS[toStage]}แล้ว`, 'fa-arrow-right', 'text-emerald-400');
+            if (!suppressToast) {
+                showToast(`โอนงาน "${order.moSo}" ไปแผนก${STAGE_LABELS[toStage]}แล้ว`, 'fa-arrow-right', 'text-emerald-400');
+            }
             mascotCelebrate('transfer');
             notifyLineStageTransfer(order, fromStage, toStage);
             // NEW (2026-09-29): if that department finished LATE against its Baseline Plan and no Delay
@@ -16452,7 +16502,15 @@
                     monthShiftedMsg = ` (เลื่อนตัวกรองไปเดือน ${formatBucketLabel(newItemMonth, 'month')} ให้แล้ว)`;
                 }
             }
-            showToast((isNewRecord ? 'เพิ่มรายการ QC ใหม่สำเร็จ' : 'อัปเดตข้อมูลเรียบร้อยแล้ว') + monthShiftedMsg);
+
+            // NEW (2026-10-02): "ให้เลขที่ M/O,S/O ที่รายงาน QC ตรวจแต่ละแผนกไปแสดงที่หน้าภาพรวมการผลิต ถ้าตรวจ
+            // ที่ทอ ให้เลื่อนไปแผนกทออัตโนมัติ หรือที่ย้อมให้เลื่อนไปแผนกย้อมอัตโนมัติ" — see
+            // checkAndAutoTransferToQcDept()'s own comment for the forward-only rule (confirmed with the
+            // user to cover all 4 departments, never move an order backward).
+            const autoTransferredStage = checkAndAutoTransferToQcDept(newItem.moSo, newItem.department);
+            const transferMsg = autoTransferredStage ? ` — เลื่อนไปแผนก${STAGE_LABELS[autoTransferredStage]}อัตโนมัติแล้ว` : '';
+
+            showToast((isNewRecord ? 'เพิ่มรายการ QC ใหม่สำเร็จ' : 'อัปเดตข้อมูลเรียบร้อยแล้ว') + monthShiftedMsg + transferMsg);
 
             // NEW (2026-09-16): mark this record "pending sync" BEFORE the network call below (and
             // persist immediately) so it's protected even if the page reloads before the POST — or its
