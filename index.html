@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -9407,7 +9409,7 @@
                     <tr class="border-t border-slate-100 hover:bg-slate-50">
                         <td class="py-1.5 px-2 whitespace-nowrap">${escapeHtml(r.date || '-')}</td>
                         <td class="py-1.5 px-2 text-center">${escapeHtml(String(r.loom || '-'))}</td>
-                        <td class="py-1.5 px-2 font-mono font-semibold text-indigo-700 cursor-pointer" onclick="openOrderDetailModal(${r.orderIndex})">${escapeHtml(r.moSo || '-')}${yarnColorsBadge}</td>
+                        <td class="py-1.5 px-2 font-mono font-semibold text-indigo-700 cursor-pointer" onclick="openOrderDetailModal(${r.orderIndex})">${escapeHtml(r.moSo || '-')}${yarnColorsBadge}${(productionOrders[r.orderIndex] && productionOrders[r.orderIndex].currentStage === 'weaving') ? `<div class="mt-0.5 font-normal">${renderQcBadge(r.moSo, 'weaving')}</div>` : ''}</td>
                         <td class="py-1.5 px-2">${escapeHtml(r.quality || '-')}</td>
                         <td class="py-1.5 px-2 text-center">${escapeHtml(r.grade || '-')}</td>
                         <td class="py-1.5 px-2 text-right font-medium">${(Number(r.sqm) || 0).toFixed(2)}</td>
@@ -11028,6 +11030,15 @@
                 ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold ml-1" title="ย้อมครบตามแผนแล้ว"><i class="fa-solid fa-droplet"></i>ไหมย้อมครบแล้ว</span>`
                 : '';
 
+            // NEW (2026-10-02): "รายงาน QC ถ้าบันทึกตรวจ M/O ไหนที่แผนกอะไรให้ขึ้นที่แผนกนั้นด้วย เพราะบางที
+            // แต่ละแผนกไม่ UPDATE ข้อมูล" — the Overview row didn't show any QC info before; it only lived
+            // in the order detail modal and the Board cards. Reuses the existing renderQcBadge()/
+            // STAGE_QC_DEPT mapping (already used by the Board) so the SAME QC record shows here too.
+            // Deliberately keyed to effectiveStage (not persistent — confirmed with the user) so it only
+            // shows the QC status for the department the order is CURRENTLY sitting in; it naturally
+            // disappears from here once the order moves to the next department.
+            const overviewQcBadgeHtml = STAGE_QC_DEPT[effectiveStage] ? renderQcBadge(order.moSo, effectiveStage) : '';
+
             return `
                 <tr class="hover:bg-slate-50/80 transition border-b border-slate-100">
                     <td class="py-3.5 px-4 text-center text-xs font-bold text-slate-400">${runningNo}</td>
@@ -11049,6 +11060,7 @@
                     </td>
                     <td class="py-3.5 px-4">
                         ${renderStageStepper(effectiveStage)}
+                        ${overviewQcBadgeHtml ? `<div class="mt-1.5">${overviewQcBadgeHtml}</div>` : ''}
                         ${deadlineWarningHtml ? `<div class="mt-1.5">${deadlineWarningHtml}</div>` : ''}
                     </td>
                     <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">${escapeHtml(order.lastUpdated || '-')}</td>
@@ -17656,7 +17668,7 @@
                 return `
                     <tr class="hover:bg-slate-50/80">
                         <td class="px-2 py-1.5">${dt(orderIndex, itemIndex, 'orderDate', item.orderDate)}</td>
-                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}</td>
+                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}${order.currentStage === 'dyeing' ? `<div class="mt-0.5 font-normal">${renderQcBadge(order.moSo, 'dyeing')}</div>` : ''}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'colorNo', item.colorNo, 'w-10')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'colorCode', item.colorCode, 'w-16')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'yarnType', item.yarnType, 'w-20')}</td>
@@ -17949,7 +17961,7 @@
                 return `
                     <tr class="hover:bg-slate-50/80">
                         <td class="px-2 py-1.5">${dt(orderIndex, itemIndex, 'date', item.date)}</td>
-                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}</td>
+                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}${order.currentStage === 'finishing' ? `<div class="mt-0.5 font-normal">${renderQcBadge(order.moSo, 'finishing')}</div>` : ''}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'grade', item.grade, 'w-10')}</td>
                         <td class="px-2 py-1.5">${employeesCellHtml(orderIndex, itemIndex, item)}</td>
                         <td class="px-2 py-1.5 text-right text-slate-500">${(Number(order.totalSqm) || 0).toLocaleString('th-TH')}</td>
