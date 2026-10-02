@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -6479,6 +6481,36 @@
             }
         }
 
+        // NEW (2026-10-02): "แผนกย้อม M/O,S/O จำนวนสี จำนวนกิโลที่สั่งย้อมครบแล้ว ให้โอนไปแผนกทอได้เลย
+        // ให้ขึ้นที่ภาพรวมการผลิตว่า ไหมย้อมครบแล้ว" — single shared entry point for "is this order's
+        // dyeing now fully covered vs. plan, and if so, flag it + transfer it to ทอ immediately."
+        // Called from every path that can change dyeOrderLog coverage: the Excel-import confirm flow,
+        // the manual "add row" flow, and the manual per-cell kg edit flow — so the auto-transfer isn't
+        // dependent on which of those three the user happens to use.
+        // Sets order.dyeing.fullyDyedFlag = true and NEVER clears it afterwards — the user explicitly
+        // asked for a persistent "ไหมย้อมครบแล้ว" badge on the M/O,S/O in ภาพรวมการผลิต that keeps
+        // showing even once the order has moved on past ย้อม (ทอ/ตกแต่ง/...), not just while it's
+        // still sitting in the ย้อม stage.
+        // Only actually calls transferOrderStage() when the order is CURRENTLY in the dyeing stage —
+        // if it already moved on (e.g. someone manually transferred it, or a later edit re-confirms
+        // coverage), we just keep the flag set and skip re-transferring.
+        function checkAndAutoTransferDyeingIfComplete(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return false;
+            if (!isDyeingFullyDyedVsPlan(order)) return false;
+            if (!order.dyeing) order.dyeing = {};
+            const alreadyFlagged = !!order.dyeing.fullyDyedFlag;
+            order.dyeing.fullyDyedFlag = true;
+            if (order.currentStage === 'dyeing') {
+                transferOrderStage(orderIndex, 'dyeing', 'weaving');
+                return true;
+            }
+            // Not in dyeing anymore (already transferred, or never auto-tracked) — just make sure the
+            // persistent badge is set; nothing else to do.
+            if (!alreadyFlagged) persistOrderChange(order);
+            return false;
+        }
+
         // Derives order.dyeing.percent/colorsOrdered/colorsCompleted from the colorOrders-vs-
         // dyeOrderLog comparison above — used by recomputeStagePercent() ONLY when order.dyeing.items
         // is empty (i.e. this order isn't using the older manual per-color items list), so the two
@@ -6941,8 +6973,7 @@
                 persistOrderChange(order);
                 matched.push(order.moSo);
 
-                if (order.currentStage === 'dyeing' && isDyeingFullyDyedVsPlan(order)) {
-                    transferOrderStage(orderIndex, 'dyeing', 'weaving');
+                if (checkAndAutoTransferDyeingIfComplete(orderIndex)) {
                     autoTransferred.push(order.moSo);
                 }
             });
@@ -8085,7 +8116,13 @@
             // entered once by the Planning department (จำนวนสี/กิโลที่สั่งย้อม + ไหม surplus ที่ใช้แทน),
             // kept separate from colorsOrdered/colorsCompleted above (those are auto-derived from the
             // per-color item list the dyeing department fills in as work progresses).
-            const dyeing = Object.assign({ mode: 'internal', colorsOrdered: 0, colorsPerDay: 0, colorsCompleted: 0, percent: 0, items: [], plannedColorCount: 0, plannedKg: 0, surplusUsed: false, surplusColorCount: 0, surplusKg: 0, colorOrders: [] }, parseField(raw.dyeing, {}));
+            // fullyDyedFlag: NEW (2026-10-02) — "จำนวนสี จำนวนกิโลที่สั่งย้อมครบแล้ว ให้โอนไปแผนกทอได้เลย
+            // ให้ขึ้นที่ภาพรวมการผลิตว่า ไหมย้อมครบแล้ว". Set once (see
+            // checkAndAutoTransferDyeingIfComplete()) the moment every planned color's kg is fully dyed,
+            // and deliberately never cleared afterwards — the user explicitly asked for a persistent
+            // "ไหมย้อมครบแล้ว" label on the M/O, S/O in ภาพรวมการผลิต, so it should keep showing even
+            // once the order has moved on to ทอ/ตกแต่ง, not just during the brief moment it's still in ย้อม.
+            const dyeing = Object.assign({ mode: 'internal', colorsOrdered: 0, colorsPerDay: 0, colorsCompleted: 0, percent: 0, items: [], plannedColorCount: 0, plannedKg: 0, surplusUsed: false, surplusColorCount: 0, surplusKg: 0, colorOrders: [], fullyDyedFlag: false }, parseField(raw.dyeing, {}));
             if (dyeing.mode !== 'external') dyeing.mode = 'internal';
             if (!Array.isArray(dyeing.items)) dyeing.items = [];
             let dyeingMigrated = false;
@@ -10984,6 +11021,15 @@
                 : '';
             const deadlineWarningHtml = renderDeadlineWarningBadge(order);
 
+            // NEW (2026-10-02): "ป้ายกำกับ M/O,S/O เลย" — persistent green "ไหมย้อมครบแล้ว" badge next to
+            // the M/O,S/O itself in ภาพรวมการผลิต, per the user's explicit choice (not a toast, not tied
+            // to the current stage). Set once by checkAndAutoTransferDyeingIfComplete() the moment every
+            // planned color is fully dyed, and never cleared — keeps showing even after the order moves
+            // on to ทอ/ตกแต่ง/ส่งมอบ, so anyone scanning the Overview can see dyeing is done for this order.
+            const fullyDyedBadgeHtml = (order.dyeing && order.dyeing.fullyDyedFlag)
+                ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold ml-1" title="ย้อมครบตามแผนแล้ว"><i class="fa-solid fa-droplet"></i>ไหมย้อมครบแล้ว</span>`
+                : '';
+
             return `
                 <tr class="hover:bg-slate-50/80 transition border-b border-slate-100">
                     <td class="py-3.5 px-4 text-center text-xs font-bold text-slate-400">${runningNo}</td>
@@ -10991,7 +11037,7 @@
                         <div class="flex items-start gap-2">
                             ${order.designImageUrl ? `<img src="${escapeHtml(order.designImageUrl)}" class="w-9 h-9 object-cover rounded-lg border border-slate-200 shrink-0" alt="รูปดีไซน์" loading="lazy">` : ''}
                             <div class="min-w-0">
-                                <p class="font-bold ${moSoTextColorClass(order)} text-xs font-mono">${orderTypeBadgeHtml(order.orderType)}${marketBadgeHtml(order.market)}${orderFlagBadgesHtml(order)}${issueBadgeHtml(order.moSo)}${escapeHtml(order.moSo)}</p>
+                                <p class="font-bold ${moSoTextColorClass(order)} text-xs font-mono">${orderTypeBadgeHtml(order.orderType)}${marketBadgeHtml(order.market)}${orderFlagBadgesHtml(order)}${issueBadgeHtml(order.moSo)}${escapeHtml(order.moSo)}${fullyDyedBadgeHtml}</p>
                                 ${customerLineHtml}
                                 ${salesLineHtml}
                                 ${sqmPiecesLineHtml}
@@ -17639,6 +17685,11 @@
             });
             persistOrderChange(order);
             renderDyeOrderLogTable();
+            // NEW (2026-10-02): a manually-added row (rather than an Excel import) could also be what
+            // completes the plan, e.g. when someone logs the last color's transfer by hand.
+            if (checkAndAutoTransferDyeingIfComplete(orderIndex)) {
+                showToast(`${order.moSo} ไหมย้อมครบแล้ว — โอนไปแผนกทออัตโนมัติ`, 'fa-check-double', 'text-emerald-400');
+            }
         }
 
         function removeDyeOrderLogItem(orderIndex, itemIndex) {
@@ -17657,6 +17708,11 @@
             // Keep "สรุปรายเดือน" (ย้อมขาด depends on requisitionKg/actualTransferKg, the yarn table on
             // every field) in sync without redrawing the order-log table itself on every edit.
             if (document.getElementById('dyeingKpiSummarySection')) renderDyeingSummaryTab();
+            // NEW (2026-10-02): a manual edit to kg/color fields can be what finally completes the plan
+            // (not just an Excel import) — check every edit for auto-transfer-to-weaving.
+            if (['orderKg', 'requisitionKg', 'actualTransferKg', 'colorCode'].includes(field) && checkAndAutoTransferDyeingIfComplete(orderIndex)) {
+                showToast(`${order.moSo} ไหมย้อมครบแล้ว — โอนไปแผนกทออัตโนมัติ`, 'fa-check-double', 'text-emerald-400');
+            }
         }
 
         // NEW (2026-10-02): "ย้อมเสีย" checkbox — no existing data source, purely a manual flag an
