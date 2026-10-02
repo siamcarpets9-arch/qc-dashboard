@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -16273,14 +16271,34 @@
                 extraData: extra
             };
 
-            if (editIndex !== '') {
+            const isNewRecord = editIndex === '';
+            if (!isNewRecord) {
                 qcData[editIndex] = newItem;
-                showToast('อัปเดตข้อมูลเรียบร้อยแล้ว');
             } else {
                 qcData.unshift(newItem);
-                showToast('เพิ่มรายการ QC ใหม่สำเร็จ');
                 mascotCelebrateQcEntry(); // only for brand-new records, not edits — keeps the cheer tied to "ลงรายการ" specifically
             }
+
+            // FIX (2026-10-02): "กรอกข้อมูล QC ไปแล้วแต่ไม่เจอข้อมูล" — รายงาน QC ("records" tab) ค่าเริ่มต้น
+            // จะกรองให้เห็นเฉพาะเดือนปัจจุบัน ณ ตอน "เปิดหน้าเว็บ" เท่านั้น (ดูคอมเมนต์ของ #monthFilter ตอน
+            // initApp() ครั้งแรก — ตั้งใจไม่ให้ initApp() ที่รันซ้ำทุกครั้งหลัง save มาเปลี่ยนเดือนที่ผู้ใช้เลือกดู
+            // เอง) ปัญหาคือถ้าเปิดหน้าเว็บค้างไว้ข้ามเที่ยงคืน (เช่น เปิดไว้ตั้งแต่ 30/9 แล้วมากรอกข้อมูลวันที่
+            // 1/10 ทีหลัง) ตัวกรองเดือนจะยังค้างเป็นเดือนก่อนหน้า ทำให้รายการที่เพิ่งบันทึกไป (วันที่อยู่ใน
+            // เดือนใหม่) หายไปจากลิสต์ทันทีที่บันทึก — มีแค่ข้อความเตือนเล็กๆ (qcMonthFilterHint) ซึ่งพลาดดูง่าย
+            // มาก ป้องกันไม่ให้เกิดเหตุการณ์แบบนี้อีก โดยเลื่อนตัวกรองเดือนไปตรงกับเดือนของรายการที่เพิ่งบันทึก
+            // ทันที (ทั้งกรณีเพิ่มใหม่และแก้ไข) — รับประกันว่าสิ่งที่เพิ่งกรอกจะต้องเห็นในลิสต์เสมอ ผู้ใช้ยังย้าย
+            // ไปดูเดือนอื่นเองได้ตามปกติหลังจากนี้. ต่อข้อความไว้ใน toast เดียวกับผลบันทึก แทนที่จะยิง toast
+            // สองอันซ้อนกัน (toast มีกล่องเดียว อันที่สองจะทับอันแรกจนผู้ใช้ไม่ทันเห็นว่าบันทึกสำเร็จ).
+            let monthShiftedMsg = '';
+            if (newItem.date) {
+                const newItemMonth = newItem.date.slice(0, 7);
+                const monthFilterEl = document.getElementById('monthFilter');
+                if (monthFilterEl && monthFilterEl.value !== newItemMonth) {
+                    monthFilterEl.value = newItemMonth;
+                    monthShiftedMsg = ` (เลื่อนตัวกรองไปเดือน ${formatBucketLabel(newItemMonth, 'month')} ให้แล้ว)`;
+                }
+            }
+            showToast((isNewRecord ? 'เพิ่มรายการ QC ใหม่สำเร็จ' : 'อัปเดตข้อมูลเรียบร้อยแล้ว') + monthShiftedMsg);
 
             // NEW (2026-09-16): mark this record "pending sync" BEFORE the network call below (and
             // persist immediately) so it's protected even if the page reloads before the POST — or its
