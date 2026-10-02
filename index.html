@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -2723,6 +2721,22 @@
         </div>
     </div>
 
+    <!-- NEW (2026-10-02): "เอาตารางรายงาน QC ทั้งหมดนี้ไปใส่ในหน้าภาพรวมการผลิต" — read-only (well, the
+         action buttons inside still work) popup showing one M/O, S/O's full QC history across every
+         department, opened from the "ดูประวัติ QC" button on each ภาพรวมการผลิต row. See
+         buildQcHistoryTableHtml()/openOverviewQcHistoryModal(). -->
+    <div id="overviewQcHistoryModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-100 px-6 py-4 shrink-0">
+                <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-clipboard-list text-indigo-500 mr-2"></i>ประวัติ QC ทั้งหมดของ <span id="overviewQcHistoryMoSoLabel" class="font-mono"></span></h3>
+                <button onclick="closeOverviewQcHistoryModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="overviewQcHistoryBody" class="overflow-y-auto px-6 py-4"></div>
+        </div>
+    </div>
+
     <!-- NEW (2026-09-29): SC-FOS Planning V1 — Delay Log modal (opened from renderPlanningControlOrderBlock()'s
          "Delay" buttons or automatically via notifyMissingDelayReasonAfterCompletion() when a stage finishes
          late against its Baseline Plan with no reason on file yet). See submitPlanningDelayLog(). -->
@@ -3979,6 +3993,19 @@
             populateWeavingLogMoSoOptions();
             resetWeavingLogForm(false);
             renderWeavingLogTable();
+
+            // NEW (2026-10-02): saveQCItem()/confirmDeleteItem() both mutate qcData then call initApp()
+            // — but neither of them knows whether the order detail modal's "ประวัติ QC" section, or the
+            // Overview's "ดูประวัติ QC" popup, happen to be open right now showing a now-stale snapshot of
+            // qcData. Re-render both here, once, whenever they're actually open, so editing/deleting a QC
+            // record from either of those nested views is reflected immediately instead of only after
+            // closing and reopening them.
+            if (currentDetailOrderIndex !== null && !document.getElementById('orderDetailModal').classList.contains('hidden')) {
+                renderOrderDetailModalBody(currentDetailOrderIndex);
+            }
+            if (overviewQcHistoryOrderIndex !== null && !document.getElementById('overviewQcHistoryModal').classList.contains('hidden')) {
+                renderOverviewQcHistoryModalBody(overviewQcHistoryOrderIndex);
+            }
         }
 
         function switchView(view) {
@@ -5036,6 +5063,38 @@
             return null;
         }
 
+        // NEW (2026-10-02): factored out of renderTable() so the same one-line Thai summary (built from
+        // a QC record's department-specific extraData, same rule used for "รายงาน QC ทั้งหมด") can be
+        // reused by buildQcHistoryTableHtml() below — the per-M/O QC history now also shown in the
+        // Overview row and the order detail modal, per "รายงาน QC ถ้าบันทึกตรวจ M/O ไหนที่แผนกอะไรให้ขึ้น
+        // ที่แผนกนั้นด้วย".
+        function buildQcSummaryText(item) {
+            let summaryText = '';
+            const ex = item.extraData || {};
+            if (item.department === 'ดีไซน์/ขยายลาย') {
+                const count = ex.items ? ex.items.length : (ex.designIdMatch ? 1 : 0);
+                summaryText = `รวม ${count} รายการลายผ้า (เช็คดีไซน์ & สี)`;
+            } else if (item.department === 'แผนกวางแผน') {
+                const count = ex.items ? ex.items.length : (ex.weavingGrade ? 1 : 0);
+                summaryText = `รวม ${count} รายการแผนงาน (เกรดทอ & กำหนดเสร็จ)`;
+            } else if (item.department === 'แผนกย้อม') {
+                const dyeItems = ex.items || ((ex.codeAndQty || ex.colorCode) ? [ex] : []);
+                const count = dyeItems.length;
+                const codesPreview = dyeItems.map(d => d.colorCode || d.codeAndQty).filter(Boolean).join(', ');
+                summaryText = `รวม ${count} รายการย้อมสี${codesPreview ? ` (Code: ${codesPreview})` : ''}`;
+            } else if (item.department === 'แผนกทอมือ') {
+                const roundsCount = ex.loomRounds ? ex.loomRounds.length : 0;
+                summaryText = `จอ: ${ex.loomNo || '-'}, ตรวจ ${roundsCount} รอบ`;
+            } else if (item.department === 'แผนกตกแต่ง/ทากาว/บรรจุภัณฑ์') {
+                const count = ex.items ? ex.items.length : (ex.packagingInfo || ex.specMatch ? 1 : 0);
+                summaryText = `รวม ${count} รายการตกแต่ง/บรรจุภัณฑ์`;
+            } else {
+                summaryText = item.moSo;
+            }
+            if (item.remark) summaryText += ` | หมายเหตุ: ${item.remark}`;
+            return summaryText;
+        }
+
         function renderTable(dataToRender) {
             const tbody = document.getElementById('qcTableBody');
             const emptyState = document.getElementById('emptyState');
@@ -5050,42 +5109,17 @@
 
             dataToRender.forEach((item) => {
                 const originalIndex = qcData.findIndex(d => d === item);
-                
+
                 let badgeClass = 'bg-slate-100 text-slate-700';
                 if (item.status === 'PASS') badgeClass = 'bg-emerald-100 text-emerald-700';
                 else if (item.status === 'FAIL') badgeClass = 'bg-rose-100 text-rose-700';
                 else if (item.status === 'PENDING') badgeClass = 'bg-amber-100 text-amber-700';
 
-                let stampBadge = item.stamp === 'PASS' 
-                    ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i> PASS</span>' 
+                let stampBadge = item.stamp === 'PASS'
+                    ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i> PASS</span>'
                     : '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">-</span>';
 
-                let summaryText = '';
-                const ex = item.extraData || {};
-                if (item.department === 'ดีไซน์/ขยายลาย') {
-                    const count = ex.items ? ex.items.length : (ex.designIdMatch ? 1 : 0);
-                    summaryText = `รวม ${count} รายการลายผ้า (เช็คดีไซน์ & สี)`;
-                } else if (item.department === 'แผนกวางแผน') {
-                    const count = ex.items ? ex.items.length : (ex.weavingGrade ? 1 : 0);
-                    summaryText = `รวม ${count} รายการแผนงาน (เกรดทอ & กำหนดเสร็จ)`;
-                } else if (item.department === 'แผนกย้อม') {
-                    const dyeItems = ex.items || ((ex.codeAndQty || ex.colorCode) ? [ex] : []);
-                    const count = dyeItems.length;
-                    const codesPreview = dyeItems.map(d => d.colorCode || d.codeAndQty).filter(Boolean).join(', ');
-                    summaryText = `รวม ${count} รายการย้อมสี${codesPreview ? ` (Code: ${codesPreview})` : ''}`;
-                } else if (item.department === 'แผนกทอมือ') {
-                    const roundsCount = ex.loomRounds ? ex.loomRounds.length : 0;
-                    summaryText = `จอ: ${ex.loomNo || '-'}, ตรวจ ${roundsCount} รอบ`;
-                } else if (item.department === 'แผนกตกแต่ง/ทากาว/บรรจุภัณฑ์') {
-                    const count = ex.items ? ex.items.length : (ex.packagingInfo || ex.specMatch ? 1 : 0);
-                    summaryText = `รวม ${count} รายการตกแต่ง/บรรจุภัณฑ์`;
-                } else {
-                    summaryText = item.moSo;
-                }
-
-                if (item.remark) {
-                    summaryText += ` | หมายเหตุ: ${item.remark}`;
-                }
+                const summaryText = buildQcSummaryText(item);
 
                 const tr = document.createElement('tr');
                 tr.className = 'group hover:bg-slate-50/80 transition border-b border-slate-100';
@@ -5113,6 +5147,94 @@
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // NEW (2026-10-02): "เอาตารางรายงาน QC ทั้งหมดนี้ไปใส่ในหน้าภาพรวมการผลิต + หน้ารายละเอียดออเดอร์"
+        // — one reusable table builder for a single M/O, S/O's full QC history (every department, every
+        // date), in the same column layout as "รายงาน QC ทั้งหมด" minus the M/O column (redundant once
+        // it's already scoped to one order). Used by both renderOrderDetailModalBody() (always-visible
+        // section) and the new Overview "ดูประวัติ QC" button (openOverviewQcHistoryModal()). Action
+        // buttons reuse the exact same printQCItem()/editItem()/promptDeleteItem() functions the main
+        // records table uses (indexed into the real qcData array), so editing/deleting/printing from
+        // here behaves identically — no separate code path to keep in sync.
+        function buildQcHistoryTableHtml(moSo) {
+            const key = (moSo || '').trim();
+            const records = qcData
+                .map((item, idx) => ({ item, idx }))
+                .filter(r => (r.item.moSo || '').trim() === key)
+                .sort((a, b) => (a.item.date < b.item.date ? 1 : (a.item.date > b.item.date ? -1 : 0)));
+
+            if (records.length === 0) {
+                return `<p class="text-xs text-slate-400 py-3 text-center">ยังไม่มีประวัติการตรวจ QC สำหรับ M/O, S/O นี้</p>`;
+            }
+
+            const rowsHtml = records.map(({ item, idx }) => {
+                let badgeClass = 'bg-slate-100 text-slate-700';
+                if (item.status === 'PASS') badgeClass = 'bg-emerald-100 text-emerald-700';
+                else if (item.status === 'FAIL') badgeClass = 'bg-rose-100 text-rose-700';
+                else if (item.status === 'PENDING') badgeClass = 'bg-amber-100 text-amber-700';
+                const stampBadge = item.stamp === 'PASS'
+                    ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i>PASS</span>'
+                    : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">-</span>';
+                const summaryText = buildQcSummaryText(item);
+                return `
+                    <tr class="border-t border-slate-100 hover:bg-slate-50">
+                        <td class="py-2 px-2.5 text-[11px] text-slate-500 whitespace-nowrap">${escapeHtml(item.date)}</td>
+                        <td class="py-2 px-2.5 font-semibold text-indigo-600 text-[11px] whitespace-nowrap">${escapeHtml(item.id)}</td>
+                        <td class="py-2 px-2.5 font-medium text-[11px] whitespace-nowrap">${escapeHtml(item.department)}</td>
+                        <td class="py-2 px-2.5 text-[11px] text-slate-600 max-w-xs truncate" title="${escapeHtml(summaryText)}">${escapeHtml(summaryText)}</td>
+                        <td class="py-2 px-2.5 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeClass}">${escapeHtml(item.status)}</span></td>
+                        <td class="py-2 px-2.5 text-[11px] text-slate-600 whitespace-nowrap">${escapeHtml(item.inspector)}</td>
+                        <td class="py-2 px-2.5 text-center">${stampBadge}</td>
+                        <td class="py-2 px-2.5 text-center whitespace-nowrap">
+                            <button onclick="printQCItem(${idx})" class="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition inline-flex items-center justify-center mr-1" title="ดู PDF / พิมพ์ใบตรวจสอบนี้"><i class="fa-solid fa-file-pdf text-[10px]"></i></button>
+                            <button onclick="editItem(${idx})" class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition inline-flex items-center justify-center mr-1" title="ดู/แก้ไข"><i class="fa-solid fa-pen-to-square text-[10px]"></i></button>
+                            <button onclick="promptDeleteItem(${idx})" class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition inline-flex items-center justify-center" title="ลบ"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                        </td>
+                    </tr>`;
+            }).join('');
+
+            return `
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500">
+                            <tr>
+                                <th class="py-2 px-2.5 text-left">วันที่</th>
+                                <th class="py-2 px-2.5 text-left">QC ID</th>
+                                <th class="py-2 px-2.5 text-left">แผนก</th>
+                                <th class="py-2 px-2.5 text-left">รายละเอียดสรุป / หมายเหตุ</th>
+                                <th class="py-2 px-2.5 text-center">สถานะ</th>
+                                <th class="py-2 px-2.5 text-left">ผู้ตรวจสอบ</th>
+                                <th class="py-2 px-2.5 text-center">STAMP PASS</th>
+                                <th class="py-2 px-2.5 text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </div>`;
+        }
+
+        // Overview's "ดูประวัติ QC" modal state — same convention as overviewRemarkOrderIndex above.
+        let overviewQcHistoryOrderIndex = null;
+
+        function renderOverviewQcHistoryModalBody(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            document.getElementById('overviewQcHistoryMoSoLabel').textContent = order.moSo || '-';
+            document.getElementById('overviewQcHistoryBody').innerHTML = buildQcHistoryTableHtml(order.moSo);
+        }
+
+        function openOverviewQcHistoryModal(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            overviewQcHistoryOrderIndex = orderIndex;
+            renderOverviewQcHistoryModalBody(orderIndex);
+            document.getElementById('overviewQcHistoryModal').classList.remove('hidden');
+        }
+
+        function closeOverviewQcHistoryModal() {
+            document.getElementById('overviewQcHistoryModal').classList.add('hidden');
+            overviewQcHistoryOrderIndex = null;
         }
 
         const PACKAGING_DEPARTMENT = 'แผนกตกแต่ง/ทากาว/บรรจุภัณฑ์';
@@ -11039,6 +11161,16 @@
             // disappears from here once the order moves to the next department.
             const overviewQcBadgeHtml = STAGE_QC_DEPT[effectiveStage] ? renderQcBadge(order.moSo, effectiveStage) : '';
 
+            // NEW (2026-10-02): "เอาตารางรายงาน QC ทั้งหมดนี้ไปใส่ในหน้าภาพรวมการผลิต" — a small button that
+            // pops up the FULL QC history (every department, every date — see buildQcHistoryTableHtml())
+            // for this one M/O, S/O, right from its Overview row, instead of only the current-department
+            // badge above. Shows the record count so it's obvious at a glance whether anything's on file.
+            const qcHistoryCount = qcData.filter(d => (d.moSo || '').trim() === (order.moSo || '').trim()).length;
+            const qcHistoryButtonHtml = `
+                <button type="button" onclick="openOverviewQcHistoryModal(${orderIndex})" class="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-indigo-500 hover:text-indigo-700 transition">
+                    <i class="fa-solid fa-clock-rotate-left"></i>ดูประวัติ QC${qcHistoryCount > 0 ? ` (${qcHistoryCount})` : ''}
+                </button>`;
+
             return `
                 <tr class="hover:bg-slate-50/80 transition border-b border-slate-100">
                     <td class="py-3.5 px-4 text-center text-xs font-bold text-slate-400">${runningNo}</td>
@@ -11062,6 +11194,7 @@
                         ${renderStageStepper(effectiveStage)}
                         ${overviewQcBadgeHtml ? `<div class="mt-1.5">${overviewQcBadgeHtml}</div>` : ''}
                         ${deadlineWarningHtml ? `<div class="mt-1.5">${deadlineWarningHtml}</div>` : ''}
+                        <div>${qcHistoryButtonHtml}</div>
                     </td>
                     <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">${escapeHtml(order.lastUpdated || '-')}</td>
                     <td class="py-3.5 px-4 text-center">
@@ -15767,10 +15900,19 @@
             // NEW (2026-09-29): SC-FOS Planning V1 — Delivery Control / Plan-vs-Actual / Delay Log,
             // prefixed above the rest of the M/O detail — see renderPlanningControlOrderBlock().
             const planningControlHtml = renderPlanningControlOrderBlock(order, orderIndex);
+            // NEW (2026-10-02): "เอาตารางรายงาน QC ทั้งหมดนี้ไปใส่ในหน้ารายละเอียดออเดอร์" — full QC history
+            // for this M/O, S/O across EVERY department (not just the currently-focused stage tab above),
+            // so opening "แก้ไข" on an order shows its whole QC record in one place. Reuses the exact same
+            // buildQcHistoryTableHtml() as the Overview "ดูประวัติ QC" popup — see that function's comment.
+            const qcHistoryHtml = `
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 mt-3">
+                    <h4 class="text-sm font-bold text-slate-700 mb-2"><i class="fa-solid fa-clipboard-list text-indigo-500 mr-1.5"></i>ประวัติ QC ทั้งหมดของ M/O นี้ (ทุกแผนก)</h4>
+                    ${buildQcHistoryTableHtml(order.moSo)}
+                </div>`;
             document.getElementById('orderDetailBody').innerHTML =
                 planningControlHtml +
                 `<div id="orderDetailMasterFieldsBlock" class="space-y-3">${orderSizeItemsHtml}${orderDesignImageHtml}${orderExtraInfoHtml}${orderSpecificationsHtml}</div>` +
-                stageTabsHtml + stageSectionsHtml;
+                stageTabsHtml + stageSectionsHtml + qcHistoryHtml;
             applyDeptPermissionGating();
         }
 
