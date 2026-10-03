@@ -1153,14 +1153,18 @@
                         <!-- injected via JS -->
                     </div>
 
-                    <!-- CHANGED (2026-09-30): "รายงานแผนกขาย แยกต่างประเทศและในประเทศ ทั้ง M/O และ S/O" —
-                         ผู้ใช้ขอให้เห็นตลาดต่างประเทศ/ในประเทศพร้อมกันทั้งสองฝั่ง แทนที่ dropdown "แสดง:"
-                         (ทั้งหมด/ต่างประเทศ/ในประเทศ/ยังไม่ระบุตลาด) ที่เพิ่งเพิ่มไปก่อนหน้านี้ในรอบเดียวกัน —
-                         จึงเอา #salesReportMarketFilter ออก เหลือแค่แท็บ M/O/S/O (setSalesReportOrderType()
-                         ไม่เปลี่ยน) ส่วนตารางด้านล่างเปลี่ยนจาก 1 ตาราง (#salesReportBody) เป็นหลายตารางที่
-                         มองเห็นพร้อมกันเสมอ ต่อคอนเทนเนอร์ #salesReportMarketSections — สร้างทั้งหมดใน JS โดย
-                         renderSalesReportTables()/renderSalesReportMarketSectionHtml() ด้านล่าง เพื่อให้ตาราง
-                         "ยังไม่ระบุตลาด" แสดงเฉพาะตอนมีรายการเท่านั้น -->
+                    <!-- CHANGED (2026-10-03): "รายงานแผนกขาย ให้เห็นรายการแบบเต็มจอ ให้เลือกดูได้จะดู M/O
+                         ตลาดต่างประเทศ ในประเทศ S/O ต่างประเทศ ในประเทศ ไม่ต้องแสดงตลาดต่างประเทศกับใน
+                         ประเทศคู่ ให้เลือกดู" — รอบก่อน (2026-09-30) เพิ่งเปลี่ยนมาโชว์ตลาดต่างประเทศ/ในประเทศ
+                         พร้อมกันเสมอแบบ 2 คอลัมน์ (#salesReportMarketSections เป็น grid xl:grid-cols-2) แต่
+                         ผู้ใช้ขอกลับไปดูทีละตลาดแบบเต็มความกว้างหน้าจอแทน จึง: (1) เพิ่มแท็บเลือกตลาด
+                         ต่างประเทศ/ในประเทศ (setSalesReportMarket()) คู่กับแท็บ M/O/S/O เดิม — รวมเป็น 4
+                         มุมมองให้เลือกตามที่ขอ (2) #salesReportMarketSections เปลี่ยนจาก grid 2 คอลัมน์เป็น
+                         div เดี่ยวเต็มความกว้าง render แค่ตารางของตลาดที่เลือกไว้ตารางเดียว (ไม่โชว์คู่กันแล้ว)
+                         (3) ตาราง "ยังไม่ระบุตลาด" (ออเดอร์เก่าที่ยังไม่ระบุตลาด) ยังไม่ตัดออก — คงหลักการเดิม
+                         "ไม่มีข้อมูลไหนถูกตัดทิ้ง" ไว้ โดยเพิ่มเป็นแท็บที่ 3 ซึ่งจะโผล่ให้เลือกเฉพาะตอนประเภท
+                         รายการ (M/O หรือ S/O) ที่เลือกอยู่มีออเดอร์แบบนี้จริงเท่านั้น ดู
+                         renderSalesReportTables()/setSalesReportMarket() ด้านล่าง -->
                     <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200 pb-2.5">
                         <div class="flex items-center gap-1.5">
                             <button onclick="setSalesReportOrderType('MO')" id="salesReportTypeTabBtn-MO" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition">
@@ -1170,10 +1174,16 @@
                                 S/O <span id="salesReportTypeCount-SO" class="bg-slate-300/50 px-1.5 py-0.5 rounded-full text-[10px]">0</span>
                             </button>
                         </div>
+                        <div class="flex items-center gap-1.5" id="salesReportMarketTabs">
+                            <button onclick="setSalesReportMarket('export')" id="salesReportMarketTabBtn-export" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-sky-600 text-white shadow-sm transition"><i class="fa-solid fa-earth-asia"></i> ต่างประเทศ <span id="salesReportMarketCount-export" class="bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]">0</span></button>
+                            <button onclick="setSalesReportMarket('domestic')" id="salesReportMarketTabBtn-domestic" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition"><i class="fa-solid fa-house-flag"></i> ในประเทศ <span id="salesReportMarketCount-domestic" class="bg-slate-300/50 px-1.5 py-0.5 rounded-full text-[10px]">0</span></button>
+                            <!-- โผล่เฉพาะตอนประเภทรายการที่เลือกอยู่มีออเดอร์ที่ยังไม่ระบุตลาดจริง — toggle ใน renderSalesReportTables() -->
+                            <button onclick="setSalesReportMarket('none')" id="salesReportMarketTabBtn-none" class="hidden flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition"><i class="fa-solid fa-circle-question"></i> ยังไม่ระบุตลาด <span id="salesReportMarketCount-none" class="bg-slate-300/50 px-1.5 py-0.5 rounded-full text-[10px]">0</span></button>
+                        </div>
                     </div>
 
-                    <div id="salesReportMarketSections" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <!-- injected via JS: renderSalesReportTables() -->
+                    <div id="salesReportMarketSections">
+                        <!-- injected via JS: renderSalesReportTables() — ตารางเดียวของตลาดที่เลือกอยู่ -->
                     </div>
                 </div>
             </div>
@@ -2912,7 +2922,13 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">เลขที่ M/O และ S/O</label>
-                    <input type="text" id="formMoSo" required placeholder="เช่น M/O: 6902-01, S/O: 45001" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <!-- NEW (2026-10-03): เปลี่ยนจากช่องพิมพ์เอง (free text) เป็น dropdown ล็อกให้เลือกได้
+                         เฉพาะเลขที่ M/O, S/O ที่มีอยู่จริงในระบบเท่านั้น — ดู populateFormMoSoOptions() —
+                         ตัวเลือกจริงถูกเติมด้วย JS ทุกครั้งที่เปิดฟอร์ม ตัวเลือกด้านล่างเป็นแค่ placeholder
+                         ก่อน JS รัน -->
+                    <select id="formMoSo" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="" disabled selected>-- เลือกเลขที่ M/O, S/O --</option>
+                    </select>
                 </div>
 
                 <!-- Dynamic Department Fields -->
@@ -14181,7 +14197,7 @@
 
         function openQCModalForOrder(moSo, dept) {
             openModal();
-            document.getElementById('formMoSo').value = moSo;
+            populateFormMoSoOptions(moSo);
             document.getElementById('formDept').value = dept;
             renderDepartmentFields();
         }
@@ -14406,10 +14422,11 @@
                 </tr>
             `;
         }
-        // CHANGED (2026-09-30): "รายงานแผนกขาย แยกต่างประเทศและในประเทศ ทั้ง M/O และ S/O" — replaces the
-        // single renderSalesReportTable() helper (one table, filtered by the now-removed
-        // #salesReportMarketFilter dropdown) with one table PER MARKET, always visible together — see
-        // renderSalesReportTables() below, which calls this once per market section.
+        // CHANGED (2026-10-03): "ให้เห็นรายการแบบเต็มจอ ให้เลือกดูได้ ... ไม่ต้องแสดงตลาดต่างประเทศกับใน
+        // ประเทศคู่ ให้เลือกดู" — เดิมฟังก์ชันนี้ render ทุกตลาดพร้อมกันเป็น grid 2 คอลัมน์ ตอนนี้
+        // renderSalesReportTables() เรียกฟังก์ชันนี้แค่ครั้งเดียวต่อตลาดที่เลือกไว้ (salesReportActiveMarket)
+        // เท่านั้น ตารางจึงกว้างเต็มคอนเทนเนอร์ (เต็มจอ) และเพิ่ม max-h ให้สูงขึ้น (70vh) เพราะไม่ต้องแบ่งพื้นที่
+        // กับตารางอื่นอีกแล้ว — extraWrapperCls เดิมไม่ใช้แล้วแต่คงพารามิเตอร์ไว้เผื่ออนาคต
         function renderSalesReportMarketSectionHtml(sectionKey, label, iconCls, colorCls, list, emptyMessage, extraWrapperCls) {
             const bodyId = `salesReportBody-${sectionKey}`;
             const rowsHtml = list.length === 0
@@ -14421,7 +14438,7 @@
                         <i class="fa-solid ${iconCls}"></i> ${escapeHtml(label)}
                         <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full text-[10px] font-semibold">${list.length}</span>
                     </h4>
-                    <div class="overflow-auto border border-slate-300 rounded-lg max-h-[480px]">
+                    <div class="overflow-auto border border-slate-300 rounded-lg max-h-[70vh]">
                         <table class="min-w-full text-xs border-collapse">
                             <thead class="sticky top-0 z-10">
                                 <tr class="bg-slate-100">
@@ -14460,6 +14477,30 @@
                 else { btn.classList.remove(...activeClasses); btn.classList.add(...inactiveClasses); }
             });
         }
+        // NEW (2026-10-03): 'export' | 'domestic' | 'none' — ตลาดที่กำลังเลือกดูอยู่ (ดูทีละตลาดเท่านั้น
+        // ตามที่ผู้ใช้ขอ "ไม่ต้องแสดงตลาดต่างประเทศกับในประเทศคู่ ให้เลือกดู") รวมกับแท็บ M/O/S/O เดิมแล้ว
+        // เป็น 4 มุมมองให้เลือก ('none' = "ยังไม่ระบุตลาด" โผล่เป็นตัวเลือกเพิ่มเฉพาะตอนมีข้อมูลจริง — ดู
+        // renderSalesReportTables()).
+        let salesReportActiveMarket = 'export';
+        const SALES_REPORT_MARKET_META = {
+            export: { label: 'ตลาดต่างประเทศ (Export)', icon: 'fa-earth-asia', colorCls: 'text-sky-600', activeClasses: ['bg-sky-600', 'text-white', 'shadow-sm'] },
+            domestic: { label: 'ตลาดในประเทศ (Domestic)', icon: 'fa-house-flag', colorCls: 'text-emerald-600', activeClasses: ['bg-emerald-600', 'text-white', 'shadow-sm'] },
+            none: { label: 'ยังไม่ระบุตลาด', icon: 'fa-circle-question', colorCls: 'text-amber-600', activeClasses: ['bg-amber-600', 'text-white', 'shadow-sm'] }
+        };
+        function setSalesReportMarket(market) {
+            salesReportActiveMarket = SALES_REPORT_MARKET_META[market] ? market : 'export';
+            renderSalesReportTables();
+        }
+        function updateSalesReportMarketTabStyle() {
+            const inactiveClasses = ['bg-slate-100', 'text-slate-600', 'hover:bg-slate-200'];
+            Object.keys(SALES_REPORT_MARKET_META).forEach(market => {
+                const btn = document.getElementById(`salesReportMarketTabBtn-${market}`);
+                if (!btn) return;
+                const activeClasses = SALES_REPORT_MARKET_META[market].activeClasses;
+                if (market === salesReportActiveMarket) { btn.classList.remove(...inactiveClasses); btn.classList.add(...activeClasses); }
+                else { btn.classList.remove(...activeClasses); btn.classList.add(...inactiveClasses); }
+            });
+        }
         function renderSalesReportTables() {
             updateSalesReportTypeTabStyle();
 
@@ -14489,23 +14530,35 @@
                 if (countEl) countEl.textContent = count;
             });
 
-            // CHANGED (2026-09-30): "รายงานแผนกขาย แยกต่างประเทศและในประเทศ ทั้ง M/O และ S/O" — เดิมกรองด้วย
-            // #salesReportMarketFilter dropdown แล้วเรนเดอร์ตารางเดียว ตอนนี้แบ่งตามตลาดล่วงหน้าแล้วเรนเดอร์
-            // ทุกตารางพร้อมกัน (export/domestic เสมอ, "ยังไม่ระบุตลาด" เฉพาะตอนมีรายการ) — ไม่มีข้อมูลไหนถูก
-            // ตัดทิ้ง เหมือนหลักการเดิม.
+            // CHANGED (2026-10-03): ยังคงแบ่งตามตลาดไว้ล่วงหน้าเหมือนเดิม (ไม่มีข้อมูลไหนถูกตัดทิ้ง) แต่แทนที่
+            // จะ render ทุกตารางพร้อมกัน ตอนนี้ render แค่ตารางเดียวของ salesReportActiveMarket เท่านั้น — ดู
+            // คอมเมนต์ใหญ่เหนือ renderSalesReportMarketSectionHtml() ด้านบน.
             const ofType = productionOrders
                 .filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === salesReportActiveOrderType && matchesSearch(o))
                 .sort(sortByOpenDateThenMoSo);
             const exportList = ofType.filter(o => o.market === 'export');
             const domesticList = ofType.filter(o => o.market === 'domestic');
             const unspecifiedList = ofType.filter(o => o.market !== 'export' && o.market !== 'domestic');
+            const marketLists = { export: exportList, domestic: domesticList, none: unspecifiedList };
 
-            let sectionsHtml =
-                renderSalesReportMarketSectionHtml('export', 'ตลาดต่างประเทศ (Export)', 'fa-earth-asia', 'text-sky-600', exportList, emptyMsg) +
-                renderSalesReportMarketSectionHtml('domestic', 'ตลาดในประเทศ (Domestic)', 'fa-house-flag', 'text-emerald-600', domesticList, emptyMsg);
-            if (unspecifiedList.length > 0) {
-                sectionsHtml += renderSalesReportMarketSectionHtml('none', 'ยังไม่ระบุตลาด', 'fa-circle-question', 'text-amber-600', unspecifiedList, emptyMsg, 'xl:col-span-2');
+            // อัปเดตจำนวนบนแท็บตลาดทั้ง 3 ปุ่ม และโชว์/ซ่อนแท็บ "ยังไม่ระบุตลาด" ตามว่าประเภทรายการที่เลือก
+            // อยู่ตอนนี้มีออเดอร์แบบนี้จริงหรือไม่ (กันกดเข้าตารางเปล่า) — ถ้าแท็บที่เลือกอยู่ถูกซ่อนไป (เช่น
+            // สลับ M/O<->S/O แล้ว "ยังไม่ระบุตลาด" ของอีกฝั่งไม่มีข้อมูล) จะ fallback กลับไปที่ "ต่างประเทศ"
+            Object.keys(marketLists).forEach(market => {
+                const countEl = document.getElementById(`salesReportMarketCount-${market}`);
+                if (countEl) countEl.textContent = marketLists[market].length;
+            });
+            const noneTabBtn = document.getElementById('salesReportMarketTabBtn-none');
+            if (noneTabBtn) noneTabBtn.classList.toggle('hidden', unspecifiedList.length === 0);
+            if (salesReportActiveMarket === 'none' && unspecifiedList.length === 0) {
+                salesReportActiveMarket = 'export';
             }
+            updateSalesReportMarketTabStyle();
+
+            const meta = SALES_REPORT_MARKET_META[salesReportActiveMarket];
+            const sectionsHtml = renderSalesReportMarketSectionHtml(
+                salesReportActiveMarket, meta.label, meta.icon, meta.colorCls, marketLists[salesReportActiveMarket], emptyMsg
+            );
             const sectionsContainer = document.getElementById('salesReportMarketSections');
             if (sectionsContainer) sectionsContainer.innerHTML = sectionsHtml;
 
@@ -16159,6 +16212,30 @@
             filterTable(); // keeps the global M/O, S/O switch in effect — this button only clears the Records-tab search/status/dept/month fields
         }
 
+        // NEW (2026-10-03): "รายงานแผนก QC ให้ยึดเลขที่ M/O,S/O เป็นหลัก ให้ดึงข้อมูลจากรายการที่เปิด" —
+        // เติมตัวเลือกให้ dropdown #formMoSo จากเลขที่ M/O,S/O ที่มีอยู่จริงในระบบ (productionOrders)
+        // เท่านั้น ทุกสถานะ (รวมที่ส่งงานไปแล้ว ตามที่ผู้ใช้เลือก) เพื่อไม่ให้บันทึก QC ผูกกับเลขที่พิมพ์ผิด/
+        // ไม่มีอยู่จริง ซึ่งจะทำให้ badge ต่อแผนก/ประวัติ QC ทั้งหมด/auto-transfer (ที่ผูกด้วยการเทียบสตริง
+        // M/O,S/O แบบ exact match) จับคู่ไม่ติดกับออเดอร์จริง — ล็อกเป็นเลือกอย่างเดียว ไม่ให้พิมพ์เอง
+        // selectedMoSo: ค่าที่ต้องการให้เลือกไว้ล่วงหน้า (ใช้ตอนแก้ไขรายการเดิม/เปิดจากปุ่มของออเดอร์ใด
+        // ออเดอร์หนึ่ง) — ถ้าค่านี้ไม่ตรงกับออเดอร์ใดในระบบปัจจุบันแล้ว (เช่น ข้อมูลเก่าก่อนมี dropdown หรือ
+        // ออเดอร์ถูกลบไปจริง ๆ) จะเติมเป็นตัวเลือกพิเศษต่อท้ายไว้ เพื่อไม่ให้ข้อมูลเดิมถูกเปลี่ยนค่าไปเอง
+        function populateFormMoSoOptions(selectedMoSo) {
+            const sel = document.getElementById('formMoSo');
+            if (!sel) return;
+            const key = (selectedMoSo || '').trim();
+            const uniqueSorted = Array.from(new Set(
+                productionOrders.map(o => (o.moSo || '').trim()).filter(Boolean)
+            )).sort((a, b) => a.localeCompare(b));
+            let optionsHtml = '<option value="" disabled>-- เลือกเลขที่ M/O, S/O --</option>';
+            optionsHtml += uniqueSorted.map(moSo => `<option value="${escapeHtml(moSo)}">${escapeHtml(moSo)}</option>`).join('');
+            if (key && !uniqueSorted.includes(key)) {
+                optionsHtml += `<option value="${escapeHtml(key)}">${escapeHtml(key)} (ไม่พบในระบบปัจจุบัน)</option>`;
+            }
+            sel.innerHTML = optionsHtml;
+            sel.value = key || '';
+        }
+
         function openModal() {
             document.getElementById('qcModal').classList.remove('hidden');
             document.getElementById('modalTitle').textContent = 'เพิ่มบันทึก QC ตามแผนก';
@@ -16166,6 +16243,7 @@
             document.getElementById('editIndex').value = '';
             document.getElementById('formDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('formId').value = 'QC-' + Math.floor(100000 + Math.random() * 900000);
+            populateFormMoSoOptions('');
             renderDepartmentFields();
         }
 
@@ -16550,7 +16628,7 @@
             document.getElementById('formId').value = item.id;
             document.getElementById('formDate').value = item.date;
             document.getElementById('formDept').value = item.department;
-            document.getElementById('formMoSo').value = item.moSo;
+            populateFormMoSoOptions(item.moSo);
             document.getElementById('formStatus').value = item.status;
             document.getElementById('formInspector').value = item.inspector;
             document.getElementById('formStamp').value = item.stamp;
