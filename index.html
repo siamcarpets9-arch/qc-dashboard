@@ -7182,7 +7182,7 @@
                     preview.classList.remove('hidden');
                     preview.innerHTML = rows.map(r => {
                         const foundBadge = r.orderIndex !== -1
-                            ? `<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> พบในระบบ${r.canAutoTransfer ? ' · ครบแผนแล้วจะโอนแผนกทอให้อัตโนมัติ' : ''}</span>`
+                            ? `<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> พบในระบบ${r.canAutoTransfer ? ' · ครบแผนแล้วจะโอนแผนกทอให้อัตโนมัติ' : ''}${(r.orderIndex !== -1 && productionOrders[r.orderIndex].currentStage === 'planning') ? ' · ยังอยู่แผนกวางแผน จะย้ายมาแผนกย้อมให้' : ''}</span>`
                             : `<span class="text-rose-500"><i class="fa-solid fa-circle-exclamation"></i> ไม่พบ M/O, S/O นี้ในระบบ</span>`;
                         return `<div class="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                             <div><span class="font-semibold text-slate-700">${escapeHtml(r.moSoDisplay)}</span>
@@ -7346,9 +7346,20 @@
                 persistOrderChange(order);
                 matched.push(order.moSo);
 
-                if (checkAndAutoTransferDyeingIfComplete(orderIndex)) {
-                    autoTransferred.push(order.moSo);
+                // NEW (2026-10-05): "รายการย้อมยังไม่โชว์" — an order whose dye report arrives while it is still in แผนกวางแผน was
+                // never on the แผนกย้อม board, so its imported colors had nowhere to show. Dye work being reported means the order is
+                // in ย้อม: move it there (forward-only, same rule as the QC auto-transfer) — transferOrderStage() hands it straight on
+                // to ทอ/ตกแต่ง if it is already fully dyed vs. the plan.
+                let movedFromPlanning = false;
+                if (order.currentStage === 'planning' && !order.shipped && !order.readyToShip) {
+                    transferOrderStage(orderIndex, 'planning', 'dyeing', true);
+                    movedFromPlanning = true;
+                    detail.movedFromPlanning = true;
                 }
+                let autoMoved = false;
+                if (order.currentStage === 'dyeing') autoMoved = checkAndAutoTransferDyeingIfComplete(orderIndex);
+                else if (movedFromPlanning) autoMoved = true; // the transfer above already chained it on (fully dyed)
+                if (autoMoved) autoTransferred.push(order.moSo);
                 detail.stage = getEffectiveStage(order);
                 importDetails.push(detail);
             });
@@ -7380,12 +7391,13 @@
             if (matched.length > 0) {
                 const detailLines = importDetails.map(d => {
                     const where = [d.regular > 0 ? `บันทึกสั่งย้อม ${d.regular} แถว` : '', d.extra > 0 ? `ย้อมเพิ่ม ${d.extra} แถว (แท็บ "ย้อมเพิ่ม")` : ''].filter(Boolean).join(' • ') || 'ไม่มีแถวใหม่';
-                    return `<div class="text-[11px] text-slate-600"><span class="font-semibold">${escapeHtml(d.moSo)}</span> → ${where} • ตอนนี้อยู่แผนก${escapeHtml(STAGE_LABELS[d.stage] || d.stage || '-')}</div>`;
+                    return `<div class="text-[11px] text-slate-600"><span class="font-semibold">${escapeHtml(d.moSo)}</span> → ${where} • ${d.movedFromPlanning ? ' • ย้ายจากแผนกวางแผนมาแผนกย้อมให้แล้ว' : ''} • ตอนนี้อยู่แผนก${escapeHtml(STAGE_LABELS[d.stage] || d.stage || '-')}</div>`;
                 }).join('');
                 status.innerHTML = `<span class="text-emerald-600 font-medium"><i class="fa-solid fa-circle-check"></i> นำเข้าสำเร็จ ${matched.length} M/O, S/O</span>` +
                     `<div class="mt-1 space-y-0.5 max-h-40 overflow-y-auto">${detailLines}</div>` +
                     (unmatchedCount > 0 ? `<div class="text-[11px] text-amber-600 mt-1"><i class="fa-solid fa-triangle-exclamation"></i> ข้าม ${unmatchedCount} M/O, S/O ที่ไม่พบในระบบ</div>` : '') +
-                    `<div class="text-[11px] text-slate-400 mt-1">ดูรายการได้ที่ แผนกย้อม (KPI) > บันทึกสั่งย้อม / ย้อมเพิ่ม (พาไปที่หน้านี้ให้แล้ว ปิดหน้าต่างนี้เพื่อดู)</div>` +
+                    `<div class="text-[11px] text-slate-400 mt-1">ดูรายการได้ที่ แผนกย้อม (KPI) > บันทึกสั่งย้อม / ย้อมเพิ่ม และการ์ดของ M/O ในบอร์ดแผนกย้อม</div>` +
+                    `<button type="button" onclick="closeImportDyeingModal()" class="mt-2 w-full bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium py-2 rounded-lg shadow transition"><i class="fa-solid fa-table-list mr-1"></i> ปิดหน้าต่าง แล้วดูรายการย้อม</button>` +
                     (autoTransferred.length > 0 ? `<br><span class="text-violet-600"><i class="fa-solid fa-arrow-right"></i> โอนไปแผนกทออัตโนมัติ ${autoTransferred.length} รายการ: ${autoTransferred.map(escapeHtml).join(', ')}</span>` : '');
                 showToast(`นำเข้ารายงานย้อมสำเร็จ ${matched.length} M/O, S/O${autoTransferred.length > 0 ? ` (โอนแผนกทออัตโนมัติ ${autoTransferred.length} รายการ)` : ''}`, 'fa-droplet', 'text-violet-500');
             } else {
@@ -8766,7 +8778,44 @@
         // A count-based progress summary ("เสร็จแล้ว X/Y รายการ") shown instead of a numeric % —
         // the underlying % is still tracked internally (see recomputeStagePercent /
         // recomputePlanningPercent) and still used to gate transfers, it's just not displayed anymore.
+        // NEW (2026-10-05): "รายการย้อมยังไม่โชว์" — a card in the แผนกย้อม board column used to say "ยังไม่มีรายการ" (it only read the
+        // manual dyeing.items[] list) even after the dye report was imported into dyeOrderLog, so the imported colors never showed there.
+        // Summarises PLAN (colorOrders, net of surplus) vs ACTUAL (dyeOrderLog) per color code, plus any dyed color that is not in the plan.
+        function buildDyeingLogSummary(order) {
+            const dye = (order && order.dyeing) || {};
+            const colorOrders = Array.isArray(dye.colorOrders) ? dye.colorOrders : [];
+            const log = Array.isArray(dye.dyeOrderLog) ? dye.dyeOrderLog.filter(r => r && typeof r === 'object') : [];
+            const labels = new Map();
+            colorOrders.concat(log).forEach(r => {
+                const k = normalizeDyeColorCodeKey(r && r.colorCode);
+                if (k && !labels.has(k)) labels.set(k, String(r.colorCode).trim());
+            });
+            let required = new Map(), actual = new Map();
+            try { required = getDyeingRequiredKgByColor(order); actual = getDyeingActualKgByColor(order); } catch (e) { console.error('buildDyeingLogSummary failed:', e); }
+            const keys = [];
+            required.forEach((_, k) => keys.push(k));
+            actual.forEach((_, k) => { if (!keys.includes(k)) keys.push(k); });
+            const rows = keys.map(k => {
+                const planKg = required.has(k) ? required.get(k) : null;
+                const actualKg = actual.get(k) || 0;
+                return { key: k, code: labels.get(k) || k, planKg, actualKg, done: planKg !== null && planKg > 0 && actualKg >= planKg - 0.01 };
+            });
+            return {
+                rows,
+                planned: rows.filter(r => r.planKg !== null && r.planKg > 0).length,
+                doneCount: rows.filter(r => r.done).length,
+                logCount: log.length,
+                extraCount: log.filter(r => r.isExtra).length,
+                totalActualKg: rows.reduce((t, r) => t + r.actualKg, 0)
+            };
+        }
+
         function stageProgressText(order, stage) {
+            if (stage === 'dyeing' && !((order.dyeing || {}).items || []).length) {
+                const ds = buildDyeingLogSummary(order);
+                if (ds.planned > 0) return `ย้อมครบ ${ds.doneCount}/${ds.planned} สี ตามแผน (ย้อมแล้ว ${ds.totalActualKg.toFixed(2)} กก.)`;
+                if (ds.logCount > 0) return `บันทึกย้อมแล้ว ${ds.logCount} รายการ (${ds.totalActualKg.toFixed(2)} กก.) — ยังไม่มีแผนสีจากแผนกวางแผน`;
+            }
             if (stage === 'planning') {
                 const done = (order.planning.specDone ? 1 : 0) + (order.planning.planEntered ? 1 : 0);
                 return `เสร็จแล้ว ${done}/2 ขั้นตอน`;
@@ -12586,6 +12635,17 @@
                 `;
             } else if (stage === 'dyeing' && order.dyeing.mode === 'external') {
                 mainHtml = `<p class="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold w-fit"><i class="fa-solid fa-truck-ramp-box"></i> ไหมสั่งย้อมนอกบริษัท</p>`;
+            } else if (stage === 'dyeing') {
+                const ds = buildDyeingLogSummary(order);
+                if (ds.rows.length > 0) {
+                    const shown = ds.rows.slice(0, 8);
+                    mainHtml = `
+                        <div class="space-y-0.5">
+                            <p class="text-[10px] font-semibold text-violet-700"><i class="fa-solid fa-droplet mr-1"></i>รายการย้อม (${ds.rows.length} สี)${ds.extraCount > 0 ? ` • ย้อมเพิ่ม ${ds.extraCount} รายการ` : ''}</p>
+                            ${shown.map(r => `<div class="flex justify-between gap-2 text-[10px] ${r.done ? 'text-emerald-600' : 'text-slate-600'}"><span class="font-mono truncate">${r.done ? '✓ ' : ''}${escapeHtml(r.code)}</span><span class="whitespace-nowrap">${r.actualKg.toFixed(2)}${r.planKg !== null ? ` / ${r.planKg.toFixed(2)}` : ''} กก.</span></div>`).join('')}
+                            ${ds.rows.length > shown.length ? `<p class="text-[10px] text-slate-400">… และอีก ${ds.rows.length - shown.length} สี (ดูทั้งหมดที่ แผนกย้อม > KPI)</p>` : ''}
+                        </div>`;
+                }
             } else if (stage === 'weaving' && order.weaving.mode === 'external') {
                 const ext = order.weaving.external;
                 const qcBadge = ext.qcResult === 'pass'
