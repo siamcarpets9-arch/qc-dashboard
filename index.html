@@ -2338,7 +2338,7 @@
                     <div>
                         <p class="text-[10px] font-bold tracking-widest text-teal-700 uppercase">Shipping</p>
                         <h3 class="text-xl font-bold text-slate-800">ใบส่งสินค้า + Marks &amp; Nos</h3>
-                        <p class="text-[11px] text-slate-500 mt-1 max-w-3xl">รวม M/O และ S/O หลายรายการเข้าใบส่งเดียวกันได้ พร้อมพิมพ์ใบส่งสินค้า (Delivery Note) และป้าย Marks &amp; Nos ในที่เดียว — แสดงเฉพาะใบส่งที่สร้างไว้แล้วเท่านั้น M/O, S/O ที่ยังไม่ได้ทำใบส่งจะไม่แสดงในแท็บนี้</p>
+                        <p class="text-[11px] text-slate-500 mt-1 max-w-3xl">รวม M/O และ S/O หลายรายการเข้าใบส่งเดียวกันได้ พร้อมพิมพ์ใบส่งสินค้า (Delivery Note) และป้าย Marks &amp; Nos ในที่เดียว — เพิ่ม M/O, S/O ได้ทุกสถานะ (ไม่ต้องรอพรมเสร็จ/รอส่ง) ทำเอกสารล่วงหน้าได้ แล้วค่อยกด "ยืนยันส่งแล้ว" ที่แท็บ "รายการรอส่ง" ตอนส่งจริง • แสดงเฉพาะใบส่งที่สร้างไว้แล้วเท่านั้น</p>
                     </div>
                     <button type="button" onclick="createShippingInvoice()" class="shrink-0 bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow transition flex items-center gap-1.5">
                         <i class="fa-solid fa-plus"></i> สร้างใบส่งใหม่
@@ -2825,10 +2825,11 @@
     <div id="importHistoryModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden p-6 space-y-3 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-                <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-clock-rotate-left text-indigo-600 mr-2"></i>นำเข้าข้อมูลเก่า (งานที่ส่งแล้ว) เข้ารายงานแผนกขาย</h3>
+                <h3 id="importHistoryTitle" class="font-bold text-lg text-slate-800"><i class="fa-solid fa-clock-rotate-left text-indigo-600 mr-2"></i>นำเข้าข้อมูลเก่า (งานที่ส่งแล้ว) เข้ารายงานแผนกขาย</h3>
                 <button onclick="closeImportHistoryModal()" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <p class="text-xs text-slate-500">เลือกตลาด แล้วเลือกไฟล์ทะเบียนเปิด M/O, S/O เดิมของแผนกขาย (เลือกได้หลายไฟล์ ระบบอ่านทุก sheet ที่เป็นทะเบียนให้เอง) จากนั้นเลือก "เดือนที่เปิด M/O" ที่ต้องการนำเข้า — รายการที่นำเข้าจะถูกบันทึกเป็น <b>ส่งแล้ว</b> จึงไม่ขึ้นในแผนการผลิต (บอร์ด/ภาพรวม/ปฏิทิน) แต่ยังดูได้ในรายงานแผนกขาย • M/O, S/O ที่ซ้ำกับของเดิมจะถูกข้าม ไม่ทับ</p>
+            <p id="importHistoryModeNote" class="hidden text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2"><i class="fa-solid fa-circle-info mr-1"></i>โหมดงานใหม่: ระบบเลือกให้เองเฉพาะ M/O, S/O <b>ล่าสุดที่ยังไม่มีในระบบ</b> (เลขที่ใหม่กว่าเลขล่าสุดที่มีในระบบ) แล้วสร้างเป็นงานที่ <b>ยังต้องผลิต</b> เข้า "แผนกวางแผน" — ไม่ต้องเลือกเดือน, ติ๊กออกได้ถ้าไม่ต้องการบางรายการ • เลขที่ซ้ำกับที่มีอยู่แล้วจะถูกข้าม</p>
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <div class="flex items-center gap-1.5">
                     <span class="text-xs font-semibold text-slate-600">ตลาด:</span>
@@ -3235,6 +3236,20 @@
         // synced). Persisted to localStorage so it survives the very reload this bug happens around.
         let qcPendingSyncIds = new Set();
         let productionOrders = [];
+        // NEW (2026-10-05): "โอนไปแล้ว แต่การ์ดกลับมาขึ้นที่แผนกเดิมตลอด" — the same race qcPendingSyncIds (above)
+        // fixes for QC records existed for production orders. syncOrderToSheet() is a no-cors POST whose
+        // response is opaque, so a transfer ("ผ่าน → ...") could never be confirmed as having reached the
+        // Sheet — and the POST could simply not land (page reloaded/closed right after the click, the
+        // Apps Script lock timing out while several orders were being written, a network blip). The next
+        // fetchOrdersFromGoogleSheet() then did a hard `productionOrders = <Sheet rows>` overwrite, and the
+        // Sheet still said "planning", so the card came back and the transfer was lost both on the Sheet
+        // AND locally. orderPendingSync = { "<moSo>": <epoch ms when last sent> } records every order sent
+        // but not yet seen round-tripped; fetchOrdersFromGoogleSheet() keeps the local copy (and re-sends
+        // it) while the Sheet is BEHIND it in the stage flow, and hands authority back to the Sheet as soon
+        // as it has caught up (or moved further on). Persisted so it survives the very reload this bug
+        // happens around. See reconcileFetchedOrdersWithPending().
+        let orderPendingSync = {};
+        const ORDER_PENDING_SYNC_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
         // NEW (2026-09-16): true once fetchOrdersFromGoogleSheet() has completed at least one successful
         // response (even if it came back with zero orders) — lets the yarn calculator's "ค้นหา" lookup
         // tell a genuine "not found" apart from "still loading" right after the page opens. See the
@@ -3865,6 +3880,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            try { orderPendingSync = JSON.parse(localStorage.getItem('qc_pending_order_sync_v1') || '{}') || {}; } catch(e) { orderPendingSync = {}; }
             const savedLocal = localStorage.getItem('qc_comprehensive_data_v2');
             if (savedLocal) {
                 try { qcData = JSON.parse(savedLocal); } catch(e) {}
@@ -5560,6 +5576,17 @@
             return `${Number(m[3])}/${Number(m[2])}/${Number(m[1]) + 543}`;
         }
 
+        // NEW (2026-10-05): "ไม่ต้องพรมรอส่งถึงจะตัดได้ บางทีต้องทำเอกสารออกก่อน ไว้ส่งจริงค่อยมาตัดตามหลัง" —
+        // an M/O, S/O can go on an invoice at ANY stage (planning .. shipped); the invoice only prepares the
+        // paperwork. The real "ตัดส่ง" stays the existing "ยืนยันส่งแล้ว" in the รายการรอส่ง list, done later.
+        function shippingStageBadgeHtml(order) {
+            if (!order) return '';
+            const stage = getEffectiveStage(order);
+            const label = STAGE_LABELS[stage] || stage || '';
+            const cls = stage === 'shipped' ? 'text-emerald-600' : (stage === 'ready_to_ship' ? 'text-orange-600' : 'text-slate-500');
+            return `<span class="font-semibold ${cls}">${escapeHtml(label)}</span>`;
+        }
+
         function shippingOrderTypeLabel(moSo) {
             return getOrderTypeByMoSo(moSo) === 'SO' ? 'S/O' : 'M/O';
         }
@@ -5655,10 +5682,9 @@
             renderShippingInvoiceCards();
         }
 
-        // Candidates for "เพิ่ม M/O หรือ SO เข้าใบส่งนี้": ready-to-ship or already shipped orders (the same
-        // pool the old tab used — getEffectiveStage() reconciles the legacy QC-PASS path and the newer
-        // order.readyToShip flag) that match the typed text and are not already on this invoice. Nothing
-        // is listed until something is typed.
+        // Candidates for "เพิ่ม M/O หรือ SO เข้าใบส่งนี้": ANY M/O, S/O (every stage — documents are often
+        // prepared before the carpet is finished) that matches the typed text and is not already on this
+        // invoice. Nothing is listed until something is typed.
         function getShippingInvoiceCandidates(inv, term) {
             const t = String(term || '').trim().toLowerCase();
             if (!inv || !t) return [];
@@ -5667,7 +5693,6 @@
             const out = [];
             productionOrders.forEach((order, orderIndex) => {
                 const stage = getEffectiveStage(order);
-                if (stage !== 'ready_to_ship' && stage !== 'shipped') return;
                 if (used.has((order.moSo || '').trim())) return;
                 const hay = [order.moSo, order.customerName, order.customerPO, order.refNote].map(v => String(v || '').toLowerCase()).join(' ');
                 const matches = hay.includes(t) || (tKey && String(normalizeDyeingMoSoMatchKey(order.moSo) || '').includes(tKey));
@@ -5687,13 +5712,13 @@
             }
             const list = getShippingInvoiceCandidates(inv, shippingInvoiceSearchTerm);
             if (list.length === 0) {
-                box.innerHTML = '<p class="text-center text-[11px] text-slate-400 py-3">ไม่พบ M/O, S/O ที่รอส่ง/ส่งแล้วตรงกับคำค้นหา (หรือเพิ่มเข้าใบนี้ไปแล้ว)</p>';
+                box.innerHTML = '<p class="text-center text-[11px] text-slate-400 py-3">ไม่พบ M/O, S/O ที่ตรงกับคำค้นหา (หรือเพิ่มเข้าใบนี้ไปแล้ว)</p>';
                 return;
             }
             box.innerHTML = list.map(({ order, orderIndex, stage }) => `
                 <div class="flex items-center justify-between gap-2 px-3 py-2 border border-slate-200 rounded-lg bg-slate-50/60">
                     <div class="min-w-0">
-                        <p class="text-xs font-bold font-mono text-slate-800">${orderTypeBadgeHtml(order.orderType)}${escapeHtml(order.moSo)} <span class="font-semibold ${stage === 'shipped' ? 'text-emerald-600' : 'text-orange-600'}">${stage === 'shipped' ? 'ส่งแล้ว' : 'รอส่ง'}</span></p>
+                        <p class="text-xs font-bold font-mono text-slate-800">${orderTypeBadgeHtml(order.orderType)}${escapeHtml(order.moSo)} ${shippingStageBadgeHtml(order)}</p>
                         <p class="text-[11px] text-slate-500 truncate">${escapeHtml(order.customerName || '-')}${order.customerPO ? ` • ${escapeHtml(order.customerPO)}` : ''}</p>
                     </div>
                     <button type="button" onclick="addOrderToShippingInvoice(${orderIndex})" class="shrink-0 bg-teal-700 hover:bg-teal-800 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg"><i class="fa-solid fa-plus mr-1"></i>เพิ่ม</button>
@@ -5778,7 +5803,6 @@
 
             const itemRows = inv.items.map((it, idx) => {
                 const order = findOrderByMoSo(it.moSo);
-                const stage = order ? getEffectiveStage(order) : '';
                 const img = order && order.designImageUrl
                     ? `<img src="${escapeHtml(order.designImageUrl)}" alt="" class="w-10 h-10 object-cover rounded border border-slate-200">`
                     : '<div class="w-10 h-10 border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 text-[10px]">-</div>';
@@ -5787,7 +5811,7 @@
                     <td class="py-2 pr-2">${img}</td>
                     <td class="py-2 pr-2 whitespace-nowrap">
                         <p class="text-xs font-bold font-mono text-slate-800">${orderTypeBadgeHtml(order ? order.orderType : detectOrderTypeFromMoSo(it.moSo))}${escapeHtml(it.moSo || '-')}</p>
-                        <p class="text-[10px] mt-0.5 font-semibold ${stage === 'shipped' ? 'text-emerald-600' : (stage === 'ready_to_ship' ? 'text-orange-600' : 'text-slate-400')}">${stage === 'shipped' ? 'ส่งแล้ว' : (stage === 'ready_to_ship' ? 'รอส่ง' : (order ? '' : 'ไม่พบ M/O ในระบบ'))}</p>
+                        <p class="text-[10px] mt-0.5">${order ? shippingStageBadgeHtml(order) : '<span class="text-slate-400 font-semibold">ไม่พบ M/O ในระบบ</span>'}</p>
                     </td>
                     <td class="py-2 pr-2 min-w-[110px]">
                         <p class="text-xs text-slate-700">${escapeHtml(order && order.customerName ? order.customerName : '-')}</p>
@@ -5825,7 +5849,7 @@
                 <div class="flex flex-wrap items-start justify-between gap-2">
                     <div>
                         <h4 class="font-bold text-slate-800 text-sm">แก้ไขใบส่ง</h4>
-                        <p class="text-[10px] text-slate-400 mt-0.5 max-w-2xl">1 ใบส่ง (INVOICE) มีได้หลาย M/O, S/O — แก้ MARKS / ขนาด / หมายเหตุ ได้ที่นี่โดยไม่กระทบข้อมูล M/O ต้นฉบับ • ข้อมูลใบส่งเก็บในเครื่องนี้ (เบราว์เซอร์) เท่านั้น</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 max-w-2xl">1 ใบส่ง (INVOICE) มีได้หลาย M/O, S/O (เพิ่มได้ทุกสถานะ ทำเอกสารล่วงหน้าก่อนพรมเสร็จได้ — ตัดส่งจริงทีหลังที่ "รายการรอส่ง") — แก้ MARKS / ขนาด / หมายเหตุ ได้ที่นี่โดยไม่กระทบข้อมูล M/O ต้นฉบับ • ข้อมูลใบส่งเก็บในเครื่องนี้ (เบราว์เซอร์) เท่านั้น</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <button type="button" onclick="printShippingInvoiceDeliveryNote()" class="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition"><i class="fa-solid fa-print mr-1"></i>พิมพ์ใบส่ง</button>
@@ -7697,9 +7721,16 @@
                 let result;
                 try { result = JSON.parse(text); } catch(e) { return; }
                 if (Array.isArray(result)) {
-                    productionOrders = result.map(o => normalizeOrder(o));
+                    const merged = reconcileFetchedOrdersWithPending(result.map(o => normalizeOrder(o)), productionOrders);
+                    productionOrders = merged.orders;
                     ordersFetchedFromSheetOnce = true;
                     saveOrdersToLocal();
+                    if (merged.resend.length > 0) {
+                        // The Sheet is behind what this device did (e.g. a transfer that never reached it) — keep
+                        // the local copy and send it again, one at a time so the Apps Script lock isn't flooded.
+                        showToast(`Google Sheet ยังไม่ได้รับการอัปเดตล่าสุดของ ${merged.resend.length} M/O (เช่น ${merged.resend[0].moSo}) — เก็บค่าในเครื่องไว้และส่งซ้ำให้แล้ว`, 'fa-rotate', 'text-amber-400');
+                        (async () => { for (const o of merged.resend) { await syncOrderToSheet(o); } })();
+                    }
                     renderProductionOverview();
                     renderProductionBoard();
                     renderProductionTimeline();
@@ -10179,19 +10210,91 @@
             `;
         }
 
+        // NEW (2026-10-05): records that this order was sent but not yet confirmed back from the Sheet —
+        // see orderPendingSync's declaration comment. Every write path (transfer, edit, import, create)
+        // goes through syncOrderToSheet(), so marking here covers all of them.
+        function markOrderPendingSync(order) {
+            const key = String((order && order.moSo) || '').trim();
+            if (!key) return;
+            orderPendingSync[key] = Date.now();
+            try { localStorage.setItem('qc_pending_order_sync_v1', JSON.stringify(orderPendingSync)); } catch (e) {}
+        }
+
         async function syncOrderToSheet(order) {
             if (!gasWebAppUrl) return;
+            markOrderPendingSync(order);
             try {
                 const postUrl = gasWebAppUrl.includes('?') ? gasWebAppUrl + '&type=order' : gasWebAppUrl + '?type=order';
-                await fetch(postUrl, {
+                const body = JSON.stringify(order);
+                const opts = {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(order)
-                });
+                    body
+                };
+                // keepalive lets the request survive a reload/close right after the click (the usual way a
+                // "ผ่าน" got lost) — browsers cap a keepalive body at 64KB, so only use it when it fits.
+                try { if (new TextEncoder().encode(body).length < 60000) opts.keepalive = true; } catch (e) {}
+                await fetch(postUrl, opts);
             } catch(err) {
                 console.error("Error syncing production order to Google Sheet:", err);
             }
+        }
+
+        // How far along the production flow an order is (higher = further). Stages only move forward in
+        // normal use, so "local is further than the Sheet" means the Sheet missed an update of ours.
+        function orderProgressRank(order) {
+            if (order.shipped) return 5;
+            if (order.readyToShip) return 4;
+            const idx = ORDER_STAGES.indexOf(order.currentStage);
+            return idx < 0 ? 0 : idx;
+        }
+
+        // Merges a fresh Sheet read (already normalized) with local orders that were sent but not yet
+        // confirmed (orderPendingSync). Returns { orders, resend }:
+        //  - no pending entry            -> the Sheet's copy (unchanged behaviour: the Sheet is authoritative)
+        //  - pending, Sheet BEHIND local -> keep the local copy and queue it for re-sending
+        //  - pending, Sheet same/ahead   -> take the Sheet's copy and clear the pending entry (confirmed,
+        //                                   or somebody else already moved it on)
+        //  - pending, missing on Sheet   -> keep the local order (its create never landed) and re-send it
+        // Entries older than ORDER_PENDING_SYNC_MAX_AGE_MS are dropped so a genuine remote delete or an
+        // abandoned write can't pin a stale copy forever.
+        function reconcileFetchedOrdersWithPending(fetched, localOrders) {
+            const now = Date.now();
+            const localByKey = new Map();
+            localOrders.forEach(o => localByKey.set(String(o.moSo || '').trim(), o));
+            const resend = [];
+            const seen = new Set();
+            let changedPending = false;
+            const orders = fetched.map(remote => {
+                const key = String(remote.moSo || '').trim();
+                seen.add(key);
+                const ts = orderPendingSync[key];
+                if (ts === undefined) return remote;
+                const local = localByKey.get(key);
+                if (!local || now - ts > ORDER_PENDING_SYNC_MAX_AGE_MS || orderProgressRank(local) <= orderProgressRank(remote)) {
+                    delete orderPendingSync[key];
+                    changedPending = true;
+                    return remote;
+                }
+                resend.push(local);
+                return local;
+            });
+            Object.keys(orderPendingSync).forEach(key => {
+                if (seen.has(key)) return;
+                const local = localByKey.get(key);
+                if (!local || now - orderPendingSync[key] > ORDER_PENDING_SYNC_MAX_AGE_MS) {
+                    delete orderPendingSync[key];
+                    changedPending = true;
+                    return;
+                }
+                orders.push(local);
+                resend.push(local);
+            });
+            if (changedPending) {
+                try { localStorage.setItem('qc_pending_order_sync_v1', JSON.stringify(orderPendingSync)); } catch (e) {}
+            }
+            return { orders, resend };
         }
 
         // Sends a LINE broadcast (to everyone who's added the company's LINE Official Account as a
@@ -19034,55 +19137,86 @@
         async function importMoOpenReport(fileInput) {
             const file = fileInput.files[0];
             if (!file) return;
-            readExcelAoaFromFile(file, async (err, aoa) => {
-                fileInput.value = '';
-                if (err) { showToast('อ่านไฟล์ไม่สำเร็จ: ' + err.message, 'fa-triangle-exclamation', 'text-rose-400'); return; }
-                const rows = parseMoOpenRowsFromAoa(aoa);
-                if (rows.length === 0) {
-                    showToast('ไม่พบแถวข้อมูลที่อ่านได้ในไฟล์นี้ (ตรวจสอบว่ามีคอลัมน์ M/O No. หรือ M/O, S/O)', 'fa-triangle-exclamation', 'text-amber-400');
+            const reader = new FileReader();
+            reader.onerror = () => { fileInput.value = ''; showToast('อ่านไฟล์ไม่สำเร็จ', 'fa-triangle-exclamation', 'text-rose-400'); };
+            reader.onload = (ev) => {
+                let workbook, aoa;
+                try {
+                    workbook = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true });
+                    aoa = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: true, defval: '' });
+                } catch (err) {
+                    fileInput.value = '';
+                    showToast('อ่านไฟล์ไม่สำเร็จ: ' + err.message, 'fa-triangle-exclamation', 'text-rose-400');
                     return;
                 }
-                const seenInFile = new Set(productionOrders.map(o => String(o.moSo || '').trim().toLowerCase()));
-                const created = [];
-                let skippedDuplicate = 0;
-                rows.forEach(r => {
-                    const key = String(r.moSo || '').trim().toLowerCase();
-                    if (seenInFile.has(key)) { skippedDuplicate++; return; }
-                    seenInFile.add(key);
-                    const raw = Object.assign({}, r, {
-                        orderType: (r.orderType === 'SO' || r.orderType === 'MO') ? r.orderType : detectOrderTypeFromMoSo(r.moSo),
-                        currentStage: 'planning'
-                    });
-                    const order = normalizeOrder(raw);
-                    productionOrders.push(order);
-                    created.push(order);
-                });
-                if (created.length > 0) {
-                    saveOrdersToLocal();
-                    for (const order of created) {
-                        await syncOrderToSheet(order);
-                        notifyLineNewOrder(order); // no-op while LINE_NOTIFY_ISSUES_ONLY is true, same as submitNewOrder()
-                    }
-                    recomputeAllSchedules();
-                    renderProductionBoard();
-                    renderProductionTimeline();
-                    renderProductionOverview();
-                    renderSalesReportTables();
-                    mascotCelebrate('newOrder');
-                    queueWorkChangeAlert({
-                        icon: 'fa-file-import', iconColor: 'text-emerald-500',
-                        title: 'นำเข้า M/O, S/O ใหม่จากไฟล์ Excel',
-                        message: `เพิ่มสำเร็จ ${created.length} รายการ` + (skippedDuplicate > 0 ? `\nข้าม ${skippedDuplicate} รายการที่มี M/O, S/O ซ้ำอยู่แล้ว` : '')
-                    });
+                fileInput.value = '';
+                // NEW (2026-10-05): "นำเข้า M/O ใหม่ ไม่เจอ" — this button only ever read the FIRST sheet and needed an
+                // "M/O No."/"M/O, S/O" header there, so the sales team's real registry files (MO-TH/MO-DM/SO-D/
+                // S/O ต่างประเทศ: many sheets per year/month, S/O headed "S/O No.", the first sheet often a
+                // different one such as "SO-D_JAN"/"Data") found nothing → "ไม่พบแถวข้อมูล". When the first sheet
+                // gives nothing (or the workbook is a multi-sheet registry) hand the file to the same reader the
+                // "นำเข้าข้อมูลเก่า" button uses (every sheet, shifted layouts, swapped day/month fix) in 'new'
+                // mode: pick the months, rows become still-to-produce orders on the planning board.
+                const simpleRows = parseMoOpenRowsFromAoa(aoa);
+                let parsedHistory = null;
+                try { parsedHistory = parseHistoryWorkbook(workbook, file.name); } catch (err) { console.error('importMoOpenReport: history parser failed', err); }
+                const historyRowCount = parsedHistory ? parsedHistory.sheets.reduce((n, sh) => n + (sh.skipped ? 0 : sh.rows.length), 0) : 0;
+                if (historyRowCount > 0 && (workbook.SheetNames.length > 1 || simpleRows.length === 0)) {
+                    openImportHistoryModal('new');
+                    applyParsedHistoryFiles([parsedHistory]);
+                    showToast('ไฟล์นี้เป็นทะเบียน M/O, S/O หลาย sheet — ระบบเลือก M/O, S/O ล่าสุดที่ยังไม่มีในระบบให้แล้ว ตรวจรายการแล้วกดนำเข้า', 'fa-circle-info', 'text-sky-400');
+                    return;
                 }
-                showToast(
-                    created.length > 0
-                        ? `นำเข้าสำเร็จ ${created.length} รายการ${skippedDuplicate > 0 ? `, ข้ามซ้ำ ${skippedDuplicate} รายการ` : ''}`
-                        : `ไม่มีรายการใหม่ให้นำเข้า — ทุกแถวมี M/O, S/O ซ้ำกับที่มีอยู่แล้ว (${skippedDuplicate} รายการ)`,
-                    created.length > 0 ? 'fa-check' : 'fa-circle-info',
-                    created.length > 0 ? 'text-emerald-400' : 'text-slate-400'
-                );
+                importMoOpenRowsFromParsed(simpleRows);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function importMoOpenRowsFromParsed(rows) {
+            if (rows.length === 0) {
+                showToast('ไม่พบแถวข้อมูลที่อ่านได้ในไฟล์นี้ (ตรวจสอบว่ามีคอลัมน์ M/O No. หรือ M/O, S/O)', 'fa-triangle-exclamation', 'text-amber-400');
+                return;
+            }
+            const seenInFile = new Set(productionOrders.map(o => String(o.moSo || '').trim().toLowerCase()));
+            const created = [];
+            let skippedDuplicate = 0;
+            rows.forEach(r => {
+                const key = String(r.moSo || '').trim().toLowerCase();
+                if (seenInFile.has(key)) { skippedDuplicate++; return; }
+                seenInFile.add(key);
+                const raw = Object.assign({}, r, {
+                    orderType: (r.orderType === 'SO' || r.orderType === 'MO') ? r.orderType : detectOrderTypeFromMoSo(r.moSo),
+                    currentStage: 'planning'
+                });
+                const order = normalizeOrder(raw);
+                productionOrders.push(order);
+                created.push(order);
             });
+            if (created.length > 0) {
+                saveOrdersToLocal();
+                for (const order of created) {
+                    await syncOrderToSheet(order);
+                    notifyLineNewOrder(order); // no-op while LINE_NOTIFY_ISSUES_ONLY is true, same as submitNewOrder()
+                }
+                recomputeAllSchedules();
+                renderProductionBoard();
+                renderProductionTimeline();
+                renderProductionOverview();
+                renderSalesReportTables();
+                mascotCelebrate('newOrder');
+                queueWorkChangeAlert({
+                    icon: 'fa-file-import', iconColor: 'text-emerald-500',
+                    title: 'นำเข้า M/O, S/O ใหม่จากไฟล์ Excel',
+                    message: `เพิ่มสำเร็จ ${created.length} รายการ` + (skippedDuplicate > 0 ? `\nข้าม ${skippedDuplicate} รายการที่มี M/O, S/O ซ้ำอยู่แล้ว` : '')
+                });
+            }
+            showToast(
+                created.length > 0
+                    ? `นำเข้าสำเร็จ ${created.length} รายการ${skippedDuplicate > 0 ? `, ข้ามซ้ำ ${skippedDuplicate} รายการ` : ''}`
+                    : `ไม่มีรายการใหม่ให้นำเข้า — ทุกแถวมี M/O, S/O ซ้ำกับที่มีอยู่แล้ว (${skippedDuplicate} รายการ)`,
+                created.length > 0 ? 'fa-check' : 'fa-circle-info',
+                created.length > 0 ? 'text-emerald-400' : 'text-slate-400'
+            );
         }
 
         // =====================================================================================
@@ -19109,13 +19243,19 @@
         // =====================================================================================
         const HISTORY_IMPORT_DOMESTIC_CODES = ['TH', 'DM', 'MP'];
         const HISTORY_IMPORT_UNIT_FACTORS = { M2: 1, SQM: 1, F2: 0.09290304, FT2: 0.09290304, SQFT: 0.09290304, Y2: 0.83612736, SQYD: 0.83612736 };
-        let historyImportState = { market: 'export', code: 'TH', files: [], selected: new Set(), computed: null };
+        let historyImportState = { mode: 'history', market: 'export', code: 'TH', files: [], selected: new Set(), skipKeys: new Set(), computed: null };
 
         function histCellText(v) {
             if (v === null || v === undefined || v instanceof Date) return '';
             return String(v).replace(/\s+/g, ' ').trim();
         }
         function histDateKey(v) {
+            const k = histDateKeyRaw(v);
+            // พิมพ์ปี พ.ศ. ลงในช่องวันที่ (เช่น 2566-04-10) -> แปลงเป็น ค.ศ.
+            const m = k && k.match(/^(\d{4})(-.*)$/);
+            return m && Number(m[1]) > 2400 ? (Number(m[1]) - 543) + m[2] : k;
+        }
+        function histDateKeyRaw(v) {
             if (v instanceof Date) return excelCellDateToDateKey(v) || '';
             const s = String(v === null || v === undefined ? '' : v).trim();
             if (!s) return '';
@@ -19332,7 +19472,7 @@
                         const moSo = `${prefix}${String(r.no).padStart(4, '0')}/${r.yr}`;
                         const key = normalizeDyeingMoSoMatchKey(moSo);
                         const monthKey = r.openDate ? r.openDate.slice(0, 7) : 'unknown';
-                        const entry = { raw: r, moSo, key, monthKey, orderType: r.orderType, status: 'new' };
+                        const entry = { raw: r, moSo, key, monthKey, orderType: r.orderType, status: 'new', prefix: String(prefix || '').toUpperCase(), seq: histSeqOf(r.no, r.yr), latest: false };
                         if (existing.has(key)) { entry.status = 'dupExisting'; result.duplicateExisting++; }
                         else if (seen.has(key)) { entry.status = 'dupFile'; result.duplicateInFile++; }
                         else { seen.add(key); if (r.openDateSwapped) result.swapped++; }
@@ -19344,8 +19484,52 @@
                     result.sheetsUsed.push(`${sh.sheetName} (${used})`);
                 });
             });
+            if (st.mode === 'new') histMarkLatestRows(result);
             st.computed = result;
             return result;
+        }
+
+        // เลขลำดับเทียบข้ามปี: ปี 2 หลัก * 10000 + เลขที่ (0161/26 -> 260161)
+        function histSeqOf(no, yr) {
+            const n = Number(no), y = Number(yr);
+            if (!isFinite(n) || !isFinite(y)) return 0;
+            return (y % 100) * 10000 + n;
+        }
+        // เลขล่าสุดที่มีในระบบ แยกตามชุดเลข (รหัสหน้าเลข: '' = M/O ต่างประเทศ, SC, TH, DM, MP, D)
+        function histExistingBaselines() {
+            const base = {};
+            productionOrders.forEach(o => {
+                const m = String(o.moSo || '').trim().match(/^([A-Za-z]*)\s*0*(\d+)\s*[\/\-]\s*(\d{2,4})$/);
+                if (!m) return;
+                const seq = histSeqOf(m[2], Number(m[3]) % 100);
+                const key = m[1].toUpperCase();
+                if (seq > (base[key] ? base[key].seq : 0)) base[key] = { seq, moSo: String(o.moSo).trim() };
+            });
+            return base;
+        }
+        // โหมดงานใหม่: "เอาเฉพาะ M/O ล่าสุด" = เลขที่ใหม่กว่าเลขล่าสุดของชุดเลขนั้นในระบบ และยังไม่มีในระบบ
+        // ชุดเลขที่ระบบยังไม่มีเลยจะไม่มีเลขอ้างอิง → ใช้เฉพาะที่เปิด M/O ภายใน 60 วันล่าสุด
+        function histMarkLatestRows(result) {
+            const base = histExistingBaselines();
+            const bySeries = {};
+            result.rows.forEach(e => { if (e.status === 'new') (bySeries[e.prefix] = bySeries[e.prefix] || []).push(e); });
+            result.series = [];
+            Object.keys(bySeries).forEach(prefix => {
+                const rows = bySeries[prefix];
+                const b = base[prefix];
+                let picked, rule;
+                if (b) { picked = rows.filter(e => e.seq > b.seq); rule = 'baseline'; }
+                else {
+                    // ยังไม่มีเลขชุดนี้ในระบบเลย → เอาเฉพาะที่เปิด M/O ภายใน 60 วันล่าสุด (กันดึงงานเก่าหลายปีเข้าแผน)
+                    const cut = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+                    picked = rows.filter(e => e.raw.openDate && e.raw.openDate >= cut);
+                    rule = 'recent60';
+                }
+                picked.forEach(e => { e.latest = true; });
+                picked.sort((a, c) => a.seq - c.seq);
+                result.series.push({ prefix, baseline: b ? b.moSo : '', rule, count: picked.length, firstNo: picked[0] && picked[0].moSo, lastNo: picked.length ? picked[picked.length - 1].moSo : '', olderMissing: rows.length - picked.length });
+            });
+            result.latestCount = result.rows.filter(e => e.latest).length;
         }
 
         function histMonthLabel(monthKey) {
@@ -19354,8 +19538,19 @@
             return `${THAI_SHORT_MONTHS[m - 1]} ${y + 543}`;
         }
 
-        function openImportHistoryModal() {
-            historyImportState = { market: (salesReportActiveMarket === 'domestic' ? 'domestic' : 'export'), code: 'TH', files: [], selected: new Set(), computed: null };
+        // mode 'history' = นำเข้าข้อมูลเก่า (บันทึกเป็น "ส่งแล้ว", ไม่ขึ้นแผน)
+        // mode 'new'     = NEW (2026-10-05) "นำเข้า M/O ใหม่ ไม่เจอ" — ไฟล์ทะเบียนเปิด M/O (หลาย sheet/ปี) ที่ปุ่ม
+        //                  "นำเข้า Excel (เปิด M/O ใหม่)" อ่านไม่ได้ (มันอ่านเฉพาะ sheet แรก) → ใช้ตัวอ่านเดียวกับข้อมูลเก่า
+        //                  แต่สร้างเป็นงานใหม่ที่ "ยังต้องผลิต" เข้าบอร์ดแผนกวางแผน
+        function openImportHistoryModal(mode) {
+            historyImportState = { mode: mode === 'new' ? 'new' : 'history', market: (salesReportActiveMarket === 'domestic' ? 'domestic' : 'export'), code: 'TH', files: [], selected: new Set(), skipKeys: new Set(), computed: null };
+            const isNewMode = historyImportState.mode === 'new';
+            const titleEl = document.getElementById('importHistoryTitle');
+            if (titleEl) titleEl.innerHTML = isNewMode
+                ? '<i class="fa-solid fa-file-import text-emerald-600 mr-2"></i>นำเข้า M/O, S/O ใหม่ (งานที่ยังต้องผลิต) จากไฟล์ทะเบียนเปิด M/O'
+                : '<i class="fa-solid fa-clock-rotate-left text-indigo-600 mr-2"></i>นำเข้าข้อมูลเก่า (งานที่ส่งแล้ว) เข้ารายงานแผนกขาย';
+            const noteEl = document.getElementById('importHistoryModeNote');
+            if (noteEl) noteEl.classList.toggle('hidden', !isNewMode);
             const fi = document.getElementById('importHistoryFileInput'); if (fi) fi.value = '';
             document.getElementById('importHistoryModal').classList.remove('hidden');
             renderImportHistoryModal();
@@ -19364,12 +19559,22 @@
 
         function setHistoryImportMarket(market) {
             historyImportState.market = market === 'domestic' ? 'domestic' : 'export';
-            historyImportState.selected = new Set();
+            historyImportState.selected = new Set(); historyImportState.skipKeys = new Set();
             renderImportHistoryModal();
         }
         function setHistoryImportCode(code) {
             historyImportState.code = HISTORY_IMPORT_DOMESTIC_CODES.includes(code) ? code : 'TH';
-            historyImportState.selected = new Set();
+            historyImportState.selected = new Set(); historyImportState.skipKeys = new Set();
+            renderImportHistoryModal();
+        }
+
+        function applyParsedHistoryFiles(parsed) {
+            historyImportState.files = parsed;
+            historyImportState.selected = new Set(); historyImportState.skipKeys = new Set();
+            // ถ้าไฟล์ที่เลือกเป็นของอีกตลาดทั้งหมด ให้สลับตลาดให้อัตโนมัติ (ยังเปลี่ยนเองได้)
+            const hints = new Set();
+            parsed.forEach(f => f.sheets.forEach(s => { if (!s.skipped && s.rows.length > 0 && s.marketHint) hints.add(s.marketHint); }));
+            if (hints.size === 1 && !hints.has(historyImportState.market)) historyImportState.market = Array.from(hints)[0];
             renderImportHistoryModal();
         }
 
@@ -19393,19 +19598,24 @@
                     }
                     if (--pendingCount === 0) {
                         parsed.sort((a, b) => files.findIndex(f => f.name === a.fileName) - files.findIndex(f => f.name === b.fileName));
-                        historyImportState.files = parsed;
-                        historyImportState.selected = new Set();
-                        // ถ้าไฟล์ที่เลือกเป็นของอีกตลาดทั้งหมด ให้สลับตลาดให้อัตโนมัติ (ยังเปลี่ยนเองได้)
-                        const hints = new Set();
-                        parsed.forEach(f => f.sheets.forEach(s => { if (!s.skipped && s.rows.length > 0 && s.marketHint) hints.add(s.marketHint); }));
-                        if (hints.size === 1 && !hints.has(historyImportState.market)) historyImportState.market = Array.from(hints)[0];
-                        renderImportHistoryModal();
+                        applyParsedHistoryFiles(parsed);
                     }
                 };
                 reader.onerror = () => { if (--pendingCount === 0) { status.textContent = 'อ่านไฟล์ไม่สำเร็จ'; } };
                 reader.readAsArrayBuffer(file);
             });
             input.value = '';
+        }
+
+        function toggleHistoryLatestRow(key, checked) {
+            if (checked) historyImportState.skipKeys.delete(key); else historyImportState.skipKeys.add(key);
+            renderImportHistoryModal();
+        }
+        function toggleHistoryLatestAll(checked) {
+            const c = historyImportState.computed; if (!c) return;
+            historyImportState.skipKeys = new Set();
+            if (!checked) c.rows.forEach(e => { if (e.latest) historyImportState.skipKeys.add(e.key); });
+            renderImportHistoryModal();
         }
 
         function toggleHistoryMonth(monthKey, checked) {
@@ -19467,6 +19677,35 @@
                 summary.textContent = '';
                 return;
             }
+            if (st.mode === 'new') {
+                const latestRows = c.rows.filter(e => e.latest).sort((a, b) => (a.prefix > b.prefix) - (a.prefix < b.prefix) || a.seq - b.seq);
+                const pickedRows = latestRows.filter(e => !st.skipKeys.has(e.key));
+                const serHtml = (c.series || []).map(sr => `<div class="text-[11px] ${sr.count > 0 ? 'text-slate-600' : 'text-slate-400'}"><b>${escapeHtml(sr.prefix || 'M/O ต่างประเทศ')}</b>: ${sr.baseline ? `ในระบบล่าสุด ${escapeHtml(sr.baseline)} → ` : 'ยังไม่มีเลขชุดนี้ในระบบ → ใช้เฉพาะที่เปิด M/O ภายใน 60 วัน → '}${sr.count > 0 ? `จะนำเข้า ${sr.count} รายการ (${escapeHtml(sr.firstNo)}${sr.count > 1 ? ' – ' + escapeHtml(sr.lastNo) : ''})` : 'ไม่มีรายการใหม่กว่า'}${sr.olderMissing > 0 ? ` <span class="text-slate-400">• เลขเก่ากว่าที่ไม่มีในระบบ ${sr.olderMissing} รายการ (ไม่นำเข้า)</span>` : ''}</div>`).join('');
+                if (latestRows.length === 0) {
+                    monthsEl.innerHTML = `<div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-2">${serHtml}</div><p class="text-xs text-slate-500 text-center py-6"><i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i>ไม่มี M/O, S/O ใหม่กว่าที่มีในระบบ — ระบบเป็นปัจจุบันแล้ว</p>`;
+                    confirmBtn.classList.add('hidden');
+                    summary.textContent = '';
+                    return;
+                }
+                monthsEl.innerHTML = `<div class="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3 mb-2 space-y-0.5">${serHtml}</div>
+                    <div class="flex items-center gap-2 mb-1 text-xs"><span class="font-semibold text-slate-600">รายการที่จะนำเข้า (ติ๊กออกถ้าไม่ต้องการ):</span>
+                        <button type="button" onclick="toggleHistoryLatestAll(true)" class="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50">เลือกทั้งหมด</button>
+                        <button type="button" onclick="toggleHistoryLatestAll(false)" class="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50">ล้าง</button></div>
+                    <div class="border border-slate-100 rounded-xl divide-y divide-slate-50 text-xs">${latestRows.slice(0, 400).map(e => {
+                        const on = !st.skipKeys.has(e.key);
+                        return `<label class="flex items-center gap-2 px-3 py-1.5 cursor-pointer ${on ? '' : 'opacity-40'}"><input type="checkbox" data-latest-key="${escapeHtml(e.key)}" ${on ? 'checked' : ''} onchange="toggleHistoryLatestRow(this.getAttribute('data-latest-key'), this.checked)">
+                            <span class="font-mono font-semibold text-slate-700 w-24 shrink-0">${escapeHtml(e.moSo)}</span>
+                            <span class="truncate text-slate-600 flex-grow">${escapeHtml(e.raw.customerName || '-')}</span>
+                            <span class="text-slate-400 shrink-0">เปิด ${escapeHtml(e.raw.openDate || '-')}</span>
+                            <span class="text-slate-400 shrink-0 w-24 text-right">ส่ง ${escapeHtml(e.raw.dueDate || '-')}</span></label>`;
+                    }).join('')}${latestRows.length > 400 ? `<div class="px-3 py-1.5 text-slate-400">… และอีก ${latestRows.length - 400} รายการ</div>` : ''}</div>`;
+                summary.textContent = `เลือกแล้ว ${pickedRows.length} จาก ${latestRows.length} รายการ`;
+                confirmBtn.classList.remove('hidden');
+                confirmBtn.disabled = pickedRows.length === 0;
+                confirmBtn.className = `px-4 py-2 rounded-xl text-sm font-semibold shadow transition ${pickedRows.length === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`;
+                confirmBtn.innerHTML = `<i class="fa-solid fa-file-import mr-1.5"></i> นำเข้า ${pickedRows.length} รายการ (เข้าแผนกวางแผน)`;
+                return;
+            }
             const byYear = {};
             Object.keys(c.months).forEach(k => { const y = k === 'unknown' ? 'unknown' : k.slice(0, 4); (byYear[y] = byYear[y] || []).push(k); });
             const years = Object.keys(byYear).sort((a, b) => (a === 'unknown') - (b === 'unknown') || b.localeCompare(a));
@@ -19495,8 +19734,8 @@
             summary.textContent = `เลือกแล้ว ${st.selected.size} เดือน • ${selCount} รายการ`;
             confirmBtn.classList.remove('hidden');
             confirmBtn.disabled = selCount === 0;
-            confirmBtn.className = `px-4 py-2 rounded-xl text-sm font-semibold shadow transition ${selCount === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`;
-            confirmBtn.innerHTML = `<i class="fa-solid fa-file-import mr-1.5"></i> นำเข้า ${selCount} รายการ (บันทึกเป็นส่งแล้ว)`;
+            confirmBtn.className = `px-4 py-2 rounded-xl text-sm font-semibold shadow transition ${selCount === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : (st.mode === 'new' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white')}`;
+            confirmBtn.innerHTML = `<i class="fa-solid fa-file-import mr-1.5"></i> นำเข้า ${selCount} รายการ ${st.mode === 'new' ? '(เข้าแผนกวางแผน)' : '(บันทึกเป็นส่งแล้ว)'}`;
         }
 
         // สร้างออเดอร์ "ส่งแล้ว" จากเดือนที่เลือก — ไม่เรียก LINE/mascot/recomputeAllSchedules (เป็นข้อมูลเก่า ไม่ใช่งานใหม่)
@@ -19504,23 +19743,27 @@
             const st = historyImportState;
             const c = st.computed;
             if (!c) return;
-            const picked = c.rows.filter(r => r.status === 'new' && st.selected.has(r.monthKey));
+            const picked = st.mode === 'new'
+                ? c.rows.filter(r => r.status === 'new' && r.latest && !st.skipKeys.has(r.key))
+                : c.rows.filter(r => r.status === 'new' && st.selected.has(r.monthKey));
             if (picked.length === 0) return;
             const today = new Date().toISOString().split('T')[0];
+            const isNewMode = st.mode === 'new';
             const created = [];
             picked.forEach(e => {
                 const r = e.raw;
                 const shippedDate = [r.shippedDate, r.dueDate, r.openDate].filter(Boolean).map(d => (d > today ? today : d))[0] || today;
-                const order = normalizeOrder({
+                const stageFields = isNewMode
+                    ? { currentStage: 'planning', createdAt: r.openDate || today, lastUpdated: today }
+                    : { currentStage: 'finishing', readyToShip: true, shipped: true, shippedDate, createdAt: r.openDate || '2000-01-01', lastUpdated: shippedDate };
+                const order = normalizeOrder(Object.assign({
                     moSo: e.moSo, orderType: e.orderType, market: st.market, salesName: r.salesName,
                     customerName: r.customerName, customerPO: r.customerPO, locationName: r.locationName,
                     openDate: r.openDate, dueDate: r.dueDate, postponeDispatchDate: r.postponeDispatchDate,
                     quality: r.quality, packaging: r.packaging, yarnType: r.yarnType, carpetSizeNote: r.carpetSizeNote,
                     colorsCount: r.colorsCount, totalPieces: r.totalPieces, totalSqm: r.totalSqm,
                     incoterms: r.incoterms, designRef: r.designRef, refNote: r.refNote, orderRemark: r.orderRemark,
-                    currentStage: 'finishing', readyToShip: true, shipped: true, shippedDate,
-                    createdAt: r.openDate || '2000-01-01', lastUpdated: shippedDate
-                });
+                }, stageFields));
                 productionOrders.push(order);
                 created.push(order);
             });
@@ -19538,6 +19781,7 @@
                     await Promise.all(created.slice(i, i + 5).map(o => syncOrderToSheet(o)));
                 }
             }
+            if (isNewMode) recomputeAllSchedules(); // งานใหม่ที่ยังต้องผลิต → คำนวณกำหนดการแต่ละแผนกให้ (ข้อมูลเก่าไม่ต้อง)
             renderProductionBoard();
             renderProductionTimeline();
             renderProductionOverview();
@@ -19547,6 +19791,20 @@
             salesReportActiveMarket = st.market;
             salesReportActiveOrderType = hasMo ? 'MO' : 'SO';
             renderSalesReportTables();
+            if (isNewMode) {
+                // ให้เห็นผลทันทีที่บอร์ดแผนกวางแผน (เหมือน confirmPlanningImport): ปลดตัวกรอง/คำค้นที่จะซ่อนรายการที่เพิ่งนำเข้า
+                const relaxed = [];
+                if (orderTypeFilter !== 'all' && created.some(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) !== orderTypeFilter)) { setOrderTypeFilter('all'); relaxed.push('ตัวกรอง M/O-S/O'); }
+                if (marketFilter !== 'all' && created.some(o => !matchesMarketFilter(o))) { setMarketFilter('all'); relaxed.push('ตัวกรองตลาด'); }
+                const searchEl = document.getElementById('boardSearchInput');
+                if (searchEl && searchEl.value.trim()) { searchEl.value = ''; relaxed.push('คำค้นหา'); }
+                switchView('board');
+                setDeptKpiSubTab('planning', 'board');
+                mascotCelebrate('newOrder');
+                showToast(`นำเข้า M/O, S/O ใหม่สำเร็จ ${created.length} รายการ (${st.market === 'domestic' ? 'ในประเทศ' : 'ต่างประเทศ'}) — อยู่ที่บอร์ดแผนกวางแผน${relaxed.length ? ` • ปลด${relaxed.join(', ')}ให้แล้ว` : ''}`, 'fa-file-import', 'text-emerald-400');
+                closeImportHistoryModal();
+                return;
+            }
             const resultText = `นำเข้าข้อมูลเก่าสำเร็จ ${created.length} รายการ (${st.market === 'domestic' ? 'ในประเทศ' : 'ต่างประเทศ'}) — บันทึกเป็น "ส่งแล้ว" ไม่ขึ้นในแผนการผลิต ดูได้ที่รายงานแผนกขาย`;
             showToast(resultText, 'fa-file-import', 'text-emerald-400');
             closeImportHistoryModal();
