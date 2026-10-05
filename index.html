@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -6819,6 +6817,12 @@
             try {
                 const required = getDyeingRequiredKgByColor(order);
                 if (required.size === 0) return false;
+                // CHANGED (2026-10-05): a plan where every color needs 0 kg net (kg not typed yet, or all drawn from
+                // Surplus) has nothing dyed "per plan" — never count it as complete (it is also now re-checked whenever the
+                // plan itself is edited, so a half-typed new row must not auto-transfer the order).
+                let totalRequired = 0;
+                required.forEach(reqKg => { totalRequired += reqKg; });
+                if (!(totalRequired > 0.01)) return false;
                 const actual = getDyeingActualKgByColor(order);
                 let allCovered = true;
                 required.forEach((reqKg, key) => {
@@ -6852,7 +6856,8 @@
             const alreadyFlagged = !!order.dyeing.fullyDyedFlag;
             order.dyeing.fullyDyedFlag = true;
             if (order.currentStage === 'dyeing') {
-                transferOrderStage(orderIndex, 'dyeing', 'weaving');
+                // "เพื่อรอทอได้เลย": ไปแผนกทอ (ถ้าวางแผนให้ทอภายนอก ไปทากาว/ตกแต่งเลย — กฎเดียวกับปุ่ม "ผ่าน" ของแผนกวางแผน)
+                transferOrderStage(orderIndex, 'dyeing', (order.weaving && order.weaving.mode === 'external') ? 'finishing' : 'weaving');
                 return true;
             }
             // Not in dyeing anymore (already transferred, or never auto-tracked) — just make sure the
@@ -13381,6 +13386,14 @@
             // NEW (2026-09-29): if that department finished LATE against its Baseline Plan and no Delay
             // Reason is on file yet, prompt for one now — see notifyMissingDelayReasonAfterCompletion().
             notifyMissingDelayReasonAfterCompletion(orderIndex, fromStage);
+            // NEW (2026-10-05): "แผนกย้อม ถ้าย้อมตามคำสั่งแผนกวางแผนครบแล้วโอนไปแผนกทอ เพื่อรอทอได้เลย" — an order that ARRIVES in
+            // ย้อม already fully dyed vs. the plan (e.g. dye report imported while it was still in planning) must not sit there
+            // waiting for another edit; hand it straight on to ทอ. Guarded so a plan-less order is never moved.
+            if (toStage === 'dyeing' && isDyeingFullyDyedVsPlan(order)) {
+                if (checkAndAutoTransferDyeingIfComplete(orderIndex)) {
+                    showToast(`${order.moSo} ไหมย้อมครบตามแผนแล้ว — โอนไปแผนกถัดไปอัตโนมัติ`, 'fa-check-double', 'text-emerald-400');
+                }
+            }
         }
 
         // NEW (2026-09-30): "แผนกวางแผน...ย้อมภายในบริษัท ไปที่แผนกย้อม ย้อมภายนอกบริษัท ทอภายในบริษัท
@@ -13401,7 +13414,7 @@
         // (e.g. external dye + internal weave still visits Weaving; internal dye + external weave visits
         // neither Dyeing nor Weaving and lands straight in Finishing).
         function computePlanningNextStage(order) {
-            const dyeSkipped = (order.dyeing && order.dyeing.mode === 'external') || dyeingFullyCoveredBySurplus(order);
+            const dyeSkipped = (order.dyeing && order.dyeing.mode === 'external') || dyeingFullyCoveredBySurplus(order) || isDyeingFullyDyedVsPlan(order);
             if (!dyeSkipped) return 'dyeing';
             if (order.weaving && order.weaving.mode === 'external') return 'finishing';
             return 'weaving';
@@ -13465,6 +13478,9 @@
             if (row) reverseSurplusLedgerDeduction(row);
             order.dyeing.colorOrders = order.dyeing.colorOrders.filter(r => r.id !== rowId);
             persistOrderChange(order);
+            if (checkAndAutoTransferDyeingIfComplete(orderIndex)) {
+                showToast(`${order.moSo} ไหมย้อมครบตามแผนแล้ว — โอนไปแผนกถัดไปอัตโนมัติ`, 'fa-check-double', 'text-emerald-400');
+            }
             rerenderOrderViews(orderIndex);
         }
 
@@ -13474,6 +13490,10 @@
             if (!row) return;
             row[field] = value;
             persistOrderChange(order);
+            // NEW (2026-10-05): editing the PLAN (e.g. lowering a color's kg) can be what makes the dyed amount already enough.
+            if (['kg', 'colorCode'].includes(field) && checkAndAutoTransferDyeingIfComplete(orderIndex)) {
+                showToast(`${order.moSo} ไหมย้อมครบตามแผนแล้ว — โอนไปแผนกถัดไปอัตโนมัติ`, 'fa-check-double', 'text-emerald-400');
+            }
             rerenderOrderViews(orderIndex);
         }
 
@@ -13537,6 +13557,9 @@
             if (row.useSurplus) applySurplusLedgerDeduction(row);
             persistOrderChange(order);
             renderKpiSurplusLedger(); // reflect the new weightOutKg immediately if that report happens to be open
+            if (checkAndAutoTransferDyeingIfComplete(orderIndex)) {
+                showToast(`${order.moSo} ไหมย้อมครบตามแผนแล้ว — โอนไปแผนกถัดไปอัตโนมัติ`, 'fa-check-double', 'text-emerald-400');
+            }
             rerenderOrderViews(orderIndex);
         }
 
@@ -19281,6 +19304,13 @@
             if (items.length === 0) return;
             const results = [];
             items.forEach(item => { results.push(applyPlanningImportItem(item)); });
+            // NEW (2026-10-05): a re-imported plan may already be covered by what Dyeing has dyed -> hand on to ทอ right away.
+            const autoMovedByImport = [];
+            results.forEach(r => {
+                if (r.action !== 'updated') return;
+                const idx = productionOrders.indexOf(r.order);
+                if (idx !== -1 && checkAndAutoTransferDyeingIfComplete(idx)) autoMovedByImport.push(r.order.moSo);
+            });
             const created = results.filter(r => r.action === 'created');
             const updated = results.filter(r => r.action === 'updated');
             closePlanningImportModal();
@@ -19327,6 +19357,7 @@
             let msg = `นำเข้าใบสั่งย้อม + GRADE สำเร็จ ${results.length} รายการ (เปิดใหม่ ${created.length}, เติมเข้าของเดิม ${updated.length}) • ${nums} อยู่ที่บอร์ดแผนกวางแผน`;
             if (elsewhere.length) msg += ` (ยกเว้น ${elsewhere.map(o => `${o.moSo} อยู่แผนก${STAGE_LABELS[getEffectiveStage(o)] || getEffectiveStage(o)}แล้ว`).join(', ')})`;
             if (relaxed.length) msg += ` • ปลด${relaxed.join(', ')}ให้แล้ว`;
+            if (autoMovedByImport.length) msg += ` • ย้อมครบตามแผนแล้ว โอนไปแผนกถัดไป: ${autoMovedByImport.join(', ')}`;
             showToast(msg, 'fa-file-import', 'text-violet-500');
         }
 
@@ -19657,9 +19688,11 @@
                 if (err) { showToast('อ่านไฟล์ไม่สำเร็จ: ' + err.message, 'fa-triangle-exclamation', 'text-rose-400'); return; }
                 const rows = parseFlatRowsFromAoa(aoa, DYEING_ORDER_COLUMNS);
                 let added = 0, unmatched = 0;
+                const touchedIdx = new Set();
                 rows.forEach(r => {
                     const orderIndex = productionOrders.findIndex(o => o.moSo === String(r.moSo || '').trim());
                     if (orderIndex === -1) { unmatched++; return; }
+                    touchedIdx.add(orderIndex);
                     const order = productionOrders[orderIndex];
                     if (!order.dyeing) order.dyeing = {};
                     if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
@@ -19669,8 +19702,11 @@
                     persistOrderChange(order);
                     added++;
                 });
+                // NEW (2026-10-05): the imported rows may be what completes the plan — same auto-transfer as the other dye-log paths.
+                const autoMoved = [];
+                touchedIdx.forEach(i => { if (checkAndAutoTransferDyeingIfComplete(i)) autoMoved.push(productionOrders[i].moSo); });
                 renderDyeOrderLogTable();
-                showToast(`นำเข้าสำเร็จ ${added} รายการ${unmatched > 0 ? `, ไม่พบ M/O ${unmatched} รายการ` : ''}`, 'fa-check', 'text-emerald-400');
+                showToast(`นำเข้าสำเร็จ ${added} รายการ${unmatched > 0 ? `, ไม่พบ M/O ${unmatched} รายการ` : ''}${autoMoved.length ? ` • ไหมย้อมครบตามแผน โอนไปแผนกถัดไปอัตโนมัติ: ${autoMoved.join(', ')}` : ''}`, 'fa-check', 'text-emerald-400');
             });
         }
 
