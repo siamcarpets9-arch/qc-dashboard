@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -816,6 +818,13 @@
                 <button onclick="setDeptKpiSubTab('planning', 'kpi')" id="planningKpiSubTabBtn-kpi" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                     <i class="fa-solid fa-scroll"></i> รายงานวางแผน (KPI)
                 </button>
+                <!-- NEW (2026-10-05): "เพิ่มปุ่มนำเข้า excel เฉพาะ Sheet Dye Order A กับ GRADE เข้าแผนกวางแผน" —
+                     อ่านไฟล์ M/O (.xlsx) ของแผนกวางแผนทีละหลายไฟล์ แต่แตะเฉพาะ 2 sheet นี้เท่านั้น (ชื่อ "Dye Order A"
+                     และชื่อที่ขึ้นต้นด้วย "GRADE" เช่น "GRADE NEW") — ดู importPlanningDyeGradeFiles() -->
+                <label class="ml-auto shrink-0 bg-white border border-violet-600 text-violet-700 hover:bg-violet-50 font-medium px-3 py-2 rounded-xl transition text-xs flex items-center gap-1.5 cursor-pointer" title="นำเข้าเฉพาะ Sheet Dye Order A และ GRADE จากไฟล์ M/O (เลือกได้หลายไฟล์)">
+                    <i class="fa-solid fa-file-import"></i> นำเข้า Excel (Dye Order A + GRADE)
+                    <input type="file" id="planningImportFileInput" accept=".xlsx,.xls" multiple class="hidden" onchange="importPlanningDyeGradeFiles(this)">
+                </label>
             </div>
             <div id="designKpiSubTabBar" class="hidden flex items-center gap-2 mb-4">
                 <button onclick="setDeptKpiSubTab('design', 'board')" id="designKpiSubTabBtn-board" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition">
@@ -2744,6 +2753,23 @@
                 </button>
             </div>
             <div id="overviewQcHistoryBody" class="overflow-y-auto px-6 py-4"></div>
+        </div>
+    </div>
+
+    <!-- NEW (2026-10-05): พรีวิวก่อนยืนยันนำเข้า Excel แผนกวางแผน (Sheet Dye Order A + GRADE) — เปิดโดย
+         importPlanningDyeGradeFiles() หลังอ่านไฟล์ทุกไฟล์เสร็จ ยังไม่แก้ข้อมูลจริงจนกว่าจะกด "ยืนยันนำเข้า"
+         (confirmPlanningImport()) เพราะการนำเข้าเขียนทับ "ข้อมูลสำหรับ AI ช่วยคำนวณเวลา" ของ M/O เดิมได้ -->
+    <div id="planningImportModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-100 px-6 py-4 shrink-0">
+                <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-file-import text-violet-600 mr-2"></i>นำเข้า Excel แผนกวางแผน (Dye Order A + GRADE)</h3>
+                <button onclick="closePlanningImportModal()" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="planningImportBody" class="overflow-y-auto px-6 py-4 space-y-3 text-sm"></div>
+            <div class="flex gap-2 border-t border-slate-100 px-6 py-3 shrink-0">
+                <button type="button" onclick="closePlanningImportModal()" class="w-1/3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium text-xs rounded-xl transition">ยกเลิก</button>
+                <button type="button" id="planningImportConfirmBtn" onclick="confirmPlanningImport()" class="w-2/3 py-2 bg-violet-600 hover:bg-violet-700 text-white font-medium text-xs rounded-xl transition shadow disabled:opacity-40 disabled:cursor-not-allowed">ยืนยันนำเข้า</button>
+            </div>
         </div>
     </div>
 
@@ -18736,6 +18762,354 @@
                     created.length > 0 ? 'text-emerald-400' : 'text-slate-400'
                 );
             });
+        }
+
+        // =====================================================================================
+        // NEW (2026-10-05): "เพิ่มปุ่มนำเข้า excel เฉพาะ Sheet Dye Order A กับ GRADE เข้าแผนกวางแผน"
+        //
+        // อ่านไฟล์ M/O ของแผนกวางแผน (1 ไฟล์ = 1 M/O, เลือกได้หลายไฟล์พร้อมกัน) แต่แตะเฉพาะ 2 sheet:
+        //   - "Dye Order A"            -> หัวใบสั่ง (ลูกค้า/พื้นที่รวม/คุณภาพ/กำหนดส่ง/จำนวนสี/Ref.) + ตารางสี/น้ำหนักไหม
+        //                                 (เข้า order.dyeing.colorOrders) + เกรดของ M/O ("เกรด: ทอ C แต่ง X")
+        //   - "GRADE" / "GRADE NEW"    -> ตารางเกณฑ์เกรดมาตรฐาน — ใช้ดึงค่าของเกรดทอที่ M/O นี้ระบุไว้ ลงช่อง
+        //                                 "ข้อมูลสำหรับ AI ช่วยคำนวณเวลา" (order.productionCalc)
+        // ที่เหลือในไฟล์ (K.P.I., ใบแทรก, แท็ค, Tufting Spec. ฯลฯ) ไม่อ่านเลยตามที่ขอ "เฉพาะ Sheet ..."
+        //
+        // ตลาด: M/O ที่ขึ้นต้นด้วย "TH" = ในประเทศ (domestic) นอกนั้น = ต่างประเทศ (export) — ตามที่ผู้ใช้บอก
+        // ("ในประเทศ จะขึ้นต้นด้วย TH") และตรงกับ moSoPrefixFor() ของฟอร์มเปิด M/O ใหม่.
+        // จับคู่ M/O เดิมด้วย normalizeDyeingMoSoMatchKey() (ตัด 0 นำหน้า/ช่องว่าง: "0184/26" = "184/26");
+        // ไม่พบ -> เปิดออเดอร์ใหม่ (ผู้ใช้เลือก "จับคู่ M/O ที่มีอยู่ ถ้าไม่พบให้เปิดใหม่").
+        // =====================================================================================
+        const PLANNING_IMPORT_GRADE_LETTERS = ['A', 'B', 'C', 'C+', 'D', 'D+', 'E', 'X', 'Z'];
+        let planningImportPending = [];
+
+        // วันที่ในไฟล์เป็นได้ทั้ง Date จริง ("2026-02-11") และข้อความแบบไทย dd/mm/yy ("16/11/26")
+        function parsePlanningImportDate(v) {
+            if (v instanceof Date) return excelCellDateToDateKey(v) || '';
+            const s = String(v == null ? '' : v).trim();
+            if (!s) return '';
+            const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+            if (!m) return normalizeDateString(s) || '';
+            const d = Number(m[1]); const mo = Number(m[2]); let y = Number(m[3]);
+            if (y < 100) y += 2000; else if (y > 2400) y -= 543;
+            if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+            return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+
+        // หาค่าทางขวาของป้ายหัวข้อ (อยู่คอลัมน์ A เสมอในใบสั่งย้อม) เช่น "พื้นที่รวม/Quantity:" -> ค่าในแถวเดียวกัน
+        function planningImportValueAfterLabel(aoa, labelRegex) {
+            for (let r = 0; r < Math.min(aoa.length, 16); r++) {
+                const row = aoa[r] || [];
+                if (typeof row[0] === 'string' && labelRegex.test(row[0].trim())) {
+                    for (let c = 1; c < row.length; c++) {
+                        if (row[c] !== null && row[c] !== undefined && String(row[c]).trim() !== '') return row[c];
+                    }
+                }
+            }
+            return null;
+        }
+
+        // "TH 168/26" / "184/26" -> "TH0168/26" / "0184/26" (รูปแบบเลขรันของระบบ — เหมือน generateAutoMoSo())
+        function formatPlanningImportMoSo(raw) {
+            const compact = String(raw == null ? '' : raw).trim().toUpperCase().replace(/\s+/g, '');
+            const m = compact.match(/^([A-Z]*)(\d+)\/(\d{2,4})$/);
+            if (!m) return String(raw == null ? '' : raw).trim();
+            return `${m[1]}${m[2].padStart(4, '0')}/${m[3].slice(-2)}`;
+        }
+
+        // ตารางเกณฑ์เกรดทอ (แถว A..Z ของ sheet GRADE) — ตารางทอมาก่อนตารางตอกลาย/ตกแต่งเสมอ จึงเอาแถวแรกที่เจอของแต่ละเกรด
+        function parsePlanningGradeSheet(ws) {
+            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+            const table = {};
+            for (let r = 0; r < Math.min(aoa.length, 20); r++) {
+                const row = aoa[r] || [];
+                const letter = String(row[0] == null ? '' : row[0]).replace(/\s+/g, '').toUpperCase();
+                if (!PLANNING_IMPORT_GRADE_LETTERS.includes(letter) || table[letter]) continue;
+                if (!Number.isFinite(Number(row[1])) || !Number.isFinite(Number(row[2])) || row[1] === null || row[2] === null) continue;
+                const rawMax = row[3];
+                table[letter] = {
+                    patternBase: Number(row[1]),
+                    patternPct: Number(row[2]),
+                    maxColors: (typeof rawMax === 'string' && rawMax.trim().startsWith('>')) ? (Number(rawMax.replace(/[^\d.]/g, '')) || 20) + 1 : (Number(rawMax) || 0),
+                    stitching: String(row[7] == null ? '' : row[7]).trim().toUpperCase(),
+                    target: Number(row[8]) || 0
+                };
+            }
+            return table;
+        }
+
+        // ตั้งค่า productionCalc ให้ computeTuftingGrade() ได้เกรดตรงกับที่ไฟล์ระบุ — ถ้าค่าก้าวการทอของแถวนั้น
+        // (D/VD) ทำให้สูตรของระบบกระโดดไปเกรดอื่น (เช่น เกรด E ที่ก้าว VD -> Z) จะลองก้าว N แทน; ถ้ายังไม่ตรง
+        // คงค่าตามไฟล์ไว้และแจ้งเตือนในพรีวิว (ไม่ปิดเงียบ)
+        function buildPlanningImportProductionCalc(baseCalc, wantGrade, gradeInfo, area) {
+            const calc = Object.assign({
+                totalArea: 0, patternPercentage: 0, maxColors: 0, stitchingDensity: 'N',
+                hasCutAndLoop: false, isRepeat: false, isMachinePunch: false
+            }, baseCalc || {});
+            if (area > 0) calc.totalArea = area;
+            const result = { calc, engineGrade: null, warning: '' };
+            if (!gradeInfo) return result;
+            calc.patternPercentage = gradeInfo.patternPct;
+            calc.maxColors = gradeInfo.maxColors;
+            const candidates = [];
+            if (['N', 'D', 'VD'].includes(gradeInfo.stitching)) candidates.push(gradeInfo.stitching);
+            if (!candidates.includes('N')) candidates.push('N');
+            let chosen = candidates[0];
+            for (const s of candidates) {
+                if (computeTuftingGrade(Object.assign({}, calc, { stitchingDensity: s })).grade === wantGrade) { chosen = s; break; }
+            }
+            calc.stitchingDensity = chosen;
+            result.engineGrade = computeTuftingGrade(calc).grade;
+            if (result.engineGrade !== wantGrade) {
+                result.warning = `ไฟล์ระบุเกรดทอ ${wantGrade} แต่สูตรของระบบคำนวณจากค่าเกณฑ์ได้เกรด ${result.engineGrade}`;
+            }
+            return result;
+        }
+
+        // อ่าน 1 workbook -> ผลที่พรีวิวได้ (ไม่แตะข้อมูลจริง). ต้องมี sheet "Dye Order A" ถึงจะนำเข้าได้
+        function parsePlanningDyeGradeWorkbook(workbook, fileName) {
+            const item = { fileName, ok: false, error: '', warnings: [] };
+            const dyeSheetName = workbook.SheetNames.find(n => /^dye\s*order\s*a$/i.test(String(n).trim()));
+            if (!dyeSheetName) { item.error = 'ไม่พบ Sheet "Dye Order A" ในไฟล์นี้'; return item; }
+            const gradeSheetName = workbook.SheetNames.find(n => /^grade/i.test(String(n).trim()));
+
+            const aoa = XLSX.utils.sheet_to_json(workbook.Sheets[dyeSheetName], { header: 1, raw: true, defval: null });
+            const moSoRaw = planningImportValueAfterLabel(aoa, /^M\/O\s*:?$/i);
+            if (moSoRaw === null) { item.error = 'ไม่พบเลขที่ M/O ใน Sheet "Dye Order A" (ช่อง "M/O:")'; return item; }
+            item.moSoSource = String(moSoRaw).trim();
+            item.moSo = formatPlanningImportMoSo(item.moSoSource);
+            item.market = /^TH/i.test(item.moSoSource.replace(/\s+/g, '')) ? 'domestic' : 'export';
+            item.customerName = String(planningImportValueAfterLabel(aoa, /^ลูกค้า/) || '').trim();
+            item.quality = String(planningImportValueAfterLabel(aoa, /^คุณภาพ/) || '').trim();
+            item.refNote = String(planningImportValueAfterLabel(aoa, /^อ้างถึง/) || '').trim();
+            const areaRaw = Number(planningImportValueAfterLabel(aoa, /^พื้นที่รวม/));
+            item.totalSqm = Number.isFinite(areaRaw) && areaRaw > 0 ? areaRaw : 0;
+            item.dueDate = parsePlanningImportDate(planningImportValueAfterLabel(aoa, /^กำหนดส่ง/));
+            const colorsRaw = Number(planningImportValueAfterLabel(aoa, /^จำนวนสี/));
+            item.colorsCount = Number.isFinite(colorsRaw) && colorsRaw > 0 ? colorsRaw : 0;
+
+            // ตารางสี: เริ่มแถวถัดจากแถวหัวตารางภาษาอังกฤษ ("No.") อ่านต่อเนื่องจนคอลัมน์ลำดับไม่ใช่ตัวเลข
+            const headerIdx = aoa.findIndex(row => row && String(row[0] == null ? '' : row[0]).trim() === 'No.');
+            const colorMap = new Map();
+            let rawColorRows = 0;
+            if (headerIdx !== -1) {
+                for (let i = headerIdx + 1; i < aoa.length; i++) {
+                    const row = aoa[i] || [];
+                    const seq = row[0];
+                    if (seq === null || seq === undefined || String(seq).trim() === '' || !Number.isFinite(Number(seq))) break;
+                    const code = String(row[1] == null ? '' : row[1]).trim();
+                    const kg = Number(row[4]) || 0;
+                    if (!code && kg <= 0) continue;
+                    rawColorRows++;
+                    const key = code.toUpperCase().replace(/\s+/g, ' ');
+                    const existing = colorMap.get(key);
+                    if (existing) existing.kg += kg;
+                    else colorMap.set(key, { colorCode: code, kg });
+                }
+            }
+            item.colors = Array.from(colorMap.values()).map(c => ({ colorCode: c.colorCode, kg: Math.round(c.kg * 100) / 100 }));
+            item.totalKg = Math.round(item.colors.reduce((s, c) => s + c.kg, 0) * 100) / 100;
+            if (item.colors.length === 0) item.warnings.push('ไม่พบรายการสี/น้ำหนักไหมในตาราง Dye Order A');
+            else if (rawColorRows > item.colors.length) item.warnings.push(`รวมแถวที่ Color Code ซ้ำกัน ${rawColorRows} แถว เป็น ${item.colors.length} สี (รวมน้ำหนักให้)`);
+            if (item.colorsCount > 0 && item.colors.length > 0 && item.colorsCount !== item.colors.length) {
+                item.warnings.push(`จำนวนสีในหัวใบสั่ง (${item.colorsCount}) ไม่ตรงกับจำนวนสีในตาราง (${item.colors.length})`);
+            }
+
+            // เกรดของ M/O นี้ — ข้อความ "เกรด: ทอ C แต่ง X" (ตำแหน่งเซลล์ไม่คงที่ระหว่างไฟล์ จึงไล่หาในหัวใบสั่ง)
+            item.weavingGrade = ''; item.finishingGrade = '';
+            for (let r = 0; r < Math.min(aoa.length, 16) && !item.weavingGrade; r++) {
+                for (const cell of (aoa[r] || [])) {
+                    if (typeof cell !== 'string') continue;
+                    const gm = cell.match(/เกรด\s*[:：]?\s*ทอ\s*([A-Za-z]\s*\+?)\s*แต่ง\s*([A-Za-z]\s*\+?)/);
+                    if (gm) {
+                        item.weavingGrade = gm[1].replace(/\s+/g, '').toUpperCase();
+                        item.finishingGrade = gm[2].replace(/\s+/g, '').toUpperCase();
+                        break;
+                    }
+                }
+            }
+
+            item.gradeInfo = null; item.engineGrade = null; item.productionCalcPreview = null;
+            if (!item.weavingGrade) {
+                item.warnings.push('ไม่พบเกรดของ M/O นี้ ("เกรด: ทอ … แต่ง …") ใน Dye Order A — จะไม่ตั้งค่า AI ช่วยคำนวณเวลา');
+            } else if (!gradeSheetName) {
+                item.warnings.push('ไม่พบ Sheet GRADE ในไฟล์นี้ — จะไม่ตั้งค่า AI ช่วยคำนวณเวลา');
+            } else {
+                const table = parsePlanningGradeSheet(workbook.Sheets[gradeSheetName]);
+                item.gradeInfo = table[item.weavingGrade] || null;
+                if (!item.gradeInfo) item.warnings.push(`ไม่พบแถวเกรด ${item.weavingGrade} ในตาราง Sheet GRADE`);
+                else {
+                    const built = buildPlanningImportProductionCalc({}, item.weavingGrade, item.gradeInfo, item.totalSqm);
+                    item.engineGrade = built.engineGrade;
+                    item.stitchingUsed = built.calc.stitchingDensity;
+                    if (built.warning) item.warnings.push(built.warning);
+                }
+            }
+            item.ok = true;
+            return item;
+        }
+
+        function findPlanningImportExistingOrderIndex(moSo) {
+            const key = normalizeDyeingMoSoMatchKey(moSo);
+            if (!key) return -1;
+            return productionOrders.findIndex(o => normalizeDyeingMoSoMatchKey(o.moSo) === key);
+        }
+
+        function readPlanningImportFile(file) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+                        resolve(parsePlanningDyeGradeWorkbook(workbook, file.name));
+                    } catch (err) {
+                        resolve({ fileName: file.name, ok: false, error: 'อ่านไฟล์ไม่สำเร็จ: ' + err.message, warnings: [] });
+                    }
+                };
+                reader.onerror = () => resolve({ fileName: file.name, ok: false, error: 'อ่านไฟล์ไม่สำเร็จ', warnings: [] });
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        async function importPlanningDyeGradeFiles(fileInput) {
+            const files = Array.from(fileInput.files || []);
+            fileInput.value = '';
+            if (files.length === 0) return;
+            const items = [];
+            for (const f of files) items.push(await readPlanningImportFile(f));
+            planningImportPending = items;
+            renderPlanningImportModalBody();
+            document.getElementById('planningImportModal').classList.remove('hidden');
+        }
+
+        function closePlanningImportModal() {
+            document.getElementById('planningImportModal').classList.add('hidden');
+            planningImportPending = [];
+        }
+
+        function renderPlanningImportModalBody() {
+            const body = document.getElementById('planningImportBody');
+            if (!body) return;
+            const fmtKg = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const marketBadge = m => m === 'domestic'
+                ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">ในประเทศ (ขึ้นต้น TH)</span>'
+                : '<span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 text-[10px] font-bold">ต่างประเทศ</span>';
+            let validCount = 0;
+            const cards = planningImportPending.map(item => {
+                if (!item.ok) {
+                    return `<div class="border border-rose-200 bg-rose-50 rounded-xl p-3"><p class="text-xs font-semibold text-slate-700 truncate"><i class="fa-solid fa-file-excel mr-1.5 text-rose-500"></i>${escapeHtml(item.fileName)}</p><p class="text-xs text-rose-600 mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${escapeHtml(item.error)} — ข้ามไฟล์นี้</p></div>`;
+                }
+                validCount++;
+                const existingIdx = findPlanningImportExistingOrderIndex(item.moSo);
+                const actionBadge = existingIdx === -1
+                    ? '<span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold">เปิด M/O ใหม่</span>'
+                    : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">เติมเข้า M/O เดิม</span>';
+                const colorRows = item.colors.length === 0
+                    ? '<tr><td colspan="2" class="px-2 py-2 text-center text-slate-400">ไม่มีรายการสี</td></tr>'
+                    : item.colors.map(c => `<tr><td class="px-2 py-1 border-t border-slate-100 font-mono">${escapeHtml(c.colorCode || '-')}</td><td class="px-2 py-1 border-t border-slate-100 text-right">${fmtKg(c.kg)}</td></tr>`).join('');
+                let gradeHtml;
+                if (item.gradeInfo) {
+                    gradeHtml = `<p class="text-xs text-slate-600"><span class="font-semibold">เกรดทอ ${escapeHtml(item.weavingGrade)}</span> → % ลาย ${item.gradeInfo.patternPct}, สีสูงสุด ${item.gradeInfo.maxColors}, ก้าว ${escapeHtml(item.stitchingUsed || 'N')}, พื้นที่รวม ${fmtKg(item.totalSqm)} ตร.ม. → ช่อง "AI ช่วยคำนวณเวลา" (ระบบคำนวณเกรด ${escapeHtml(item.engineGrade || '-')})${item.finishingGrade ? `<br><span class="text-slate-400">เกรดแต่งในไฟล์: ${escapeHtml(item.finishingGrade)} — ระบบคำนวณเกรดแต่งจาก % ลายเดียวกับเกรดทอ จึงไม่ได้ตั้งแยก</span>` : ''}</p>`;
+                } else {
+                    gradeHtml = '<p class="text-xs text-slate-400">ไม่ตั้งค่า "AI ช่วยคำนวณเวลา" (ไม่มีข้อมูลเกรดที่อ่านได้)</p>';
+                }
+                const warnHtml = item.warnings.length === 0 ? '' : `<ul class="text-[11px] text-amber-700 list-disc pl-4 space-y-0.5">${item.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`;
+                return `
+                    <div class="border border-slate-200 rounded-xl p-3 space-y-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-mono font-bold text-slate-800">${escapeHtml(item.moSo)}</span>${actionBadge}${marketBadge(item.market)}
+                            <span class="text-[10px] text-slate-400 truncate">${escapeHtml(item.fileName)}</span>
+                        </div>
+                        <p class="text-xs text-slate-600">ลูกค้า: <span class="font-medium">${escapeHtml(item.customerName || '-')}</span> • คุณภาพ: ${escapeHtml(item.quality || '-')} • กำหนดส่ง: ${escapeHtml(item.dueDate || '-')} • ${item.colorsCount || item.colors.length} สี</p>
+                        <div class="border border-slate-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+                            <table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500"><tr><th class="px-2 py-1 text-left font-semibold">Color Code</th><th class="px-2 py-1 text-right font-semibold">น้ำหนัก (กก.)</th></tr></thead><tbody>${colorRows}</tbody>
+                            <tfoot><tr class="bg-slate-50 font-semibold"><td class="px-2 py-1 border-t border-slate-200">รวม</td><td class="px-2 py-1 border-t border-slate-200 text-right">${fmtKg(item.totalKg)}</td></tr></tfoot></table>
+                        </div>
+                        ${gradeHtml}${warnHtml}
+                    </div>`;
+            }).join('');
+            body.innerHTML = cards + `<p class="text-[11px] text-slate-400"><i class="fa-solid fa-circle-info mr-1"></i>อ่านเฉพาะ Sheet "Dye Order A" และ "GRADE" • M/O เดิม: เติมเฉพาะช่องหัวใบสั่งที่ยังว่าง (ลูกค้า/คุณภาพ/กำหนดส่ง/ตร.ม./จำนวนสี/Ref.) และรวมแผนสั่งย้อมตาม Color Code (เขียนทับน้ำหนักของสีที่ซ้ำ) แต่จะเขียนทับค่า "AI ช่วยคำนวณเวลา" ตามเกรดในไฟล์</p>`;
+            const btn = document.getElementById('planningImportConfirmBtn');
+            if (btn) { btn.disabled = validCount === 0; btn.textContent = validCount > 0 ? `ยืนยันนำเข้า ${validCount} M/O` : 'ไม่มีไฟล์ที่นำเข้าได้'; }
+        }
+
+        // นำ 1 รายการเข้าระบบ -> { action: 'created'|'updated', order, orderIndex }
+        function applyPlanningImportItem(item) {
+            let orderIndex = findPlanningImportExistingOrderIndex(item.moSo);
+            const existed = orderIndex !== -1;
+            const gradeBuilt = item.gradeInfo
+                ? buildPlanningImportProductionCalc(existed ? productionOrders[orderIndex].productionCalc : {}, item.weavingGrade, item.gradeInfo, item.totalSqm)
+                : null;
+            const newColorRows = item.colors.map(c => ({ id: 'co_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), colorCode: c.colorCode, kg: c.kg, useSurplus: false, surplusKg: 0, surplusLedgerId: '' }));
+
+            if (!existed) {
+                const d = new Date();
+                const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const raw = {
+                    moSo: item.moSo, orderType: 'MO', market: item.market, currentStage: 'planning',
+                    customerName: item.customerName, quality: item.quality, dueDate: item.dueDate,
+                    totalSqm: item.totalSqm, colorsCount: item.colorsCount || item.colors.length, refNote: item.refNote,
+                    openDate: today,
+                    dyeing: { colorOrders: newColorRows }
+                };
+                if (gradeBuilt) raw.productionCalc = gradeBuilt.calc;
+                else if (item.totalSqm > 0) raw.productionCalc = { totalArea: item.totalSqm };
+                const order = normalizeOrder(raw);
+                productionOrders.push(order);
+                return { action: 'created', order, orderIndex: productionOrders.length - 1 };
+            }
+
+            const order = productionOrders[orderIndex];
+            if (!order.customerName && item.customerName) order.customerName = item.customerName;
+            if (!order.quality && item.quality) order.quality = item.quality;
+            if (!order.dueDate && item.dueDate) order.dueDate = item.dueDate;
+            if (!(Number(order.totalSqm) > 0) && item.totalSqm > 0) order.totalSqm = item.totalSqm;
+            if (!(Number(order.colorsCount) > 0) && (item.colorsCount || item.colors.length)) order.colorsCount = item.colorsCount || item.colors.length;
+            if (!order.refNote && item.refNote) order.refNote = item.refNote;
+            if (!order.market) order.market = item.market;
+            if (gradeBuilt) order.productionCalc = gradeBuilt.calc;
+            else if (item.totalSqm > 0) {
+                if (!order.productionCalc) order.productionCalc = {};
+                order.productionCalc.totalArea = item.totalSqm;
+            }
+            if (!order.dyeing) order.dyeing = {};
+            if (!Array.isArray(order.dyeing.colorOrders)) order.dyeing.colorOrders = [];
+            // แถวเปล่าที่ระบบสร้างให้เป็นค่าเริ่มต้น (ไม่มี Code/กก./Surplus) ถูกแทนที่ด้วยรายการจริงจากไฟล์
+            order.dyeing.colorOrders = order.dyeing.colorOrders.filter(r => r.colorCode || Number(r.kg) > 0 || r.useSurplus);
+            newColorRows.forEach(nr => {
+                const match = order.dyeing.colorOrders.find(r => String(r.colorCode || '').trim().toUpperCase().replace(/\s+/g, ' ') === nr.colorCode.trim().toUpperCase().replace(/\s+/g, ' '));
+                if (match) match.kg = nr.kg; // คง useSurplus/surplusKg/surplusLedgerId เดิมไว้
+                else order.dyeing.colorOrders.push(nr);
+            });
+            persistOrderChange(order);
+            return { action: 'updated', order, orderIndex };
+        }
+
+        async function confirmPlanningImport() {
+            const items = planningImportPending.filter(i => i.ok);
+            if (items.length === 0) return;
+            const results = [];
+            items.forEach(item => { results.push(applyPlanningImportItem(item)); });
+            const created = results.filter(r => r.action === 'created');
+            const updated = results.filter(r => r.action === 'updated');
+            closePlanningImportModal();
+            if (created.length > 0) {
+                saveOrdersToLocal();
+                for (const r of created) {
+                    await syncOrderToSheet(r.order);
+                    notifyLineNewOrder(r.order); // no-op while LINE_NOTIFY_ISSUES_ONLY is true, same as submitNewOrder()
+                }
+            }
+            recomputeAllSchedules();
+            renderProductionBoard();
+            renderProductionTimeline();
+            renderProductionOverview();
+            renderSalesReportTables();
+            updated.forEach(r => rerenderOrderViews(productionOrders.indexOf(r.order)));
+            if (created.length > 0) mascotCelebrate('newOrder');
+            showToast(
+                `นำเข้า Dye Order A + GRADE สำเร็จ ${results.length} M/O (เปิดใหม่ ${created.length}, เติมเข้าของเดิม ${updated.length})`,
+                'fa-file-import', 'text-violet-500'
+            );
         }
 
         // ---- 1. วางแผน: กำหนดส่งตามแผน (แก้ไขฟิลด์ของ M/O ที่มีอยู่แล้ว ไม่สร้างแถวใหม่) -----------------
