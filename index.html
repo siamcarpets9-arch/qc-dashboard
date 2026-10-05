@@ -243,22 +243,39 @@
            renderSalesReportRow()); the order-detail-modal button and its visibility-toggle code were
            removed. */
         .mo-print-sheet { font-family: 'Prompt', sans-serif; color: #000; page: mo-landscape; }
-        .mo-page { padding: 3mm 2mm; position: relative; }
+        /* CHANGED (2026-10-05): "ทำแบบฟอร์มสำหรับพิมพ์ใบ M/O หน้า 1 หน้า 2 ขนาด A3 แนวนอนเหมือนในภาพ" — ใบ M/O ถูกจัดวางใหม่
+           ให้เหมือนแบบฟอร์มจริงของบริษัท (ตารางย้อม/กรอด้านซ้าย, SPECIFICATIONS + ตารางเริ่ม-เสร็จ-ลายเซ็นต์ของแผนกทอ/
+           ทากาว-ตกแต่ง/คลังสินค้า/ดีไซน์ + กล่อง Remark ด้านขวา, หน้า 2 ตารางสี/ย้อม + เวลาที่ใช้ + QUALITY CONTROL) โดยกำหนดขนาด
+           เป็นมิลลิเมตรให้พอดี 1 หน้า A3 แนวนอน (พื้นที่พิมพ์ 410×287mm หลังหักขอบ 5mm). ช่องที่ระบบมีข้อมูลเติมให้เป็นตัวอักษร
+           สีน้ำเงินเหมือนในภาพ ที่เหลือเว้นว่างให้กรอกด้วยมือ. */
+        .mo-page { position: relative; width: 406mm; height: 281mm; overflow: hidden; box-sizing: border-box; font-size: 12px; line-height: 1.15; }
         .mo-page + .mo-page { page-break-before: always; }
-        .mo-page-number { text-align: right; font-size: 10px; margin-bottom: 3px; }
-        .mo-header-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 2px; }
-        .mo-header-row img { height: 46px; }
-        .mo-header-row h1 { font-size: 26px; font-weight: 800; letter-spacing: 0.03em; margin: 0; }
-        .mo-company-name { text-align: center; font-size: 15px; font-weight: 600; margin-bottom: 8px; }
-        table.mo-grid { width: 100%; border-collapse: collapse; margin-bottom: 7px; table-layout: fixed; }
-        table.mo-grid td, table.mo-grid th { border: 1px solid #000; padding: 4px 7px; vertical-align: top; font-size: 12px; overflow-wrap: break-word; }
-        table.mo-grid th.mo-section-header, table.mo-grid td.mo-section-header { text-align: center; font-weight: 700; font-size: 13px; }
-        .mo-fill { font-weight: 600; }
-        .mo-checkbox { display: inline-block; width: 11px; height: 11px; border: 1.4px solid #000; margin-right: 5px; vertical-align: middle; text-align: center; line-height: 9px; font-size: 10px; font-weight: 800; }
+        .mo-pageno { text-align: right; font-size: 11px; height: 5mm; }
+        .mo-header-row { display: flex; align-items: center; justify-content: center; gap: 5mm; height: 14mm; }
+        .mo-header-row img { height: 13mm; }
+        .mo-header-row h1 { font-family: 'Times New Roman', 'Prompt', serif; font-size: 26px; font-weight: 800; margin: 0; letter-spacing: 0.01em; }
+        .mo-company-name { font-family: 'Times New Roman', 'Prompt', serif; font-size: 14px; font-weight: 600; height: 7mm; display: flex; align-items: center; }
+        .mo-fill { font-weight: 700; color: #1e3a8a; }
+        .mo-checkbox { display: inline-block; width: 4mm; height: 4mm; border: 1.2px solid #000; margin-right: 1.5mm; vertical-align: middle; text-align: center; line-height: 3.4mm; font-size: 13px; font-weight: 800; color: #1e3a8a; flex: none; }
         .mo-checkbox.mo-checked::after { content: '\2713'; }
-        .mo-remark-box { border: 1px solid #000; min-height: 90px; padding: 6px 8px; font-size: 12px; white-space: pre-wrap; }
-        .mo-signature-row { display: flex; justify-content: space-between; margin-top: 26px; font-size: 12px; gap: 24px; line-height: 2; }
-        .mo-footer-code { text-align: right; font-size: 10px; margin-top: 6px; }
+        .mo-box { display: flex; border: 1.4px solid #000; box-sizing: border-box; }
+        .mo-r { display: flex; border-bottom: 1px solid #000; box-sizing: border-box; overflow: hidden; }
+        .mo-r:last-child { border-bottom: 0; }
+        .mo-c { display: flex; align-items: center; padding: 0 1.6mm; border-right: 1px solid #000; box-sizing: border-box; overflow: hidden; gap: 1.5mm; }
+        .mo-c:last-child { border-right: 0; }
+        .mo-c.mo-top { align-items: flex-start; padding-top: 1mm; }
+        .mo-center { justify-content: center; text-align: center; }
+        .mo-opts { display: flex; flex-wrap: wrap; align-items: center; column-gap: 3.5mm; row-gap: 0.5mm; }
+        .mo-opt { display: inline-flex; align-items: center; white-space: nowrap; }
+        table.mo-t { border-collapse: collapse; table-layout: fixed; }
+        table.mo-t td, table.mo-t th { border: 1px solid #000; padding: 0 1mm; font-size: 11px; font-weight: 400; overflow: hidden; white-space: nowrap; text-align: center; line-height: 1.1; }
+        table.mo-t td.mo-left, table.mo-t th.mo-left { text-align: left; }
+        table.mo-t td .mo-fill { font-size: 11px; }
+        .mo-remark-line { border-bottom: 1px solid #000; box-sizing: border-box; }
+        .mo-sig-row { display: flex; justify-content: space-between; align-items: flex-end; font-size: 12px; margin-top: 9mm; }
+        .mo-blank { display: inline-block; border-bottom: 1px solid #000; min-width: 38mm; height: 4mm; vertical-align: baseline; }
+        .mo-footer-code { position: absolute; bottom: 0; right: 2mm; font-size: 10px; }
+        .mo-qc-line { position: absolute; left: 1.4mm; right: 1mm; height: var(--rh); top: calc((var(--row) - 1) * var(--rh)); display: flex; align-items: center; font-size: 11.5px; white-space: nowrap; overflow: hidden; }
         .mo-note { font-size: 10px; color: #333; }
 
         /* NEW: ใบสั่งเปิดงานผลิต (Production Work Order) print sheet — embeds the M/O's design image
@@ -821,8 +838,8 @@
                 <!-- NEW (2026-10-05): "เพิ่มปุ่มนำเข้า excel เฉพาะ Sheet Dye Order A กับ GRADE เข้าแผนกวางแผน" —
                      อ่านไฟล์ M/O (.xlsx) ของแผนกวางแผนทีละหลายไฟล์ แต่แตะเฉพาะ 2 sheet นี้เท่านั้น (ชื่อ "Dye Order A"
                      และชื่อที่ขึ้นต้นด้วย "GRADE" เช่น "GRADE NEW") — ดู importPlanningDyeGradeFiles() -->
-                <label class="ml-auto shrink-0 bg-white border border-violet-600 text-violet-700 hover:bg-violet-50 font-medium px-3 py-2 rounded-xl transition text-xs flex items-center gap-1.5 cursor-pointer" title="นำเข้าเฉพาะ Sheet Dye Order A และ GRADE จากไฟล์ M/O (เลือกได้หลายไฟล์)">
-                    <i class="fa-solid fa-file-import"></i> นำเข้า Excel (Dye Order A + GRADE)
+                <label class="ml-auto shrink-0 bg-white border border-violet-600 text-violet-700 hover:bg-violet-50 font-medium px-3 py-2 rounded-xl transition text-xs flex items-center gap-1.5 cursor-pointer" title="นำเข้าใบสั่งย้อม + GRADE จากไฟล์ M/O (Sheet Dye Order A) และไฟล์ S/O (Sheet ใบปะหน้า/DyeD) — เลือกได้หลายไฟล์">
+                    <i class="fa-solid fa-file-import"></i> นำเข้า Excel (M/O • S/O)
                     <input type="file" id="planningImportFileInput" accept=".xlsx,.xls" multiple class="hidden" onchange="importPlanningDyeGradeFiles(this)">
                 </label>
             </div>
@@ -2762,7 +2779,7 @@
     <div id="planningImportModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-100 px-6 py-4 shrink-0">
-                <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-file-import text-violet-600 mr-2"></i>นำเข้า Excel แผนกวางแผน (Dye Order A + GRADE)</h3>
+                <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-file-import text-violet-600 mr-2"></i>นำเข้า Excel แผนกวางแผน (M/O • S/O)</h3>
                 <button onclick="closePlanningImportModal()" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="planningImportBody" class="overflow-y-auto px-6 py-4 space-y-3 text-sm"></div>
@@ -6279,141 +6296,269 @@
         }
 
         function buildManufacturingOrderPrintHTML(order) {
-            const v = (val) => val ? escapeHtml(val) : '';
+            const v = (val) => (val === null || val === undefined || val === '') ? '' : escapeHtml(String(val));
             const cb = (checked) => `<span class="mo-checkbox${checked ? ' mo-checked' : ''}"></span>`;
+            const opt = (checked, label) => `<span class="mo-opt">${cb(checked)}${label}</span>`;
             const kgText = (n) => (Number(n) || 0) > 0 ? (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+            const fmtDMY = (s) => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s || ''); };
 
-            const glueTypes = (productionSettings.finishing && Array.isArray(productionSettings.finishing.glueTypes) && productionSettings.finishing.glueTypes.length > 0)
-                ? productionSettings.finishing.glueTypes : DEFAULT_GLUE_TYPES;
-            const glueKeyForLabel = (label) => { const t = glueTypes.find(g => g.label === label); return t ? t.key : null; };
-            const glueUsed = (label) => { const k = glueKeyForLabel(label); return k ? sumGlueTypeKgForOrder(order, k) > 0 : false; };
+            const specs = order.specs || {};
+            const sp = (g, k) => !!(specs[g] && specs[g][k]);
+            const qualityText = String(order.quality || '');
+            const surfaceText = String(order.surface || '');
+            // Pile texture: ใช้ที่ติ๊กไว้ใน SPECIFICATIONS ก่อน ถ้ายังไม่มีที่ติ๊กเลย เดาจากชื่อคุณภาพ (…CUT / …LOOP) เพื่อไม่ให้ว่างทั้งที่ระบุไว้ชัด
+            const anyPile = sp('pileType', 'cut') || sp('pileType', 'loop') || sp('pileType', 'cutLoop');
+            const hasCutWord = /\bCUT\b/i.test(qualityText), hasLoopWord = /\bLOOP\b/i.test(qualityText);
+            const pileCut = anyPile ? sp('pileType', 'cut') : (hasCutWord && !hasLoopWord);
+            const pileLoop = anyPile ? sp('pileType', 'loop') : (hasLoopWord && !hasCutWord);
+            const pileCutLoop = anyPile ? sp('pileType', 'cutLoop') : (hasCutWord && hasLoopWord);
+            const anyCarve = ['hairline', 'carving', 'carvingBeveling', 'embossing', 'embossingBeveling', 'combination'].some(k => sp('carveStyle', k));
+            const carved = anyCarve || /แกะลาย|carv/i.test(surfaceText) || /แกะลาย|carv/i.test(qualityText);
+            const uncarved = /เรียบ|uncarv/i.test(surfaceText);
+            const isExport = order.market === 'export', isDomestic = order.market === 'domestic';
 
             const totalSqmText = kgText(order.totalSqm);
+            const sizeLines = String(order.carpetSizeNote || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+            const sizeShort = sizeLines.length ? sizeLines[0].replace(/^\d+\)\s*/, '').split(/\s+[-–·]\s+/)[0] : '';
+
+            // ----- ตารางสีของหน้า 1 และ 2: แผนสั่งย้อมของ M/O (colorOrders) + บันทึกย้อมจริง (dyeOrderLog) รวมตามรหัสสี -----
+            const dye = order.dyeing || {};
+            const colorMap = new Map();
+            const colorKey = (c) => String(c || '').trim().toUpperCase().replace(/\s+/g, ' ');
+            const getColor = (code) => {
+                const k = colorKey(code);
+                if (!colorMap.has(k)) colorMap.set(k, { code: String(code || '').trim(), planKg: 0, surplusKg: 0, dyedKg: 0, extraKg: 0, intoLoomKg: 0 });
+                return colorMap.get(k);
+            };
+            (Array.isArray(dye.colorOrders) ? dye.colorOrders : []).forEach(r => {
+                if (!r.colorCode && !(Number(r.kg) > 0)) return;
+                const c = getColor(r.colorCode);
+                c.planKg += Number(r.kg) || 0;
+                if (r.useSurplus) c.surplusKg += Number(r.surplusKg) || 0;
+            });
+            (Array.isArray(dye.dyeOrderLog) ? dye.dyeOrderLog : []).forEach(e => {
+                const c = getColor(e.colorCode);
+                if (e.isExtra) c.extraKg += Number(e.orderKg) || 0;
+                else { c.dyedKg += Number(e.orderKg) || 0; c.intoLoomKg += Number(e.actualTransferKg) || 0; }
+            });
+            const colors = Array.from(colorMap.values());
+
+            // =============================== หน้า 1 ===============================
+            const dyeHeaderRows = `
+                <tr style="height:5.8mm;">
+                    <th colspan="2">สี/Colors</th><th colspan="3">Light Source</th><th rowspan="2">เทียบสี<br>Matching</th>
+                    <th colspan="4">การย้อม/Dyeing</th><th colspan="2">กรอ Winding/ตีเกลียว Twisting</th>
+                </tr>
+                <tr style="height:5.8mm;">
+                    <th>No.</th><th>ก.ก./Kgs.</th><th>DL</th><th>F</th><th>I</th>
+                    <th>ย้อม</th><th>จ้าง</th><th>วันที่เสร็จ</th><th>Q.A.</th><th>รายละเอียด/Details</th><th>Q.A.</th>
+                </tr>`;
+            const DYE_ROWS = 18;
+            let dyeBody = '';
+            for (let i = 0; i < DYE_ROWS; i++) {
+                const c = colors[i];
+                dyeBody += `<tr style="height:8.65mm;"><td class="mo-left">${c ? `<span class="mo-fill">${i + 1}&nbsp;${v(c.code)}</span>` : ''}</td><td>${c ? `<span class="mo-fill">${kgText(c.planKg)}</span>` : ''}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+            }
+            const dyeCols = [80, 40, 22, 20, 19, 46, 22, 20, 42, 26, 66, 35];
+            const dyeColsTotal = dyeCols.reduce((a, b) => a + b, 0);
+            const colgroup = (arr, total) => `<colgroup>${arr.map(w => `<col style="width:${(w / total * 100).toFixed(3)}%">`).join('')}</colgroup>`;
+
+            const startFinishHead = `<th>เริ่ม</th><th>เสร็จ</th><th>ลายเซ็นต์</th>`;
+            const blankRows = (n, cols, h) => Array.from({ length: n }).map(() => `<tr style="height:${h}mm;">${'<td></td>'.repeat(cols)}</tr>`).join('');
+
+            const remarkText = String(order.orderRemark || '');
+            const REMARK_LINES = 6;
 
             const page1 = `
                 <div class="mo-page">
-                    <div class="mo-page-number">หน้าที่ 1/2</div>
+                    <div class="mo-pageno">หน้าที่ 1/2</div>
                     <div class="mo-header-row">
                         <img src="data:image/jpeg;base64,${SIAM_LOGO_JPEG_B64}" alt="Siam Carpets">
                         <h1>MANUFACTURING ORDER</h1>
                     </div>
-                    <div class="mo-company-name">SIAM CARPETS MANUFACTURING CO., LTD./บริษัท อุตสาหกรรมพรมสยาม จำกัด — WORK SHEET/บันทึกการปฏิบัติงาน</div>
-                    <table class="mo-grid">
-                        <tr>
-                            <td style="width:65%;">M/O: <span class="mo-fill">${v(order.moSo)}</span></td>
-                            <td>อ้างถึง/Ref.S/O: <span class="mo-fill"></span></td>
-                        </tr>
-                        <tr>
-                            <td>ลูกค้า/Customer: <span class="mo-fill">${v(order.customerName)}</span></td>
-                            <td rowspan="6" style="vertical-align:top;">
-                                <b>SPECIFICATIONS:</b><br>
-                                TYPE: ${cb(false)}ทอมือ Handtufted &nbsp;&nbsp; ${cb(false)}ทอจักร Passtufted<br>
-                                Yarn Spec: ${cb(false)}WO &nbsp; ${cb(false)}WN &nbsp; ${cb(false)}AB &nbsp; ${cb(false)}NYLON &nbsp; ${cb(false)}อื่นๆ/Other...${order.yarnType ? ` <span class="mo-fill">(${v(order.yarnType)})</span>` : ''}<br>
-                                Pile Texture: ${cb(false)}ขนตัด/CUT &nbsp; ${cb(false)}ขนห่วง/LOOP &nbsp; ${cb(false)}ขนตัด&amp;ขนห่วง/CUT&amp;LOOP<br>
-                                Surface: ${cb(false)}แกะลาย/Carved &nbsp; A)${cb(false)}Hairline &nbsp; B)${cb(false)}Carving &nbsp; C)${cb(false)}Carving&amp;Beveling<br>
-                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${cb(false)}เต่งเรียบ/Uncarved &nbsp; D)${cb(false)}Embossing &nbsp; E)${cb(false)}Embossing&amp;Beveling &nbsp; F)${cb(false)}Combination${order.surface ? ` <span class="mo-fill">(${v(order.surface)})</span>` : ''}<br>
-                                Backing: ${cb(false)}ปะตาข่าย/Scrim &nbsp; ${cb(false)}ปะกระสอบ/Hessien &nbsp; ${cb(false)}ปะผ้าใบ/Canvas<br>
-                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${cb(false)}ปล่อยขอบ/Wall to Wall &nbsp; ${cb(false)}พับขอบ/Binding &nbsp; ${cb(false)}เย็บขอบ/Whipping &nbsp; ${cb(false)}ชายครุย/Fringe<br>
-                                Lagel: ${cb(false)}ของบริษัท (Siam Carpets) &nbsp; ${cb(false)}ของลูกค้า(Customer's) &nbsp; ${cb(false)}พ่น (Stencil)<br>
-                                Latex: ${cb(glueUsed('EUR178'))}EUR178 &nbsp; ${cb(glueUsed('66012'))}EUR66012R &nbsp; ${cb(glueUsed('TH31'))}TF31
-                            </td>
-                        </tr>
-                        <tr><td>Product Code: <span class="mo-fill"></span></td></tr>
-                        <tr><td>Project: <span class="mo-fill">${v(order.customerPO)}</span></td></tr>
-                        <tr><td>พื้นที่รวม/Quantity: <span class="mo-fill">${totalSqmText}</span>${totalSqmText ? ' ตร.ม.' : ''} &nbsp;&nbsp; จำนวนชิ้น/No.of Pcs.: <span class="mo-fill">${v(order.totalPieces ? String(order.totalPieces) : '')}</span><br>รายละเอียด/Details: <span class="mo-fill">${v(order.carpetSizeNote)}</span></td></tr>
-                        <tr><td>คุณภาพ/Quality: <span class="mo-fill">${v(order.quality)}</span> &nbsp;&nbsp; Design/PAT.: <span class="mo-fill">${v(order.designRef)}</span></td></tr>
-                        <tr><td>กำหนดส่งของ/Delivery: <span class="mo-fill">${v(order.dueDate)}</span> &nbsp;&nbsp; จำนวนสี/No.of Colors: <span class="mo-fill">${v(order.colorsCount ? String(order.colorsCount) : '')}</span></td></tr>
-                    </table>
-                    <p style="font-weight:700; font-size:12px; margin:6px 0 2px;">Remark/Special Instructions (หมายเหตุ/คำสั่งพิเศษ)</p>
-                    <div class="mo-remark-box">${v(order.orderRemark)}</div>
-                    <div class="mo-signature-row">
-                        <div>จัดทำโดย……………………………………<br>วันที่............./…...…./……….</div>
-                        <div>อนุมัติโดย (Plainning Manager)……………………<br>วันที่............./…...…./……….</div>
-                        <div>Completed by (Manufactufring Manager)……………………<br>วันที่............./…...…./……….</div>
+                    <div class="mo-company-name">SIAM CARPETS MANUFACTURING CO., LTD./บริษัท อุตสาหกรรมพรมสยาม จำกัด</div>
+                    <div class="mo-box" style="height:228mm;">
+                        <!-- ===== ซ้าย: หัวใบสั่ง + ตารางย้อม/กรอ ===== -->
+                        <div style="width:44.2%; border-right:1px solid #000; display:flex; flex-direction:column; box-sizing:border-box;">
+                            <div class="mo-r" style="height:6.5mm;">
+                                <div class="mo-c" style="width:39%;">M/O&nbsp;&nbsp;<span class="mo-fill" style="font-size:14px;">${v(order.moSo)}</span></div>
+                                <div class="mo-c" style="flex:1;">อ้างถึง/Ref.S/O:&nbsp;<span class="mo-fill">${v(order.refNote)}</span></div>
+                            </div>
+                            <div class="mo-r" style="height:15.5mm;">
+                                <div style="flex:1; display:flex; flex-direction:column; border-right:1px solid #000;">
+                                    <div class="mo-r" style="height:8mm;"><div class="mo-c" style="flex:1;">ลูกค้า/Customer:&nbsp;<span class="mo-fill" style="font-size:13px;">${v(order.customerName)}</span></div></div>
+                                    <div class="mo-r" style="height:7.5mm;"><div class="mo-c" style="flex:1;">Project&nbsp;&nbsp;<span class="mo-fill">${v(order.customerPO)}</span></div></div>
+                                </div>
+                                <div class="mo-c mo-top" style="width:33%;">Product Code:</div>
+                            </div>
+                            <div class="mo-r" style="height:38mm; border-bottom:1px solid #000;">
+                                <div style="width:46%; display:flex; flex-direction:column; border-right:1px solid #000;">
+                                    <div class="mo-r" style="height:8.5mm;"><div class="mo-c" style="flex:1;">พื้นที่รวม/Quantity:&nbsp;<span class="mo-fill" style="font-size:13px;">${totalSqmText}${totalSqmText ? '&nbsp;ตร.ม. (sq.m.)' : ''}</span></div></div>
+                                    <div class="mo-r" style="height:8.5mm;"><div class="mo-c" style="flex:1;">คุณภาพ/Quality:&nbsp;<span class="mo-fill" style="font-size:11px;">${v(order.quality)}</span></div></div>
+                                    <div class="mo-r" style="height:7mm;"><div class="mo-c" style="flex:1;">Design/PAT.:&nbsp;<span class="mo-fill">${v(order.designRef)}</span></div></div>
+                                    <div class="mo-r" style="height:8mm;"><div class="mo-c" style="flex:1;">กำหนดส่งของ/Delivery:&nbsp;<span class="mo-fill" style="font-size:13px;">${v(fmtDMY(order.dueDate))}</span></div></div>
+                                    <div class="mo-r" style="height:6mm;"><div class="mo-c" style="flex:1;">จำนวนสี/No.of Colors:&nbsp;<span class="mo-fill">${v(order.colorsCount ? String(order.colorsCount) : '')}</span></div></div>
+                                </div>
+                                <div style="flex:1; padding:1mm 1.6mm;">
+                                    <div>จำนวนชิ้น/No.of Pcs.&nbsp;<span class="mo-fill" style="font-size:14px;">${v(order.totalPieces ? order.totalPieces + ' ชิ้น' : '')}</span>&nbsp;&nbsp;&nbsp;&nbsp;รายละเอียด/Details:</div>
+                                    <div class="mo-fill" style="margin-top:1mm; white-space:pre-wrap; font-size:11px;">${v(order.carpetSizeNote)}</div>
+                                </div>
+                            </div>
+                            <table class="mo-t" style="width:100%; flex:none;">
+                                ${colgroup(dyeCols, dyeColsTotal)}
+                                ${dyeHeaderRows}
+                                ${dyeBody}
+                            </table>
+                        </div>
+                        <!-- ===== ขวา: SPECIFICATIONS + ตารางเริ่ม/เสร็จ/ลายเซ็นต์ + Remark ===== -->
+                        <div style="width:55.8%; display:flex; flex-direction:column; box-sizing:border-box;">
+                            <div class="mo-r mo-center" style="height:6.5mm; align-items:center; font-weight:700; justify-content:center;">SPECIFICATIONS:</div>
+                            <div class="mo-r" style="height:9mm;"><div class="mo-c" style="width:12mm;">TYPE:</div><div class="mo-c mo-opts" style="flex:1;">${opt(sp('tuftMethod', 'handtufted'), 'ทอมือ Handtufted')}${opt(sp('tuftMethod', 'passtufted'), 'ทอจักร Passtufted')}</div></div>
+                            <div class="mo-r" style="height:8mm;"><div class="mo-c" style="width:23mm; white-space:nowrap;">Yarn Spec :</div><div class="mo-c mo-opts" style="flex:1; column-gap:6mm;">${opt(sp('material', 'wo'), 'WO')}${opt(sp('material', 'wn'), 'WN')}${opt(sp('material', 'ab'), 'AB')}${opt(sp('material', 'nylon'), 'NYLON')}${opt(sp('material', 'other'), 'อื่นๆ /Other...' + (specs.material && specs.material.otherText ? ` <span class="mo-fill">${v(specs.material.otherText)}</span>` : ''))}</div></div>
+                            <div class="mo-r" style="height:9.3mm;"><div class="mo-c" style="width:23mm; white-space:nowrap;">Pile Texture:</div><div class="mo-c mo-opts" style="flex:1;">${opt(pileCut, 'ขนตัด/CUT')}${opt(pileLoop, 'ขนห่วง/LOOP')}${opt(pileCutLoop, 'ขนตัด&amp;ขนห่วง/CUT&amp;LOOP')}</div></div>
+                            <div class="mo-r" style="height:12mm;"><div class="mo-c" style="width:16mm;">Surface:</div><div class="mo-c" style="flex:1; flex-direction:column; align-items:flex-start; justify-content:center; gap:0.8mm;">
+                                <div class="mo-opts">${opt(carved, 'แกะลาย/Carved')}${opt(sp('carveStyle', 'hairline'), 'A)Hairline')}${opt(sp('carveStyle', 'carving'), 'B)Carving')}${opt(sp('carveStyle', 'carvingBeveling'), 'C)Carving&amp;Beveling')}</div>
+                                <div class="mo-opts">${opt(uncarved, 'เต่งเรียบ/Uncarved')}${opt(sp('carveStyle', 'embossing'), 'D)Embossing')}${opt(sp('carveStyle', 'embossingBeveling'), 'E) Embossing&amp;Beveling')}${opt(sp('carveStyle', 'combination'), 'F)Combination')}</div>
+                            </div></div>
+                            <div class="mo-r" style="height:14mm;"><div class="mo-c" style="width:16mm;">Backing:</div><div class="mo-c" style="flex:1; flex-direction:column; align-items:flex-start; justify-content:center; gap:1.2mm;">
+                                <div class="mo-opts">${opt(sp('backing', 'scrim'), 'ปะตาข่าย/Scrim')}${opt(sp('backing', 'hessian'), 'ปะกระสอบ/Hessien')}${opt(sp('backing', 'canvas'), 'ปะผ้าใบ/Canvas')}</div>
+                                <div class="mo-opts">${opt(sp('edge', 'wallToWall'), 'ปล่อยขอบ/Wall to Wall')}${opt(sp('edge', 'binding'), 'พับขอบ/Binding')}${opt(sp('edge', 'whipping'), 'เย็บขอบ/Whipping')}${opt(sp('edge', 'fringe'), 'ชายครุย/Fringe')}</div>
+                            </div></div>
+                            <div class="mo-r" style="height:9.3mm;"><div class="mo-c" style="width:16mm;">Label:</div><div class="mo-c mo-opts" style="flex:1;">${opt(sp('ownership', 'siamCarpets'), 'ของบริษัท(Siam Carpets)')}${opt(sp('ownership', 'customer'), "ของลูกค้า(Customer's)")}${opt(false, 'พ่น (Stencil)')}</div></div>
+                            <div class="mo-r" style="height:9mm;"><div class="mo-c" style="width:20mm; white-space:nowrap;">Packing :</div><div class="mo-c mo-opts" style="flex:1; column-gap:8mm;">${opt(isExport, 'ส่งต่างประเทศ/Export')}${opt(isDomestic, 'ส่งในประเทศ/Domestic')}</div></div>
+
+                            <!-- ตารางเริ่ม/เสร็จ/ลายเซ็นต์ของแผนก -->
+                            <table class="mo-t" style="width:100%; flex:none; border-top:0;">
+                                ${colgroup([79, 75, 75, 125, 65, 133], 552)}
+                                <tr style="height:6.5mm;"><th colspan="3">ทอ/Tufting/ซ่อม macing</th><th colspan="2">ทากาว Latexing / ตกแต่ง Finishing</th><th>คลังสินค้า/Warehouse</th></tr>
+                                <tr style="height:7mm;">${startFinishHead}<th>รายละเอียด/Details</th><th>Q.A.</th><th>รายละเอียด/Details</th></tr>
+                                ${blankRows(4, 6, 8)}
+                            </table>
+                            <div style="display:flex; flex:none; height:51mm;">
+                                <div style="width:41.4%; box-sizing:border-box;">
+                                    <table class="mo-t" style="width:100%;">
+                                        ${colgroup([79, 75, 75], 229)}
+                                        <tr style="height:14mm;"><th colspan="3" style="border-top:0;">Design</th></tr>
+                                        <tr style="height:6mm;"><th colspan="3">ขยายแบบ&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;วาดจอ</th></tr>
+                                    </table>
+                                    <table class="mo-t" style="width:100%;">
+                                        <colgroup>${[1, 1, 1, 1, 1, 1].map(() => '<col style="width:16.6667%">').join('')}</colgroup>
+                                        <tr style="height:6mm;">${'<th>เริ่ม</th><th>เสร็จ</th><th>ลายเซ็นต์</th>'.repeat(2)}</tr>
+                                        ${blankRows(3, 6, 8.3)}
+                                    </table>
+                                </div>
+                                <div style="flex:1; border-left:1px solid #000; box-sizing:border-box; display:flex; flex-direction:column;">
+                                    <div class="mo-r mo-center" style="height:6.5mm; align-items:center;">จำนวนพื้นที่</div>
+                                    <div class="mo-r" style="height:8mm;"><div class="mo-c" style="flex:1; color:#1e3a8a; font-weight:700; font-size:11px; white-space:nowrap;">${sizeShort ? v(sizeShort) + (totalSqmText && sizeLines.length <= 1 ? ' = ' + totalSqmText + ' m²' : '') : ''}</div></div>
+                                    <div class="mo-r" style="height:6mm;"><div class="mo-c" style="flex:1; font-weight:700;">${totalSqmText ? 'รวม&nbsp;<span class="mo-fill">' + totalSqmText + '&nbsp;ตร.ม.</span>' : 'รวม'}</div></div>
+                                    <div class="mo-r" style="flex:1;"></div>
+                                    <div class="mo-r" style="flex:1;"></div>
+                                    <div class="mo-r" style="flex:1; border-bottom:0;"></div>
+                                </div>
+                            </div>
+                            <div class="mo-r mo-center" style="height:8mm; align-items:center; font-size:11.5px; border-top:1px solid #000;">Remark/Special Instructions (หมายเหตุ/คำสั่งพิเศษ)</div>
+                            <div style="flex:1; position:relative; border-top:1px solid #000;">
+                                ${Array.from({ length: REMARK_LINES }).map((_, i) => `<div class="mo-remark-line" style="height:${(100 / REMARK_LINES).toFixed(3)}%;"></div>`).join('')}
+                                <div class="mo-fill" style="position:absolute; left:1.6mm; right:1.6mm; top:0.6mm; font-size:12px; line-height:7.6mm; white-space:pre-wrap; overflow:hidden; max-height:100%;">${v(remarkText)}</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mo-footer-code">FM-QP-SL-001/05_Rev.00</div>
+                    <div class="mo-sig-row">
+                        <div>จัดทำโดย<span class="mo-blank" style="min-width:42mm;"></span>&nbsp;วันที่&nbsp;<span class="mo-fill">${v(fmtDMY(order.openDate))}</span>&nbsp;&nbsp;&nbsp;อนุมัติโดย<span class="mo-blank" style="min-width:55mm;"></span>(Sale Manager)</div>
+                        <div>Completed by <span class="mo-blank" style="min-width:55mm;"></span>&nbsp;(Manufacturing Manager) วันที่ <span class="mo-blank" style="min-width:40mm;"></span></div>
+                    </div>
                 </div>
             `;
 
-            // Page 2's left-hand color/dye table pulls from Dyeing's own dyeOrderLog: regular entries
-            // give ย้อม(ก.ก.) (orderKg) and ไหมเข้าจอ(ก.ก.) (actualTransferKg — the kg actually transferred
-            // to the loom, the clearest unambiguous match for "เข้าจอ"); any 'extra' log entries (see
-            // setDyeingKpiTab('extra')/addDyeOrderLogFromSelect()) for the SAME colorCode fold into
-            // ยอมเพิ่ม. Surplus/กก.(ใช้จริง)/คงเหลือ have no unambiguous matching field, so — per "ถ้าไม่มี
-            // ให้ข้อมูลว่างไว้" — they stay blank rather than guess a formula on a real factory-floor
-            // document. Same "don't pad with empty ruled rows" convention as buildSampleOrderPrintHTML()'s
-            // color table: only actual log entries render, nothing more.
-            const dyeLog = ((order.dyeing || {}).dyeOrderLog || []);
-            const regularDyeEntries = dyeLog.filter(e => !e.isExtra);
-            const extraKgByColor = {};
-            dyeLog.filter(e => e.isExtra).forEach(e => {
-                const key = e.colorCode || '';
-                extraKgByColor[key] = (extraKgByColor[key] || 0) + (Number(e.orderKg) || 0);
-            });
-            const dyeRowsHtml = regularDyeEntries.map((e, idx) => `
-                <tr>
-                    <td>${idx + 1}</td>
-                    <td>${v(e.colorCode)}</td>
-                    <td>${kgText(e.orderKg)}</td>
-                    <td></td>
-                    <td>${kgText(extraKgByColor[e.colorCode || ''])}</td>
-                    <td>${kgText(e.actualTransferKg)}</td>
-                    <td></td>
-                    <td></td>
-                </tr>
-            `).join('');
+            // =============================== หน้า 2 ===============================
+            const RH = 7.7;           // ความสูงแถวของตาราง 1-26 (mm) — ตารางซ้ายกับแผง QUALITY CONTROL ขวาใช้ค่าเดียวกันเพื่อให้เส้นตรงกัน
+            const BODY_ROWS = 26;
+            const L2 = [32, 70, 90, 68, 67, 63, 57, 55, 48, 82, 55, 47, 51];     // px ในภาพต้นแบบ (รวม 785)
+            const DEPT_ROWS = { 1: 'วางแผน/Planning', 2: 'ย้อม/Dyeing', 3: 'กรอ/Winding', 4: 'ตีเกลียว/Twisting', 5: 'ทอ/Tufting', 6: 'ซ่อม/Mending', 7: 'ทากาว/Latexing', 8: 'ตกแต่ง/Finishing', 9: 'ดีไซน์/Design', 10: 'สโตร์/Warehouse', 11: 'รวม/Total', 13: 'อื่นๆ/other' };
+            let body2 = '';
+            for (let i = 1; i <= BODY_ROWS; i++) {
+                const c = colors[i - 1];
+                body2 += `<tr style="height:${RH}mm;">
+                    <td>${c ? `<span class="mo-fill">${i}</span>` : i}</td>
+                    <td class="mo-left">${c ? `<span class="mo-fill">${v(c.code)}</span>` : ''}</td>
+                    <td>${c ? `<span class="mo-fill">${kgText(c.planKg)}</span>` : ''}</td>
+                    <td>${c ? `<span class="mo-fill">${kgText(c.dyedKg)}</span>` : ''}</td>
+                    <td>${c ? `<span class="mo-fill">${kgText(c.surplusKg)}</span>` : ''}</td>
+                    <td>${c ? `<span class="mo-fill">${kgText(c.extraKg)}</span>` : ''}</td>
+                    <td>${c ? `<span class="mo-fill">${kgText(c.intoLoomKg)}</span>` : ''}</td>
+                    <td></td><td></td>
+                    <td class="mo-left">${DEPT_ROWS[i] || ''}</td><td></td><td></td><td></td>
+                </tr>`;
+            }
+            const totalPlan = colors.reduce((s, c) => s + c.planKg, 0);
+            const totalDyed = colors.reduce((s, c) => s + c.dyedKg, 0);
+            const totalSurplus = colors.reduce((s, c) => s + c.surplusKg, 0);
+            const totalExtra = colors.reduce((s, c) => s + c.extraKg, 0);
+            const totalLoom = colors.reduce((s, c) => s + c.intoLoomKg, 0);
+            const hasColors = colors.length > 0;
+            const tot = (n) => hasColors && n > 0 ? `<span class="mo-fill">${kgText(n)}</span>` : '';
 
-            const DEPARTMENT_ROW_LABELS = ['วางแผน/Planning', 'ย้อม/Dyeing', 'กรอ/Winding', 'ตีเกลียว/Twisting', 'ทอ/Tufting', 'ซ่อม/Mending', 'ทากาว/Latexing', 'ตกแต่ง/Finishing', 'ดีไซน์/Design', 'สโตร์/Warehouse', 'รวม/Total', 'อื่นๆ/other'];
+            const refSize = sizeShort;
+            const qcLine = (row, html) => `<div class="mo-qc-line" style="--row:${row};">${html}</div>`;
+            const approveBlock = (fromRow, toRow) => `<div style="position:absolute; left:0; right:0; top:${((fromRow - 1) * RH).toFixed(2)}mm; height:${((toRow - fromRow + 1) * RH).toFixed(2)}mm; border-bottom:1px solid #000; box-sizing:border-box;"></div>`;
+            const surfaceQc = surfaceText || (carved ? 'แกะลาย / Carved' : (uncarved ? 'แต่งเรียบ / Uncarved' : ''));
+            const textureQc = order.texture || (pileCutLoop ? 'ขนตัด&ขนห่วง / CUT&LOOP' : (pileCut ? 'ขนตัด / CUT' : (pileLoop ? 'ขนห่วง / LOOP' : '')));
 
             const page2 = `
                 <div class="mo-page">
-                    <div class="mo-page-number">หน้าที่ 2/2</div>
-                    <table class="mo-grid">
-                        <tr>
-                            <td style="width:34%;">PO#: <span class="mo-fill">${v(order.customerPO)}</span></td>
-                            <td style="width:33%;">CUSTOMER: <span class="mo-fill">${v(order.customerName)}</span></td>
-                            <td>M/O#: <span class="mo-fill">${v(order.moSo)}</span></td>
-                        </tr>
-                    </table>
-                    <table class="mo-grid">
-                        <tr><td colspan="8" class="mo-section-header">วางแผน/Planning — ย้อม (ก.ก.) Surplus</td></tr>
-                        <tr>
-                            <th rowspan="2" style="width:5%;">No.</th>
-                            <th rowspan="2" style="width:14%;">สี/Colour</th>
-                            <th colspan="2">จ้างย้อม(ก.ก.)</th>
-                            <th rowspan="2" style="width:11%;">ยอมเพิ่ม</th>
-                            <th rowspan="2" style="width:14%;">ไหมเข้าจอ(ก.ก.)</th>
-                            <th rowspan="2" style="width:11%;">ก.ก./kgs.</th>
-                            <th rowspan="2" style="width:12%;">คงเหลือ/Bal.</th>
-                        </tr>
-                        <tr><th>ย้อม (ก.ก.)</th><th>Surplus</th></tr>
-                        ${dyeRowsHtml || '<tr><td colspan="8">&nbsp;</td></tr>'}
-                    </table>
-                    <table class="mo-grid">
-                        <tr><td colspan="4" class="mo-section-header">ใช้จริง/Actual Used &amp; เวลาที่ใช้ในการผลิตจริง/Actual Time Consumption</td></tr>
-                        <tr><th style="width:34%;">แผนก/Department</th><th>คน/Man</th><th>ชม./Hour</th><th>Man Hour</th></tr>
-                        ${DEPARTMENT_ROW_LABELS.map(dept => `<tr><td>${dept}</td><td></td><td></td><td></td></tr>`).join('')}
-                    </table>
-                    <table class="mo-grid">
-                        <tr><td colspan="3" class="mo-section-header">QUALITY CONTROL</td></tr>
-                        <tr>
-                            <td style="width:38%;">1.วัตถุดิบ/Raw Material<br>&nbsp;&nbsp;Yarn Type: <span class="mo-fill">${v(order.yarnType)}</span></td>
-                            <td rowspan="2" style="width:24%;">APPROVED BY</td>
-                            <td style="width:38%;">3. Latexing: <span class="mo-fill">${v(order.latexing)}</span></td>
-                        </tr>
-                        <tr>
-                            <td>2.ทอ/Tufting<br>&nbsp;&nbsp;Design: <span class="mo-fill">${v(order.designRef)}</span><br>&nbsp;&nbsp;Tufting Spec: <span class="mo-fill">${v(order.tuftingSpec)}</span><br>&nbsp;&nbsp;Surface: <span class="mo-fill">${v(order.surface)}</span><br>&nbsp;&nbsp;Texture: <span class="mo-fill">${v(order.texture)}</span><br>&nbsp;&nbsp;Color&amp; Color Placement: <span class="mo-fill">${v(order.colorPlacement)}</span></td>
-                            <td>4. ตกแต่ง/Finishing<br>&nbsp;&nbsp;Size<br>&nbsp;&nbsp;Tuft Bind: <span class="mo-fill">${v(order.tuftBind)}</span><br>&nbsp;&nbsp;Sprouting:<br>&nbsp;&nbsp;Label: <span class="mo-fill">${v(order.sproutingLabel)}</span></td>
-                        </tr>
-                    </table>
-                    <table class="mo-grid">
-                        <tr><td style="width:34%;">TOTAL</td><td></td></tr>
-                        <tr><td>นน./ตร.ม.(Weight/Sq.m.)</td><td></td></tr>
-                        <tr><td>Spec./ตร.ม.(Spec./Sq.m.)</td><td>Label: <span class="mo-fill"></span></td></tr>
-                    </table>
-                    <div class="mo-signature-row">
-                        <div>Completed by …………………………… Planning Mgr. วันที่............./…...…./……….</div>
-                        <div>Completed by …………………………… Q.A. Sup. วันที่............./…...…./……….</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; height:7mm; font-family:'Times New Roman','Prompt',serif; font-size:13px; font-weight:600;">
+                        <div>SIAM CARPETS MANUFACTURING CO., LTD./บริษัท อุตสาหกรรมพรมสยาม จำกัด</div><div style="font-size:11px; font-weight:400;">หน้าที่ 2/2</div>
+                    </div>
+                    <div style="display:flex; border:1.4px solid #000; box-sizing:border-box; width:100%; height:264.2mm; --rh:${RH}mm;">
+                        <div style="width:78%; box-sizing:border-box; border-right:1px solid #000;">
+                            <table class="mo-t" style="width:100%;">
+                                ${colgroup(L2, 785)}
+                                <tr style="height:12.5mm;"><th colspan="7" style="border-top:0;">วางแผน/Planning</th><th colspan="2" style="border-top:0;">ใช้จริง/Actual Used</th><th colspan="4" style="border-top:0;">เวลาที่ใช้ในการผลิตจริง/Actual Time Consumption</th></tr>
+                                <tr style="height:5mm;"><th rowspan="2">No.</th><th rowspan="2">สี/Colour</th><th rowspan="2">จ้างย้อม(ก.ก.)</th><th colspan="2">SIAM CARPETS</th><th rowspan="2">ย้อมเพิ่ม</th><th rowspan="2">ไหมเข้าจอ(ก.ก.)</th><th rowspan="2">ก.ก./Kgs.</th><th rowspan="2">คงเหลือ/Bal.</th><th rowspan="2"></th><th rowspan="2">คน/Man</th><th rowspan="2">ชม./Hour</th><th rowspan="2">Man Hour</th></tr>
+                                <tr style="height:5.5mm;"><th>ย้อม (ก.ก.)</th><th>Surplus</th></tr>
+                                ${body2}
+                                <tr style="height:8mm;"><td colspan="2" class="mo-left">TOTAL</td><td>${tot(totalPlan)}</td><td>${tot(totalDyed)}</td><td>${tot(totalSurplus)}</td><td>${tot(totalExtra)}</td><td>${tot(totalLoom)}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                                <tr style="height:8mm;"><td colspan="2" class="mo-left">นน./ตร.ม.(Weight/Sq.m.)</td>${'<td></td>'.repeat(11)}</tr>
+                                <tr style="height:8mm;"><td colspan="2" class="mo-left">Spec./ตร.ม.(Spec./Sq.m.)</td>${'<td></td>'.repeat(11)}</tr>
+                                <tr style="height:17mm;"><td colspan="13" style="text-align:right; border-bottom:0; vertical-align:bottom; padding-bottom:2.5mm; font-size:11.5px;">Completed by <span class="mo-blank" style="min-width:48mm;"></span>&nbsp;&nbsp;&nbsp;Planning Mgr. วันที่ <span class="mo-blank" style="min-width:38mm;"></span></td></tr>
+                            </table>
+                        </div>
+                        <div style="flex:1; display:flex; flex-direction:column; box-sizing:border-box;">
+                            <div style="display:flex; height:12.5mm; border-bottom:1px solid #000;">
+                                <div class="mo-c" style="width:69.4%; font-size:11.5px; align-items:center;">CUSTOMER:&nbsp;<span class="mo-fill" style="font-size:12px;">${v(order.customerName)}</span></div>
+                                <div style="flex:1; display:flex; flex-direction:column;">
+                                    <div class="mo-r" style="height:50%;"><div class="mo-c" style="flex:1; font-size:10.5px;">PO#&nbsp;<span class="mo-fill" style="font-size:10.5px;">${v(order.customerPO)}</span></div></div>
+                                    <div class="mo-r" style="height:50%; border-bottom:0;"><div class="mo-c" style="flex:1; font-size:10.5px;">M/O#&nbsp;<span class="mo-fill" style="font-size:12px;">${v(order.moSo)}</span></div></div>
+                                </div>
+                            </div>
+                            <div style="display:flex; height:10.5mm; border-bottom:1px solid #000;">
+                                <div class="mo-c mo-center" style="width:69.4%; font-weight:600; justify-content:center;">QUALITY CONTROL</div>
+                                <div class="mo-c mo-center" style="flex:1; font-size:10px; justify-content:center;">APPROVED BY</div>
+                            </div>
+                            <div style="display:flex; height:${(RH * BODY_ROWS).toFixed(1)}mm;">
+                                <div style="width:69.4%; position:relative; border-right:1px solid #000; box-sizing:border-box;">
+                                    ${qcLine(1, '1.วัตถุดิบ/Raw Material')}
+                                    ${qcLine(2, 'Yarn Type: <span class="mo-fill">&nbsp;' + v(order.yarnType) + '</span>')}
+                                    ${qcLine(3, '2.ทอ/Tufting')}
+                                    ${qcLine(4, 'Design: <span class="mo-fill">&nbsp;' + v(order.designRef) + '</span>')}
+                                    ${qcLine(6, 'Tufting Spec: <span class="mo-fill">&nbsp;' + v(order.tuftingSpec) + '</span>')}
+                                    ${qcLine(9, 'Surface: <span class="mo-fill">&nbsp;' + v(surfaceQc) + '</span>')}
+                                    ${qcLine(10, 'Texture: <span class="mo-fill">&nbsp;' + v(textureQc) + '</span>')}
+                                    ${qcLine(13, 'Color &amp; Color Placement: <span class="mo-fill">&nbsp;' + v(order.colorPlacement) + '</span>')}
+                                    ${qcLine(15, '3. Latexing : <span class="mo-fill">&nbsp;' + v(order.latexing) + '</span>')}
+                                    ${qcLine(18, '4. ตกแต่ง /Finishing')}
+                                    ${qcLine(19, 'Size: <span class="mo-fill">&nbsp;' + v(refSize) + '</span>')}
+                                    ${qcLine(21, 'Tuft Bind : <span class="mo-fill">&nbsp;' + v(order.tuftBind) + '</span>')}
+                                    ${qcLine(24, 'Sporating : <span class="mo-fill">&nbsp;' + v(order.sproutingLabel) + '</span>')}
+                                </div>
+                                <div style="flex:1; position:relative;">
+                                    ${approveBlock(1, 2)}${approveBlock(3, 14)}${approveBlock(15, 17)}${approveBlock(18, 26)}
+                                </div>
+                            </div>
+                            <div style="border-top:1px solid #000; height:8mm; display:flex; align-items:center; padding:0 1.4mm; font-size:11.5px;">Label:</div>
+                            <div style="border-top:1px solid #000; height:16mm;"></div>
+                            <div style="border-top:1px solid #000; flex:1; display:flex; align-items:flex-end; justify-content:flex-end; padding:0 1.4mm 2.5mm; font-size:10px; white-space:nowrap;">Completed by <span class="mo-blank" style="min-width:24mm;"></span>&nbsp;Q.A. Sup. วันที่ <span class="mo-blank" style="min-width:20mm;"></span></div>
+                        </div>
                     </div>
                     <div class="mo-footer-code">FM-QP-SL-001/05_Rev.00</div>
                 </div>
@@ -18781,6 +18926,14 @@
         // =====================================================================================
         const PLANNING_IMPORT_GRADE_LETTERS = ['A', 'B', 'C', 'C+', 'D', 'D+', 'E', 'X', 'Z'];
         let planningImportPending = [];
+        // ค่าขั้นต่ำที่ทำให้ computeTuftingGrade() ได้เกรดนั้นพอดี (ใช้เมื่อไฟล์ไม่มี Sheet GRADE เช่นไฟล์ S/O)
+        const PLANNING_IMPORT_FALLBACK_GRADE_INFO = {
+            A: { patternPct: 0, maxColors: 0, stitching: 'N' }, B: { patternPct: 40, maxColors: 0, stitching: 'N' },
+            C: { patternPct: 50, maxColors: 0, stitching: 'N' }, 'C+': { patternPct: 60, maxColors: 0, stitching: 'N' },
+            D: { patternPct: 70, maxColors: 0, stitching: 'N' }, 'D+': { patternPct: 75, maxColors: 0, stitching: 'N' },
+            E: { patternPct: 80, maxColors: 0, stitching: 'N' }, X: { patternPct: 90, maxColors: 0, stitching: 'N' },
+            Z: { patternPct: 100, maxColors: 0, stitching: 'N' }
+        };
 
         // วันที่ในไฟล์เป็นได้ทั้ง Date จริง ("2026-02-11") และข้อความแบบไทย dd/mm/yy ("16/11/26")
         function parsePlanningImportDate(v) {
@@ -18868,20 +19021,36 @@
         // อ่าน 1 workbook -> ผลที่พรีวิวได้ (ไม่แตะข้อมูลจริง). ต้องมี sheet "Dye Order A" ถึงจะนำเข้าได้
         function parsePlanningDyeGradeWorkbook(workbook, fileName) {
             const item = { fileName, ok: false, error: '', warnings: [] };
-            const dyeSheetName = workbook.SheetNames.find(n => /^dye\s*order\s*a$/i.test(String(n).trim()));
-            if (!dyeSheetName) { item.error = 'ไม่พบ Sheet "Dye Order A" ในไฟล์นี้'; return item; }
+            // ไฟล์ M/O: Sheet "Dye Order A"; ไฟล์ S/O: Sheet ใบสั่งย้อมชื่อ "ใบปะหน้า" / "DyeD" (ส่วน "ส่งย้อม" เป็นสำเนาเก่า
+            // ใช้เป็นตัวเลือกสุดท้ายเท่านั้น — ในไฟล์ S/O D 170/26 มีทั้งสองชีตและ "ส่งย้อม" เป็นของรอบก่อน)
+            const sheetOf = re => workbook.SheetNames.find(n => re.test(String(n).trim()));
+            const dyeSheetName = sheetOf(/^dye\s*order\s*a$/i) || sheetOf(/^ใบปะหน้า$/) || sheetOf(/^dyed$/i) || sheetOf(/^ส่งย้อม$/);
+            if (!dyeSheetName) { item.error = 'ไม่พบ Sheet "Dye Order A" (ไฟล์ S/O: "ใบปะหน้า" หรือ "DyeD") ในไฟล์นี้'; return item; }
+            item.dyeSheetName = dyeSheetName;
             const gradeSheetName = workbook.SheetNames.find(n => /^grade/i.test(String(n).trim()));
 
             const aoa = XLSX.utils.sheet_to_json(workbook.Sheets[dyeSheetName], { header: 1, raw: true, defval: null });
-            const moSoRaw = planningImportValueAfterLabel(aoa, /^M\/O\s*:?$/i);
-            if (moSoRaw === null) { item.error = 'ไม่พบเลขที่ M/O ใน Sheet "Dye Order A" (ช่อง "M/O:")'; return item; }
+            let moSoRaw = planningImportValueAfterLabel(aoa, /^M\/O\s*:?$/i);
+            item.orderType = 'MO';
+            if (moSoRaw === null) { moSoRaw = planningImportValueAfterLabel(aoa, /^S\/O\s*:?$/i); item.orderType = 'SO'; }
+            if (moSoRaw === null) { item.error = `ไม่พบเลขที่ M/O หรือ S/O ใน Sheet "${dyeSheetName}" (ช่อง "M/O:" / "S/O:")`; return item; }
             item.moSoSource = String(moSoRaw).trim();
             item.moSo = formatPlanningImportMoSo(item.moSoSource);
-            item.market = /^TH/i.test(item.moSoSource.replace(/\s+/g, '')) ? 'domestic' : 'export';
+            // ตลาด: M/O ขึ้นต้น TH = ในประเทศ; S/O ขึ้นต้น D = ในประเทศ, SC = ต่างประเทศ (ตรงกับ moSoPrefixFor())
+            const compactNo = item.moSoSource.replace(/\s+/g, '');
+            item.market = (item.orderType === 'MO' ? /^TH/i.test(compactNo) : /^D\d/i.test(compactNo)) ? 'domestic' : 'export';
             item.customerName = String(planningImportValueAfterLabel(aoa, /^ลูกค้า/) || '').trim();
             item.quality = String(planningImportValueAfterLabel(aoa, /^คุณภาพ/) || '').trim();
             item.refNote = String(planningImportValueAfterLabel(aoa, /^อ้างถึง/) || '').trim();
-            const areaRaw = Number(planningImportValueAfterLabel(aoa, /^พื้นที่รวม/));
+            // ไฟล์ S/O บางไฟล์ป้าย "พื้นที่รวม/Quantity:" ว่าง (มีแต่ตัวเลขใน C และหน่วย "ม2/m2" ใน E) จึงหาจากหน่วยแทน
+            let areaCell = planningImportValueAfterLabel(aoa, /^พื้นที่รวม/);
+            if (!(Number(areaCell) > 0)) {
+                for (let r = 0; r < Math.min(aoa.length, 16); r++) {
+                    const row = aoa[r] || [];
+                    if (/^ม2\s*\/\s*m2$/i.test(String(row[4] == null ? '' : row[4]).trim()) && Number(row[2]) > 0) { areaCell = row[2]; break; }
+                }
+            }
+            const areaRaw = Number(areaCell);
             item.totalSqm = Number.isFinite(areaRaw) && areaRaw > 0 ? areaRaw : 0;
             item.dueDate = parsePlanningImportDate(planningImportValueAfterLabel(aoa, /^กำหนดส่ง/));
             const colorsRaw = Number(planningImportValueAfterLabel(aoa, /^จำนวนสี/));
@@ -18928,11 +19097,30 @@
                 }
             }
 
+            // ไฟล์ S/O: ป้าย "เกรด:" อยู่เซลล์หนึ่ง ตัวอักษรเกรดอยู่เซลล์ขวามือ (เช่น H12 "เกรด:" / I12 "A") และไม่มีคำว่า "แต่ง"
+            for (let r = 0; r < Math.min(aoa.length, 16) && !item.weavingGrade; r++) {
+                const row = aoa[r] || [];
+                for (let c = 0; c < row.length - 1 && !item.weavingGrade; c++) {
+                    if (typeof row[c] === 'string' && /^เกรด\s*[:：]?\s*$/.test(row[c].trim())) {
+                        const letter = String(row[c + 1] == null ? '' : row[c + 1]).replace(/\s+/g, '').toUpperCase();
+                        if (PLANNING_IMPORT_GRADE_LETTERS.includes(letter)) item.weavingGrade = letter;
+                    }
+                }
+            }
+
             item.gradeInfo = null; item.engineGrade = null; item.productionCalcPreview = null;
             if (!item.weavingGrade) {
                 item.warnings.push('ไม่พบเกรดของ M/O นี้ ("เกรด: ทอ … แต่ง …") ใน Dye Order A — จะไม่ตั้งค่า AI ช่วยคำนวณเวลา');
             } else if (!gradeSheetName) {
-                item.warnings.push('ไม่พบ Sheet GRADE ในไฟล์นี้ — จะไม่ตั้งค่า AI ช่วยคำนวณเวลา');
+                // ไม่มี Sheet GRADE (ไฟล์ S/O) -> ใช้ค่าขั้นต่ำของเกรดนั้นตามสูตรของระบบเอง (TUFTING_GRADE_TABLE) แทน
+                item.gradeInfo = PLANNING_IMPORT_FALLBACK_GRADE_INFO[item.weavingGrade] || null;
+                if (item.gradeInfo) {
+                    const built = buildPlanningImportProductionCalc({}, item.weavingGrade, item.gradeInfo, item.totalSqm);
+                    item.engineGrade = built.engineGrade;
+                    item.stitchingUsed = built.calc.stitchingDensity;
+                    item.warnings.push(`ไฟล์นี้ไม่มี Sheet GRADE — ตั้งค่า "AI ช่วยคำนวณเวลา" เป็นค่าขั้นต่ำของเกรด ${item.weavingGrade} ตามสูตรของระบบ (% ลาย ${item.gradeInfo.patternPct}, สี ${item.gradeInfo.maxColors}) แก้ไขเองได้ภายหลัง`);
+                    if (built.warning) item.warnings.push(built.warning);
+                } else item.warnings.push('ไม่พบ Sheet GRADE ในไฟล์นี้ — จะไม่ตั้งค่า AI ช่วยคำนวณเวลา');
             } else {
                 const table = parsePlanningGradeSheet(workbook.Sheets[gradeSheetName]);
                 item.gradeInfo = table[item.weavingGrade] || null;
@@ -18990,9 +19178,12 @@
             const body = document.getElementById('planningImportBody');
             if (!body) return;
             const fmtKg = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const marketBadge = m => m === 'domestic'
-                ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">ในประเทศ (ขึ้นต้น TH)</span>'
-                : '<span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 text-[10px] font-bold">ต่างประเทศ</span>';
+            const marketBadge = (m, t) => m === 'domestic'
+                ? `<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">ในประเทศ (ขึ้นต้น ${t === 'SO' ? 'D' : 'TH'})</span>`
+                : `<span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 text-[10px] font-bold">ต่างประเทศ${t === 'SO' ? ' (SC)' : ''}</span>`;
+            const typeBadge = t => t === 'SO'
+                ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">S/O</span>'
+                : '<span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold">M/O</span>';
             let validCount = 0;
             const cards = planningImportPending.map(item => {
                 if (!item.ok) {
@@ -19001,8 +19192,8 @@
                 validCount++;
                 const existingIdx = findPlanningImportExistingOrderIndex(item.moSo);
                 const actionBadge = existingIdx === -1
-                    ? '<span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold">เปิด M/O ใหม่</span>'
-                    : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">เติมเข้า M/O เดิม</span>';
+                    ? `<span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold">เปิด ${item.orderType === 'SO' ? 'S/O' : 'M/O'} ใหม่</span>`
+                    : `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">เติมเข้า ${item.orderType === 'SO' ? 'S/O' : 'M/O'} เดิม</span>`;
                 const colorRows = item.colors.length === 0
                     ? '<tr><td colspan="2" class="px-2 py-2 text-center text-slate-400">ไม่มีรายการสี</td></tr>'
                     : item.colors.map(c => `<tr><td class="px-2 py-1 border-t border-slate-100 font-mono">${escapeHtml(c.colorCode || '-')}</td><td class="px-2 py-1 border-t border-slate-100 text-right">${fmtKg(c.kg)}</td></tr>`).join('');
@@ -19016,7 +19207,7 @@
                 return `
                     <div class="border border-slate-200 rounded-xl p-3 space-y-2">
                         <div class="flex flex-wrap items-center gap-2">
-                            <span class="font-mono font-bold text-slate-800">${escapeHtml(item.moSo)}</span>${actionBadge}${marketBadge(item.market)}
+                            <span class="font-mono font-bold text-slate-800">${escapeHtml(item.moSo)}</span>${typeBadge(item.orderType)}${actionBadge}${marketBadge(item.market, item.orderType)}
                             <span class="text-[10px] text-slate-400 truncate">${escapeHtml(item.fileName)}</span>
                         </div>
                         <p class="text-xs text-slate-600">ลูกค้า: <span class="font-medium">${escapeHtml(item.customerName || '-')}</span> • คุณภาพ: ${escapeHtml(item.quality || '-')} • กำหนดส่ง: ${escapeHtml(item.dueDate || '-')} • ${item.colorsCount || item.colors.length} สี</p>
@@ -19027,9 +19218,9 @@
                         ${gradeHtml}${warnHtml}
                     </div>`;
             }).join('');
-            body.innerHTML = cards + `<p class="text-[11px] text-slate-400"><i class="fa-solid fa-circle-info mr-1"></i>อ่านเฉพาะ Sheet "Dye Order A" และ "GRADE" • M/O เดิม: เติมเฉพาะช่องหัวใบสั่งที่ยังว่าง (ลูกค้า/คุณภาพ/กำหนดส่ง/ตร.ม./จำนวนสี/Ref.) และรวมแผนสั่งย้อมตาม Color Code (เขียนทับน้ำหนักของสีที่ซ้ำ) แต่จะเขียนทับค่า "AI ช่วยคำนวณเวลา" ตามเกรดในไฟล์</p>`;
+            body.innerHTML = cards + `<p class="text-[11px] text-slate-400"><i class="fa-solid fa-circle-info mr-1"></i>อ่านเฉพาะใบสั่งย้อม (M/O: Sheet "Dye Order A" • S/O: "ใบปะหน้า"/"DyeD") และ "GRADE" (ถ้ามี) • รายการเดิม: เติมเฉพาะช่องหัวใบสั่งที่ยังว่าง (ลูกค้า/คุณภาพ/กำหนดส่ง/ตร.ม./จำนวนสี/Ref.) และรวมแผนสั่งย้อมตาม Color Code (เขียนทับน้ำหนักของสีที่ซ้ำ) แต่จะเขียนทับค่า "AI ช่วยคำนวณเวลา" ตามเกรดในไฟล์</p>`;
             const btn = document.getElementById('planningImportConfirmBtn');
-            if (btn) { btn.disabled = validCount === 0; btn.textContent = validCount > 0 ? `ยืนยันนำเข้า ${validCount} M/O` : 'ไม่มีไฟล์ที่นำเข้าได้'; }
+            if (btn) { btn.disabled = validCount === 0; btn.textContent = validCount > 0 ? `ยืนยันนำเข้า ${validCount} รายการ` : 'ไม่มีไฟล์ที่นำเข้าได้'; }
         }
 
         // นำ 1 รายการเข้าระบบ -> { action: 'created'|'updated', order, orderIndex }
@@ -19045,10 +19236,11 @@
                 const d = new Date();
                 const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 const raw = {
-                    moSo: item.moSo, orderType: 'MO', market: item.market, currentStage: 'planning',
+                    moSo: item.moSo, orderType: item.orderType === 'SO' ? 'SO' : 'MO', market: item.market, currentStage: 'planning',
                     customerName: item.customerName, quality: item.quality, dueDate: item.dueDate,
                     totalSqm: item.totalSqm, colorsCount: item.colorsCount || item.colors.length, refNote: item.refNote,
                     openDate: today,
+                    createdAt: today, // ให้ป้าย "New" ขึ้นเหมือน M/O ที่เปิดจากฟอร์มใหม่ (submitNewOrder)
                     dyeing: { colorOrders: newColorRows }
                 };
                 if (gradeBuilt) raw.productionCalc = gradeBuilt.calc;
@@ -19106,10 +19298,36 @@
             renderSalesReportTables();
             updated.forEach(r => rerenderOrderViews(productionOrders.indexOf(r.order)));
             if (created.length > 0) mascotCelebrate('newOrder');
-            showToast(
-                `นำเข้า Dye Order A + GRADE สำเร็จ ${results.length} M/O (เปิดใหม่ ${created.length}, เติมเข้าของเดิม ${updated.length})`,
-                'fa-file-import', 'text-violet-500'
-            );
+
+            // นำเข้าแล้วให้เห็นผลทันทีที่บอร์ดแผนกวางแผน (เหมือนสั่งโอนงานเข้าแผนก): สลับไปหน้าบอร์ด > แผนกวางแผน
+            // > บอร์ดงาน และปลดตัวกรอง/คำค้นที่จะซ่อน M/O ที่เพิ่งนำเข้า
+            const imported = results.map(r => r.order);
+            const relaxed = [];
+            if (orderTypeFilter !== 'all' && imported.some(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) !== orderTypeFilter)) {
+                setOrderTypeFilter('all'); relaxed.push('ตัวกรอง M/O-S/O');
+            }
+            if (marketFilter !== 'all' && imported.some(o => !matchesMarketFilter(o))) {
+                setMarketFilter('all'); relaxed.push('ตัวกรองตลาด');
+            }
+            const searchEl = document.getElementById('boardSearchInput');
+            if (searchEl && searchEl.value.trim()) {
+                const term = searchEl.value.trim().toLowerCase();
+                const hidden = imported.some(o => ![o.moSo, o.customerName, o.customerPO].map(v => String(v || '').toLowerCase()).join(' ').includes(term));
+                if (hidden) { searchEl.value = ''; relaxed.push('คำค้นหา'); }
+            }
+            // รายงานแผนกขายเปิดที่แท็บตลาดของ M/O ที่นำเข้า (ไม่งั้นตลาดในประเทศจะไม่โผล่ในแท็บต่างประเทศ)
+            const firstMarket = imported.length ? (imported[0].market || '') : '';
+            if (firstMarket === 'export' || firstMarket === 'domestic') salesReportActiveMarket = firstMarket;
+            if (imported.length) salesReportActiveOrderType = (imported[0].orderType || detectOrderTypeFromMoSo(imported[0].moSo)) === 'SO' ? 'SO' : 'MO';
+            switchView('board');
+            setDeptKpiSubTab('planning', 'board'); // เลือกแผนกวางแผน + แท็บบอร์ดงาน แล้ว render ใหม่
+            renderSalesReportTables();
+            const elsewhere = imported.filter(o => getEffectiveStage(o) !== 'planning');
+            const nums = imported.map(o => o.moSo).join(', ');
+            let msg = `นำเข้าใบสั่งย้อม + GRADE สำเร็จ ${results.length} รายการ (เปิดใหม่ ${created.length}, เติมเข้าของเดิม ${updated.length}) • ${nums} อยู่ที่บอร์ดแผนกวางแผน`;
+            if (elsewhere.length) msg += ` (ยกเว้น ${elsewhere.map(o => `${o.moSo} อยู่แผนก${STAGE_LABELS[getEffectiveStage(o)] || getEffectiveStage(o)}แล้ว`).join(', ')})`;
+            if (relaxed.length) msg += ` • ปลด${relaxed.join(', ')}ให้แล้ว`;
+            showToast(msg, 'fa-file-import', 'text-violet-500');
         }
 
         // ---- 1. วางแผน: กำหนดส่งตามแผน (แก้ไขฟิลด์ของ M/O ที่มีอยู่แล้ว ไม่สร้างแถวใหม่) -----------------
