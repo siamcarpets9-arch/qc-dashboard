@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -362,6 +364,12 @@
                 </button>
                 <button onclick="openModal()" id="addBtn" class="bg-indigo-600 hover:bg-indigo-800 text-white font-medium px-4 py-2 rounded-xl shadow transition duration-200 flex items-center gap-2 text-sm border border-indigo-400">
                     <i class="fa-solid fa-plus-circle"></i> เพิ่มบันทึก QC
+                </button>
+                <!-- NEW (2026-10-05): "ตรวจงานที่ไม่มีในระบบ ให้คีย์เลขที่ได้เอง" — ปุ่มแยกสำหรับบันทึก QC
+                     ของงานที่ยังไม่มี M/O, S/O ในระบบ (เช่น งานนอก/งานตัวอย่าง) พิมพ์เลขที่เองได้ ส่วนปุ่ม
+                     "เพิ่มบันทึก QC" ปกติยังล็อกให้เลือกจากระบบเหมือนเดิม -->
+                <button onclick="openOffSystemQcModal()" id="addOffSystemBtn" class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-2 rounded-xl shadow transition duration-200 flex items-center gap-2 text-sm border border-amber-300" title="บันทึก QC ของงานที่ไม่มี M/O, S/O ในระบบ — คีย์เลขที่เองได้">
+                    <i class="fa-solid fa-keyboard"></i> ตรวจงานที่ไม่มีในระบบ
                 </button>
                 <button onclick="exportToCSV()" class="bg-white/10 hover:bg-white/20 text-white font-medium px-3.5 py-2 rounded-xl backdrop-blur-sm transition duration-200 text-sm flex items-center gap-1.5">
                     <i class="fa-solid fa-download"></i> ส่งออก
@@ -2970,6 +2978,12 @@
                     <select id="formMoSo" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         <option value="" disabled selected>-- เลือกเลขที่ M/O, S/O --</option>
                     </select>
+                    <!-- NEW (2026-10-05): โหมด "ตรวจงานที่ไม่มีในระบบ" — แสดงช่องพิมพ์เองแทน dropdown (สลับด้วย
+                         setFormMoSoMode()). ซ่อนไว้ตามค่าเริ่มต้น -->
+                    <div id="formMoSoManualWrap" class="hidden">
+                        <input type="text" id="formMoSoManual" maxlength="60" placeholder="พิมพ์เลขที่ M/O, S/O เอง เช่น M/O: 0200/26" class="w-full px-3.5 py-2.5 bg-amber-50 border border-amber-300 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <p class="text-[11px] text-amber-700 mt-1"><i class="fa-solid fa-circle-info mr-1"></i>งานนี้ไม่มีในระบบ — ระบบจะบันทึกตามเลขที่ที่พิมพ์ (ไม่เลื่อนแผนกอัตโนมัติ) และแสดงป้าย "นอกระบบ" ในรายการ</p>
+                    </div>
                 </div>
 
                 <!-- Dynamic Department Fields -->
@@ -4421,7 +4435,7 @@
             const container = document.getElementById('dyeRowsContainer');
             if (!container) return;
             // Default the row's M/O, S/O to the record's overall M/O, S/O field for convenience (still editable per row).
-            const overallMoSo = (document.getElementById('formMoSo') || {}).value || '';
+            const overallMoSo = ((typeof formMoSoManualMode !== 'undefined' && formMoSoManualMode) ? (document.getElementById('formMoSoManual') || {}).value : (document.getElementById('formMoSo') || {}).value) || '';
             const rowDiv = document.createElement('div');
             rowDiv.className = "dept-item-row bg-white p-3 rounded-xl border border-slate-200 space-y-2 relative shadow-sm";
             rowDiv.innerHTML = `
@@ -5185,7 +5199,7 @@
                     <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">${escapeHtml(item.date)}</td>
                     <td class="py-3.5 px-4 font-semibold text-indigo-600 text-xs">${escapeHtml(item.id)}</td>
                     <td class="py-3.5 px-4 font-medium text-xs">${escapeHtml(item.department)}</td>
-                    <td class="py-3.5 px-4 text-xs font-mono text-slate-600">${moSoWarningHtml || `${orderTypeBadgeHtml(getOrderTypeByMoSo(item.moSo))}${marketBadgeHtml(getMarketByMoSo(item.moSo))}${escapeHtml(item.moSo)}`}</td>
+                    <td class="py-3.5 px-4 text-xs font-mono text-slate-600">${moSoWarningHtml || `${orderTypeBadgeHtml(getOrderTypeByMoSo(item.moSo))}${marketBadgeHtml(getMarketByMoSo(item.moSo))}${escapeHtml(item.moSo)}${(item.moSo && !isMoSoInSystem(item.moSo)) ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-300 text-[10px] font-semibold align-middle whitespace-nowrap" title="เลขที่นี้ไม่มีใน productionOrders — ตรวจงานนอกระบบ"><i class="fa-solid fa-keyboard mr-1"></i>นอกระบบ</span>' : ''}`}</td>
                     <td class="py-3.5 px-4 text-xs text-slate-600 max-w-xs truncate" title="${escapeHtml(summaryText)}">${escapeHtml(summaryText)}</td>
                     <td class="py-3.5 px-4 text-center"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${badgeClass}">${escapeHtml(item.status)}</span></td>
                     <td class="py-3.5 px-4 text-xs text-slate-600">${escapeHtml(item.inspector)}</td>
@@ -7218,16 +7232,19 @@
             const { byMoSo } = pendingDyeingImport;
             const matched = [];
             const autoTransferred = [];
+            const importDetails = []; // NEW (2026-10-05): ต่อ M/O — แถวไปอยู่ที่ไหน (บันทึกสั่งย้อม / ย้อมเพิ่ม) และตอนนี้อยู่แผนกไหน
+            let unmatchedCount = 0;
 
             Object.keys(byMoSo).forEach(key => {
                 const group = byMoSo[key];
                 const orderIndex = productionOrders.findIndex(o => normalizeDyeingMoSoMatchKey(o.moSo) === key);
-                if (orderIndex === -1) return; // unmatched — already flagged in the preview, nothing to do
+                if (orderIndex === -1) { unmatchedCount++; return; } // unmatched — already flagged in the preview, nothing to do
                 const order = productionOrders[orderIndex];
                 if (!order.dyeing) order.dyeing = {};
                 if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
                 const log = order.dyeing.dyeOrderLog;
                 const usedThisRound = new Set();
+                const detail = { moSo: order.moSo, regular: 0, extra: 0, stage: '' };
 
                 // Consolidate raw rows by colorKey|isExtra|month before touching dyeOrderLog at all.
                 const colorGroups = {};
@@ -7285,6 +7302,7 @@
                     remarkParts.push(...g.extraRemarks);
                     const mergedRemark = remarkParts.join(' · ');
                     const importKey = `${g.colorKey}|${g.isExtra ? 1 : 0}|${g.monthKey}`;
+                    if (g.isExtra) detail.extra++; else detail.regular++;
                     const hasRequisitionKg = g.requisitionKg !== null;
                     const hasOrderKg = g.orderKg !== null;
 
@@ -7331,12 +7349,27 @@
                 if (checkAndAutoTransferDyeingIfComplete(orderIndex)) {
                     autoTransferred.push(order.moSo);
                 }
+                detail.stage = getEffectiveStage(order);
+                importDetails.push(detail);
             });
 
             renderProductionBoard();
             renderProductionTimeline();
             renderProductionOverview();
             if (document.getElementById('dyeingKpiSplitContainer')) renderDyeOrderLogTable();
+
+            // NEW (2026-10-05): "แผนกย้อมนำเข้าข้อมูลสำเร็จ แต่รายการไม่โชว์" — the data was always saved, but the user was left on a
+            // screen that doesn't list it: rows flagged "ย้อมเพิ่ม" go to a different tab, an order still in วางแผน is not on the
+            // dyeing board at all, and a fully-dyed order auto-moves on to ทอ. So jump straight to แผนกย้อม > KPI > the tab the rows
+            // landed in (บันทึกสั่งย้อม if any regular rows, otherwise ย้อมเพิ่ม), and list in the result where every M/O went.
+            if (importDetails.length > 0) {
+                const anyRegular = importDetails.some(d => d.regular > 0);
+                try {
+                    switchView('board');
+                    setDeptKpiSubTab('dyeing', 'kpi');
+                    setDyeingKpiTab(anyRegular ? 'regular' : 'extra');
+                } catch (navErr) { console.error('post-import dyeing navigation failed:', navErr); }
+            }
 
             const status = document.getElementById('importDyeingStatus');
             const preview = document.getElementById('importDyeingPreview');
@@ -7345,7 +7378,14 @@
             preview.classList.add('hidden');
             status.classList.remove('hidden');
             if (matched.length > 0) {
+                const detailLines = importDetails.map(d => {
+                    const where = [d.regular > 0 ? `บันทึกสั่งย้อม ${d.regular} แถว` : '', d.extra > 0 ? `ย้อมเพิ่ม ${d.extra} แถว (แท็บ "ย้อมเพิ่ม")` : ''].filter(Boolean).join(' • ') || 'ไม่มีแถวใหม่';
+                    return `<div class="text-[11px] text-slate-600"><span class="font-semibold">${escapeHtml(d.moSo)}</span> → ${where} • ตอนนี้อยู่แผนก${escapeHtml(STAGE_LABELS[d.stage] || d.stage || '-')}</div>`;
+                }).join('');
                 status.innerHTML = `<span class="text-emerald-600 font-medium"><i class="fa-solid fa-circle-check"></i> นำเข้าสำเร็จ ${matched.length} M/O, S/O</span>` +
+                    `<div class="mt-1 space-y-0.5 max-h-40 overflow-y-auto">${detailLines}</div>` +
+                    (unmatchedCount > 0 ? `<div class="text-[11px] text-amber-600 mt-1"><i class="fa-solid fa-triangle-exclamation"></i> ข้าม ${unmatchedCount} M/O, S/O ที่ไม่พบในระบบ</div>` : '') +
+                    `<div class="text-[11px] text-slate-400 mt-1">ดูรายการได้ที่ แผนกย้อม (KPI) > บันทึกสั่งย้อม / ย้อมเพิ่ม (พาไปที่หน้านี้ให้แล้ว ปิดหน้าต่างนี้เพื่อดู)</div>` +
                     (autoTransferred.length > 0 ? `<br><span class="text-violet-600"><i class="fa-solid fa-arrow-right"></i> โอนไปแผนกทออัตโนมัติ ${autoTransferred.length} รายการ: ${autoTransferred.map(escapeHtml).join(', ')}</span>` : '');
                 showToast(`นำเข้ารายงานย้อมสำเร็จ ${matched.length} M/O, S/O${autoTransferred.length > 0 ? ` (โอนแผนกทออัตโนมัติ ${autoTransferred.length} รายการ)` : ''}`, 'fa-droplet', 'text-violet-500');
             } else {
@@ -16430,6 +16470,29 @@
             sel.value = key || '';
         }
 
+        // NEW (2026-10-05): สลับช่อง "เลขที่ M/O และ S/O" ระหว่าง dropdown (งานในระบบ) กับช่องพิมพ์เอง
+        // (งานที่ไม่มีในระบบ). ช่องที่ซ่อนอยู่จะไม่ required เพื่อไม่ให้บล็อกการ submit
+        let formMoSoManualMode = false;
+        function setFormMoSoMode(manual, value) {
+            formMoSoManualMode = !!manual;
+            const sel = document.getElementById('formMoSo');
+            const wrap = document.getElementById('formMoSoManualWrap');
+            const input = document.getElementById('formMoSoManual');
+            if (!sel || !wrap || !input) return;
+            sel.classList.toggle('hidden', formMoSoManualMode);
+            sel.required = !formMoSoManualMode;
+            sel.disabled = formMoSoManualMode;
+            wrap.classList.toggle('hidden', !formMoSoManualMode);
+            input.required = formMoSoManualMode;
+            input.value = formMoSoManualMode ? (value || '') : '';
+        }
+
+        function isMoSoInSystem(moSo) {
+            const key = (moSo || '').trim();
+            if (!key) return false;
+            return productionOrders.some(o => (o.moSo || '').trim() === key);
+        }
+
         function openModal() {
             document.getElementById('qcModal').classList.remove('hidden');
             document.getElementById('modalTitle').textContent = 'เพิ่มบันทึก QC ตามแผนก';
@@ -16437,8 +16500,17 @@
             document.getElementById('editIndex').value = '';
             document.getElementById('formDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('formId').value = 'QC-' + Math.floor(100000 + Math.random() * 900000);
+            setFormMoSoMode(false);
             populateFormMoSoOptions('');
             renderDepartmentFields();
+        }
+
+        // NEW (2026-10-05): ปุ่ม "ตรวจงานที่ไม่มีในระบบ" — เปิดฟอร์ม QC เดิมแต่ให้พิมพ์เลขที่ M/O, S/O เองได้
+        function openOffSystemQcModal() {
+            openModal();
+            document.getElementById('modalTitle').textContent = 'บันทึก QC — งานที่ไม่มีในระบบ (คีย์เลขที่เอง)';
+            setFormMoSoMode(true, '');
+            setTimeout(() => { const el = document.getElementById('formMoSoManual'); if (el) el.focus(); }, 50);
         }
 
         function closeModal() {
@@ -16620,12 +16692,14 @@
             if (isDisplayMode) {
                 header.className = "no-print bg-slate-900 text-white shadow-md sticky top-0 z-30 transition-all duration-300";
                 addBtn.classList.add('hidden');
+                const offBtnH = document.getElementById('addOffSystemBtn'); if (offBtnH) offBtnH.classList.add('hidden');
                 displayBtn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> โหมดจัดการ';
                 actionCols.forEach(el => el.classList.add('hidden'));
                 showToast('เข้าสู่โหมดหน้าจอแสดงผล');
             } else {
                 header.className = "no-print bg-indigo-700 text-white shadow-md sticky top-0 z-30 transition-all duration-300";
                 addBtn.classList.remove('hidden');
+                const offBtnS = document.getElementById('addOffSystemBtn'); if (offBtnS) offBtnS.classList.remove('hidden');
                 displayBtn.innerHTML = '<i class="fa-solid fa-tv"></i> โหมดจอแสดงผล';
                 actionCols.forEach(el => el.classList.remove('hidden'));
                 showToast('กลับสู่โหมดจัดการ');
@@ -16735,11 +16809,26 @@
                 extra = { items };
             }
 
+            // NEW (2026-10-05): โหมดงานที่ไม่มีในระบบ — ใช้เลขที่ที่พิมพ์เอง (trim). ถ้าพิมพ์ตรงกับออเดอร์ที่มีใน
+            // ระบบอยู่แล้ว (ไม่สนตัวพิมพ์เล็ก/ใหญ่) ใช้ค่าตามระบบ เพื่อให้ badge/ประวัติ QC จับคู่ติดตามปกติ
+            let resolvedMoSo;
+            if (formMoSoManualMode) {
+                resolvedMoSo = document.getElementById('formMoSoManual').value.trim().replace(/\s+/g, ' ');
+                if (!resolvedMoSo) {
+                    showToast('กรุณาพิมพ์เลขที่ M/O, S/O', 'fa-triangle-exclamation', 'text-amber-400');
+                    return;
+                }
+                const canonical = productionOrders.find(o => (o.moSo || '').trim().toLowerCase() === resolvedMoSo.toLowerCase());
+                if (canonical) resolvedMoSo = canonical.moSo.trim();
+            } else {
+                resolvedMoSo = document.getElementById('formMoSo').value;
+            }
+
             const newItem = {
                 id: document.getElementById('formId').value,
                 date: document.getElementById('formDate').value,
                 department: dept,
-                moSo: document.getElementById('formMoSo').value,
+                moSo: resolvedMoSo,
                 status: document.getElementById('formStatus').value,
                 inspector: document.getElementById('formInspector').value,
                 stamp: document.getElementById('formStamp').value,
@@ -16822,7 +16911,14 @@
             document.getElementById('formId').value = item.id;
             document.getElementById('formDate').value = item.date;
             document.getElementById('formDept').value = item.department;
-            populateFormMoSoOptions(item.moSo);
+            // NEW (2026-10-05): รายการที่เลขที่ M/O, S/O ไม่อยู่ในระบบ (บันทึกจากปุ่ม "ตรวจงานที่ไม่มีในระบบ")
+            // เปิดแก้ไขด้วยช่องพิมพ์เอง แทน dropdown ที่ไม่มีเลขนั้นให้เลือก
+            if (item.moSo && !isMoSoInSystem(item.moSo)) {
+                setFormMoSoMode(true, item.moSo);
+            } else {
+                setFormMoSoMode(false);
+                populateFormMoSoOptions(item.moSo);
+            }
             document.getElementById('formStatus').value = item.status;
             document.getElementById('formInspector').value = item.inspector;
             document.getElementById('formStamp').value = item.stamp;
