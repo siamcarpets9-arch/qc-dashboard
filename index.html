@@ -868,7 +868,12 @@
                 </button>
             </div>
 
-            <div id="boardSearchCard" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 mb-4">
+            <div id="boardSearchCard" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 mb-4 flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <label for="boardMonthSelect" class="text-xs font-semibold text-slate-600"><i class="fa-solid fa-calendar-days text-indigo-500 mr-1"></i>เดือน</label>
+                    <select id="boardMonthSelect" onchange="setBoardMonthFilter(this.value)" class="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                    <span id="boardMonthHint" class="text-[10px] text-slate-400 hidden md:inline"></span>
+                </div>
                 <div class="relative w-full sm:w-80">
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 text-xs"><i class="fa-solid fa-search"></i></span>
                     <input type="text" id="boardSearchInput" oninput="renderProductionBoard()" placeholder="ค้นหา M/O, S/O, ลูกค้า, PO... (กรองทุกคอลัมน์)" class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -1234,9 +1239,10 @@
                      orders whose design.done isn't ticked yet (see renderProductionBoard()); an order can
                      appear here AND in its real currentStage column at the same time, since design isn't
                      part of that sequential handoff. -->
-                <div id="boardColWrap-design" class="bg-cyan-50/60 border border-cyan-100 border-t-4 border-t-cyan-400 rounded-2xl p-3 flex flex-col gap-3 min-h-[200px]">
-                    <div class="flex items-center justify-between px-1">
-                        <h4 class="font-bold text-cyan-700 text-xs uppercase flex items-center gap-1.5"><i class="fa-solid fa-pen-ruler text-cyan-500"></i> ดีไซน์/ขยายลาย</h4>
+                <div id="boardColWrap-design" class="flex flex-col gap-2 min-h-[200px]">
+                    <!-- UPDATED (2026-10-06): แผนกนี้เป็นใบงาน (renderDeptWorksheetPage() วาดกริด/รายละเอียดเองใน #boardColumn-design) -->
+                    <div class="flex items-center justify-end gap-1.5 px-1">
+                        <span class="text-[11px] text-slate-400">งานที่รอดีไซน์/ขยายลาย</span>
                         <span id="boardCount-design" class="text-[11px] bg-white text-cyan-700 font-semibold px-2 py-0.5 rounded-full border border-cyan-200">0</span>
                     </div>
                     <div id="boardColumn-design" class="flex flex-col gap-3"></div>
@@ -1249,16 +1255,18 @@
                     </div>
                     <div id="boardColumn-dyeing" class="flex flex-col gap-3"></div>
                 </div>
-                <div id="boardColWrap-weaving" class="bg-teal-50/60 border border-teal-100 border-t-4 border-t-teal-400 rounded-2xl p-3 flex flex-col gap-3 min-h-[200px]">
-                    <div class="flex items-center justify-between px-1">
-                        <h4 class="font-bold text-teal-700 text-xs uppercase flex items-center gap-1.5"><i class="fa-solid fa-hand-holding-heart text-teal-500"></i> ทอ</h4>
+                <div id="boardColWrap-weaving" class="flex flex-col gap-2 min-h-[200px]">
+                    <!-- UPDATED (2026-10-06): แผนกนี้เป็นใบงาน (renderDeptWorksheetPage() วาดกริด/รายละเอียดเองใน #boardColumn-weaving) -->
+                    <div class="flex items-center justify-end gap-1.5 px-1">
+                        <span class="text-[11px] text-slate-400">งานที่อยู่แผนกทอ</span>
                         <span id="boardCount-weaving" class="text-[11px] bg-white text-teal-700 font-semibold px-2 py-0.5 rounded-full border border-teal-200">0</span>
                     </div>
                     <div id="boardColumn-weaving" class="flex flex-col gap-3"></div>
                 </div>
-                <div id="boardColWrap-finishing" class="bg-fuchsia-50/60 border border-fuchsia-100 border-t-4 border-t-fuchsia-400 rounded-2xl p-3 flex flex-col gap-3 min-h-[200px]">
-                    <div class="flex items-center justify-between px-1">
-                        <h4 class="font-bold text-fuchsia-700 text-xs uppercase flex items-center gap-1.5"><i class="fa-solid fa-box-archive text-fuchsia-500"></i> ตกแต่ง/บรรจุ</h4>
+                <div id="boardColWrap-finishing" class="flex flex-col gap-2 min-h-[200px]">
+                    <!-- UPDATED (2026-10-06): แผนกนี้เป็นใบงาน (renderDeptWorksheetPage() วาดกริด/รายละเอียดเองใน #boardColumn-finishing) -->
+                    <div class="flex items-center justify-end gap-1.5 px-1">
+                        <span class="text-[11px] text-slate-400">งานที่อยู่แผนกตกแต่ง/บรรจุ</span>
                         <span id="boardCount-finishing" class="text-[11px] bg-white text-fuchsia-700 font-semibold px-2 py-0.5 rounded-full border border-fuchsia-200">0</span>
                     </div>
                     <div id="boardColumn-finishing" class="flex flex-col gap-3"></div>
@@ -11953,6 +11961,7 @@
         }
 
         function renderProductionBoard() {
+            updateBoardMonthOptions();
             const searchInputEl = document.getElementById('boardSearchInput');
             const searchTerm = (searchInputEl ? searchInputEl.value : '').trim().toLowerCase();
 
@@ -11967,6 +11976,7 @@
                     ordersHere = ordersHere.filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === orderTypeFilter);
                 }
                 ordersHere = ordersHere.filter(o => matchesMarketFilter(o));
+                ordersHere = applyBoardMonthFilter(ordersHere); // NEW (2026-10-06): เดือนปัจจุบัน + ค้างจากเดือนก่อน (ดู applyBoardMonthFilter)
                 if (searchTerm) {
                     ordersHere = ordersHere.filter(order => {
                         const haystack = [order.moSo, order.customerName, order.customerPO]
@@ -11977,13 +11987,24 @@
                 }
                 countEl.textContent = ordersHere.length;
 
-                // NEW (2026-09-16): "ตรงบอร์ดงานแผนกทอ ให้เปลี่ยนเป็นจอทอพรมจริง" — the weaving column no
+                // NEW (2026-09-16): "ตรงบอร์ดงานแผนกทอ" ให้เปลี่ยนเป็นจอทอพรมจริง" — the weaving column no
                 // longer renders one generic Kanban card per order; it renders one card per PHYSICAL LOOM
                 // (see renderWeavingLoomBoard()'s block comment). The count badge above still reflects the
                 // same "orders currently at this stage, after filters" total as every other column — only
                 // the card-rendering portion is special-cased here, so filtering/search/counts stay unified.
                 if (stage === 'weaving') {
-                    renderWeavingLoomBoard(ordersHere, searchTerm);
+                    // NEW (2026-10-06): ค่าเริ่มต้น = ใบงานทอ (กริด M/O เหมือนแผนกอื่น) สลับไปจอเครื่องทอเดิมได้ด้วยปุ่มด้านบน
+                    if (weavingBoardView === 'looms') {
+                        renderWeavingLoomBoard(ordersHere, searchTerm);
+                        column.insertAdjacentHTML('afterbegin', `<div class="flex items-center justify-between gap-2 flex-wrap"><h2 class="text-2xl font-bold text-slate-900">จอเครื่องทอ</h2>${weavingViewToggleHtml()}</div>`);
+                    } else {
+                        renderDeptWorksheetPage('weaving', ordersHere, searchTerm);
+                    }
+                    return;
+                }
+                // NEW (2026-10-06): ตกแต่ง/บรรจุ เป็นใบงานแบบเดียวกับวางแผน/ย้อม
+                if (stage === 'finishing') {
+                    renderDeptWorksheetPage('finishing', ordersHere, searchTerm);
                     return;
                 }
 
@@ -12056,6 +12077,7 @@
                 ordersHere = ordersHere.filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === orderTypeFilter);
             }
             ordersHere = ordersHere.filter(o => matchesMarketFilter(o));
+            ordersHere = applyBoardMonthFilter(ordersHere); // NEW (2026-10-06)
             if (searchTerm) {
                 ordersHere = ordersHere.filter(order => {
                     const haystack = [order.moSo, order.customerName, order.customerPO]
@@ -12065,6 +12087,9 @@
                 });
             }
             countEl.textContent = ordersHere.length;
+            // NEW (2026-10-06): แสดงเป็นใบงาน (กริดการ์ด M/O → กดเข้าใบงาน)
+            renderDeptWorksheetPage('ready_to_ship', ordersHere, searchTerm);
+            return;
 
             if (ordersHere.length === 0) {
                 column.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">${searchTerm ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : 'ไม่มีรายการรอส่ง'}</p>`;
@@ -12179,6 +12204,7 @@
                 ordersHere = ordersHere.filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === orderTypeFilter);
             }
             ordersHere = ordersHere.filter(o => matchesMarketFilter(o));
+            ordersHere = applyBoardMonthFilter(ordersHere); // NEW (2026-10-06)
             if (searchTerm) {
                 ordersHere = ordersHere.filter(order => {
                     const haystack = [order.moSo, order.customerName, order.customerPO]
@@ -12188,6 +12214,9 @@
                 });
             }
             countEl.textContent = ordersHere.length;
+            // NEW (2026-10-06): แสดงเป็นใบงาน (กริดการ์ด M/O → กดเข้าใบงาน)
+            renderDeptWorksheetPage('design', ordersHere, searchTerm);
+            return;
 
             if (ordersHere.length === 0) {
                 column.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">${searchTerm ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : 'ไม่มีรายการ (ดีไซน์/ขยายลายเสร็จหมดแล้ว)'}</p>`;
@@ -14008,6 +14037,7 @@
                             ${ws.planned
                                 ? '<span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700">วางแผนแล้ว</span>'
                                 : '<span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800">รอวางแผน</span>'}
+                            ${boardCarryOverBadgeHtml(order)}
                         </div>
                     </div>`;
             }).join('');
@@ -14812,6 +14842,7 @@
                         <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
                             <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${st.cls}">${st.label}</span>
                             ${ds.extraCount > 0 ? `<span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-fuchsia-50 text-fuchsia-700">ย้อมเพิ่ม ${ds.extraCount}</span>` : ''}
+                            ${boardCarryOverBadgeHtml(order)}
                             ${warn ? `<span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${warn.level === 'overdue' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}">${escapeHtml(warn.level === 'overdue' ? 'เลยกำหนด' : 'ใกล้กำหนด')}</span>` : ''}
                         </div>
                     </div>`;
@@ -14988,6 +15019,304 @@
         function dyeingWsOpenKpi() {
             dyeingWsUi.currentMo = '';
             try { switchView('board'); setBoardDepartmentTab('dyeing'); setDeptKpiSubTab('dyeing', 'kpi'); setDyeingKpiTab('regular'); } catch (e) { console.error(e); }
+        }
+
+        // =========================================================================================
+        // NEW (2026-10-06): ตัวกรองเดือนของ "หน้าบอร์ดทุกแผนก" + ใบงานแผนก (กริดการ์ด M/O → กดเข้าใบงาน)
+        //
+        // "หน้ารายการทุกแผนกให้ขึ้นโชว์เดือนปัจจุบัน รายการของเดือนอื่นให้เรียกดูได้" — ตัวแบ่งเดือน = วันที่เปิด M/O
+        // (order.openDate, ถ้าว่างใช้ createdAt, ถ้าว่างทั้งคู่ = ไม่ถูกกรองทิ้ง) ค่าเริ่มต้น = เดือนปัจจุบัน (เปลี่ยนเดือนเองอัตโนมัติ)
+        // งานค้างจากเดือนก่อนที่ยังอยู่ในแผนกนั้น → โชว์ในเดือนปัจจุบันด้วย ติดป้าย "ค้างจาก ก.ย." (ไม่ให้หลุดหาย)
+        // =========================================================================================
+        let boardMonthFilter = ''; // '' = เดือนปัจจุบัน (ตามวันที่จริงเสมอ), 'all' = ทุกเดือน, 'YYYY-MM' = เลือกเอง
+
+        function boardCurrentMonthKey() { return formatDateKeyUTC(new Date()).slice(0, 7); }
+        function getBoardMonthSelection() { return boardMonthFilter || boardCurrentMonthKey(); }
+        function boardOrderMonthKey(order) {
+            const k = String(order.openDate || order.createdAt || '').slice(0, 7);
+            return k === '2000-01' ? '' : k; // '2000-01-01' = ค่าตั้งต้นของ normalizeOrder เมื่อไม่มีวันที่เปิด → ถือว่าไม่ทราบเดือน (ไม่ถูกกรองทิ้ง)
+        }
+        function boardMonthLabel(key) {
+            const p = String(key || '').split('-');
+            if (p.length < 2) return key || '';
+            return `${THAI_MONTH_ABBR[parseInt(p[1], 10)] || p[1]} ${p[0]}`;
+        }
+        function applyBoardMonthFilter(orders) {
+            const sel = getBoardMonthSelection();
+            if (boardMonthFilter === 'all') return orders;
+            const cur = boardCurrentMonthKey();
+            return orders.filter(o => {
+                const k = boardOrderMonthKey(o);
+                if (!k) return true;
+                if (k === sel) return true;
+                return sel === cur && k < cur; // ค้างจากเดือนก่อน
+            });
+        }
+        // ป้าย "ค้างจาก ก.ย." — แสดงเฉพาะตอนดูเดือนปัจจุบัน และงานนั้นเปิดมาก่อนเดือนนี้
+        function boardCarryOverLabel(order) {
+            if (boardMonthFilter === 'all') return '';
+            const sel = getBoardMonthSelection();
+            if (sel !== boardCurrentMonthKey()) return '';
+            const k = boardOrderMonthKey(order);
+            if (!k || k >= sel) return '';
+            const p = k.split('-');
+            return `ค้างจาก ${THAI_MONTH_ABBR[parseInt(p[1], 10)] || p[1]}${p[0] !== sel.slice(0, 4) ? ' ' + p[0] : ''}`;
+        }
+        function boardCarryOverBadgeHtml(order) {
+            const t = boardCarryOverLabel(order);
+            return t ? `<span data-carry-over class="inline-block px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200 text-[10px] font-semibold align-middle">${escapeHtml(t)}</span>` : '';
+        }
+        function setBoardMonthFilter(value) {
+            boardMonthFilter = value === 'all' ? 'all' : (/^\d{4}-\d{2}$/.test(value) && value !== boardCurrentMonthKey() ? value : '');
+            renderProductionBoard();
+        }
+        // เติมตัวเลือกเดือน: เดือนปัจจุบัน + ทุกเดือนที่มี M/O เปิดไว้ (ใหม่ → เก่า) + ทุกเดือน
+        function updateBoardMonthOptions() {
+            const sel = document.getElementById('boardMonthSelect');
+            if (!sel) return;
+            const cur = boardCurrentMonthKey();
+            const keys = new Set([cur]);
+            productionOrders.forEach(o => { const k = boardOrderMonthKey(o); if (/^\d{4}-\d{2}$/.test(k)) keys.add(k); });
+            const list = [...keys].sort().reverse();
+            sel.innerHTML = list.map(k => `<option value="${k}">${k === cur ? 'เดือนนี้ — ' : ''}${escapeHtml(boardMonthLabel(k))}</option>`).join('') + '<option value="all">ทุกเดือน</option>';
+            sel.value = boardMonthFilter === 'all' ? 'all' : getBoardMonthSelection();
+            const hint = document.getElementById('boardMonthHint');
+            if (hint) hint.textContent = boardMonthFilter === 'all' ? 'แสดงทุกเดือน' : (getBoardMonthSelection() === cur ? 'งานค้างจากเดือนก่อนแสดงด้วย (ติดป้าย "ค้างจาก")' : 'เฉพาะ M/O ที่เปิดในเดือนที่เลือก');
+        }
+
+        // ---------------------------------------------------------------------------------------
+        // ใบงานแผนก (ดีไซน์/ขยายลาย · ทอ · ตกแต่ง/บรรจุ · รอส่ง) — โครงเดียวกับ ใบวางแผนงาน / ใบงานย้อม
+        // กริดการ์ด M/O → กดการ์ดเข้าไป: (1) ข้อมูลงาน/ความคืบหน้า/ระยะเวลา (2) ส่วนแก้ไขของแผนกนั้น (ใช้ส่วนเดิมจากหน้าต่างรายละเอียด M/O)
+        // (3) ประวัติ QC ของ M/O → ปุ่มกลับ + ปุ่มโอนงาน
+        // ---------------------------------------------------------------------------------------
+        const deptWsUi = { design: '', weaving: '', finishing: '', ready_to_ship: '' };
+        let weavingBoardView = 'orders'; // 'orders' = ใบงานทอ (กริด M/O) | 'looms' = จอเครื่องทอเดิม
+        try { weavingBoardView = localStorage.getItem('qc_weaving_board_view') === 'looms' ? 'looms' : 'orders'; } catch (e) { /* storage blocked */ }
+
+        const DEPT_WS_CFG = {
+            design: { title: 'ใบงานดีไซน์/ขยายลาย', sub: 'งานที่รอดีไซน์/ขยายลาย — คลิกการ์ดเพื่อเปิดใบงาน', empty: 'ไม่มีงานรอดีไซน์/ขยายลาย', icon: 'fa-pen-ruler', color: 'cyan', bar: 'bg-cyan-500', border: 'border-l-cyan-500', passLabel: 'ผ่าน' },
+            weaving: { title: 'ใบงานทอ', sub: 'งานที่อยู่แผนกทอ — คลิกการ์ดเพื่อเปิดใบงาน (สลับไปดูจอเครื่องทอได้ด้านบน)', empty: 'ไม่มีรายการในแผนกทอ', icon: 'fa-hand-holding-heart', color: 'teal', bar: 'bg-teal-500', border: 'border-l-teal-500', passLabel: 'โอน → ตกแต่ง/บรรจุ' },
+            finishing: { title: 'ใบงานตกแต่ง/บรรจุ', sub: 'งานที่อยู่แผนกตกแต่ง/บรรจุ — คลิกการ์ดเพื่อเปิดใบงาน', empty: 'ไม่มีรายการในแผนกตกแต่ง/บรรจุ', icon: 'fa-wand-magic-sparkles', color: 'fuchsia', bar: 'bg-fuchsia-500', border: 'border-l-fuchsia-500', passLabel: 'เสร็จ → รอส่ง' },
+            ready_to_ship: { title: 'ใบงานรอส่ง', sub: 'งานที่เสร็จพร้อมส่ง — คลิกการ์ดเพื่อเปิดใบงาน', empty: 'ไม่มีรายการรอส่ง', icon: 'fa-truck-fast', color: 'orange', bar: 'bg-orange-500', border: 'border-l-orange-500', passLabel: 'ยืนยันจัดส่ง' }
+        };
+
+        function deptWsStatus(stage, order) {
+            const pct = stage === 'design' ? 0 : Number((order[stage] || {}).percent) || 0;
+            if (stage === 'design') {
+                const d = order.design || {};
+                return d.entering ? { key: 'working', label: 'กรอกข้อมูลแล้ว', cls: 'bg-cyan-50 text-cyan-700', pct: 0 } : { key: 'waiting', label: 'รอดีไซน์', cls: 'bg-slate-100 text-slate-600', pct: 0 };
+            }
+            if (stage === 'ready_to_ship') return { key: 'waiting', label: 'รอจัดส่ง', cls: 'bg-orange-50 text-orange-700', pct: 100 };
+            if (stage === 'weaving' && (order.weaving || {}).mode === 'external') return { key: 'external', label: 'จ้างทอนอกบริษัท', cls: 'bg-amber-50 text-amber-700', pct };
+            if (stage === 'finishing' && (order.weaving || {}).mode === 'external') return pct >= 100 ? { key: 'done', label: 'ครบแล้ว', cls: 'bg-emerald-50 text-emerald-700', pct } : { key: pct > 0 ? 'working' : 'waiting', label: pct > 0 ? 'กำลังตกแต่ง · งานทอนอก' : 'รอตกแต่ง · งานทอนอก', cls: 'bg-amber-50 text-amber-700', pct };
+            if (pct >= 100) return { key: 'done', label: 'ครบแล้ว', cls: 'bg-emerald-50 text-emerald-700', pct };
+            const word = stage === 'weaving' ? 'ทอ' : 'ตกแต่ง';
+            return pct > 0 ? { key: 'working', label: `กำลัง${word}`, cls: stage === 'weaving' ? 'bg-teal-50 text-teal-700' : 'bg-fuchsia-50 text-fuchsia-700', pct } : { key: 'waiting', label: `รอ${word}`, cls: 'bg-slate-100 text-slate-600', pct };
+        }
+        function deptWsProgressText(stage, order) {
+            if (stage === 'design') return order.designRef ? `ดีไซน์: ${order.designRef}` : 'ยังไม่ระบุรหัสดีไซน์';
+            if (stage === 'ready_to_ship') return `ตร.ม. ${order.totalSqm || '-'} · พร้อมจัดส่ง`;
+            try { return stageProgressText(order, stage); } catch (e) { return ''; }
+        }
+        function deptWsPass(stage, orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            deptWsUi[stage] = '';
+            if (stage === 'design') markDesignPassed(orderIndex);
+            else if (stage === 'weaving') transferOrderStage(orderIndex, 'weaving', (order.weaving || {}).mode === 'external' ? 'finishing' : NEXT_STAGE.weaving);
+            else if (stage === 'finishing') markOrderReadyToShip(orderIndex);
+            else if (stage === 'ready_to_ship') markOrderShipped(orderIndex);
+        }
+
+        function renderDeptWorksheetPage(stage, ordersHere, searchTerm) {
+            const column = document.getElementById(`boardColumn-${stage}`);
+            if (!column) return;
+            const scrollY = window.scrollY;
+            const cfg = DEPT_WS_CFG[stage];
+            const current = deptWsUi[stage] ? productionOrders.find(o => o.moSo === deptWsUi[stage]) : null;
+            const stillHere = current && (stage === 'design' ? (!(current.design && current.design.done) && getEffectiveStage(current) !== 'shipped') : getEffectiveStage(current) === stage);
+            let html;
+            if (stillHere) {
+                html = buildDeptWorksheetDetailHtml(stage, current, productionOrders.indexOf(current));
+            } else {
+                deptWsUi[stage] = '';
+                html = buildDeptWorksheetGridHtml(stage, ordersHere || [], searchTerm || '');
+            }
+            column.innerHTML = html;
+            window.scrollTo(0, scrollY);
+        }
+
+        function deptWsHeaderHtml(stage, extraRight) {
+            const cfg = DEPT_WS_CFG[stage];
+            return `
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">${cfg.title}</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">${escapeHtml(cfg.sub)}</p>
+                    </div>
+                    ${extraRight || ''}
+                </div>`;
+        }
+        function weavingViewToggleHtml() {
+            const on = 'px-3 py-1.5 text-xs font-semibold bg-teal-600 text-white';
+            const off = 'px-3 py-1.5 text-xs font-semibold bg-white text-slate-600 hover:bg-slate-50';
+            return `<div class="inline-flex rounded-lg overflow-hidden border border-slate-300" data-weaving-view-toggle>
+                <button type="button" onclick="setWeavingBoardView('orders')" class="${weavingBoardView === 'orders' ? on : off}"><i class="fa-solid fa-table-cells-large mr-1"></i>ใบงานทอ (M/O)</button>
+                <button type="button" onclick="setWeavingBoardView('looms')" class="${weavingBoardView === 'looms' ? on : off}"><i class="fa-solid fa-industry mr-1"></i>จอเครื่องทอ</button>
+            </div>`;
+        }
+        function setWeavingBoardView(v) {
+            weavingBoardView = v === 'looms' ? 'looms' : 'orders';
+            try { localStorage.setItem('qc_weaving_board_view', weavingBoardView); } catch (e) { /* storage blocked */ }
+            deptWsUi.weaving = '';
+            renderProductionBoard();
+        }
+
+        function buildDeptWorksheetGridHtml(stage, ordersHere, searchTerm) {
+            const cfg = DEPT_WS_CFG[stage];
+            const rank = { working: 0, waiting: 1, external: 2, done: 3 };
+            const infos = ordersHere.map(order => ({ order, st: deptWsStatus(stage, order) }));
+            infos.sort((a, b) => {
+                const ra = rank[a.st.key], rb = rank[b.st.key];
+                if (ra !== rb) return ra - rb;
+                const da = a.order.dueDate || '9999', db = b.order.dueDate || '9999';
+                if (da !== db) return da < db ? -1 : 1;
+                return planningWsSeq(b.order) - planningWsSeq(a.order);
+            });
+            const cards = infos.map(({ order, st }) => {
+                const idx = productionOrders.indexOf(order);
+                const sub = order.customerPO || order.customerName || '';
+                const warn = getDeadlineWarning(order);
+                const prog = deptWsProgressText(stage, order);
+                const carry = boardCarryOverBadgeHtml(order);
+                const borderCls = st.key === 'done' ? 'border-l-emerald-500' : (st.key === 'working' ? cfg.border : (st.key === 'external' ? 'border-l-amber-500' : 'border-l-slate-300'));
+                return `
+                    <div data-dept-card="${escapeHtml(order.moSo)}" onclick="openDeptWorksheet('${stage}', ${idx})" class="relative cursor-pointer bg-white border ${warn ? (warn.level === 'overdue' ? 'border-rose-300' : 'border-amber-300') : 'border-slate-200'} border-l-4 ${borderCls} rounded-md px-3 py-2.5 hover:shadow-md hover:border-slate-300 transition">
+                        <button type="button" onclick="event.stopPropagation(); deptWsPass('${stage}', ${idx})" title="${escapeHtml(cfg.passLabel)}" class="absolute top-2 right-2 px-2 py-0.5 text-[11px] text-slate-500 bg-white border border-slate-300 rounded hover:bg-slate-50 hover:text-slate-700 transition">${escapeHtml(cfg.passLabel)}</button>
+                        <p class="font-bold text-[13px] text-slate-900 pr-24 truncate">${escapeHtml(planningWsTitle(order))}</p>
+                        <p class="text-xs text-slate-700 truncate" title="${escapeHtml(sub)}">${escapeHtml(sub) || '&nbsp;'}</p>
+                        <p class="text-[11px] text-slate-400 truncate">${escapeHtml(planningWsMoLine(order))}${order.dueDate ? ` · กำหนดส่ง ${escapeHtml(order.dueDate)}` : ''}</p>
+                        <p class="text-[11px] text-slate-600 mt-1 truncate" title="${escapeHtml(prog)}">${escapeHtml(prog)}</p>
+                        ${(stage === 'weaving' || stage === 'finishing') ? `<div class="h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden"><div class="h-full ${st.key === 'done' ? 'bg-emerald-500' : cfg.bar}" style="width:${Math.min(100, st.pct)}%"></div></div>` : ''}
+                        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${st.cls}">${escapeHtml(st.label)}</span>
+                            ${carry}
+                            ${warn ? `<span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${warn.level === 'overdue' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}">${escapeHtml(warn.level === 'overdue' ? 'เลยกำหนด' : 'ใกล้กำหนด')}</span>` : ''}
+                        </div>
+                    </div>`;
+            }).join('');
+            return `
+                <div class="space-y-4">
+                    ${deptWsHeaderHtml(stage, stage === 'weaving' ? weavingViewToggleHtml() : '')}
+                    <div class="bg-white border border-slate-200 rounded-lg">
+                        <div class="px-4 py-3 border-b border-slate-100">
+                            <p class="font-bold text-sm text-slate-800">${escapeHtml(STAGE_LABELS[stage] || cfg.title)} · ${escapeHtml(boardMonthFilter === 'all' ? 'ทุกเดือน' : boardMonthLabel(getBoardMonthSelection()))}</p>
+                            <p class="text-[10px] text-slate-400">เรียงงานที่กำลังทำก่อน แล้วตามกำหนดส่ง — เปลี่ยนเดือนได้ที่ช่อง "เดือน" ด้านบน</p>
+                        </div>
+                        <div class="p-3">
+                            ${infos.length === 0
+                                ? `<p class="text-xs text-slate-400 text-center py-10">${searchTerm ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : escapeHtml(cfg.empty) + (boardMonthFilter === 'all' ? '' : ' ในเดือนนี้ (เลือก "ทุกเดือน" เพื่อดูทั้งหมด)')}</p>`
+                                : `<div data-dept-grid="${stage}" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2.5">${cards}</div>`}
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function openDeptWorksheet(stage, orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            deptWsUi[stage] = order.moSo;
+            renderProductionBoard();
+            window.scrollTo(0, 0);
+        }
+        function closeDeptWorksheet(stage) {
+            deptWsUi[stage] = '';
+            renderProductionBoard();
+            window.scrollTo(0, 0);
+        }
+        function deptWsInfoBox(label, value) {
+            return `<div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2"><p class="text-[10px] text-slate-400">${escapeHtml(label)}</p><p class="text-sm font-bold text-slate-800 truncate" title="${escapeHtml(String(value || '-'))}">${escapeHtml(String(value || '-'))}</p></div>`;
+        }
+        function deptWsSetDuration(stage, orderIndex, raw) {
+            updateOrderField(orderIndex, 'planDurations.' + stage, raw === '' || raw === null || raw === undefined ? '' : Math.max(0, Number(raw) || 0));
+        }
+
+        function buildDeptWorksheetDetailHtml(stage, order, orderIndex) {
+            const cfg = DEPT_WS_CFG[stage];
+            const st = deptWsStatus(stage, order);
+            const durable = stage !== 'ready_to_ship';
+            const dur = (order.planDurations || {})[stage];
+            const finish = (order.planDates || {})[stage];
+            const carry = boardCarryOverBadgeHtml(order);
+            const nextLabel = stage === 'finishing' ? 'รอส่ง' : (stage === 'ready_to_ship' ? 'จัดส่งแล้ว' : (stage === 'design' ? 'ผ่านดีไซน์' : (STAGE_LABELS[(order.weaving || {}).mode === 'external' ? 'finishing' : NEXT_STAGE.weaving] || '')));
+
+            const sec1 = `
+                <section class="bg-white border border-slate-200 rounded-lg p-4 space-y-3" data-dept-section="1">
+                    <div><h3 class="text-sm font-bold text-slate-800">1) ข้อมูลงาน + ความคืบหน้า</h3>
+                    <p class="text-[11px] text-slate-400">ข้อมูลจากใบเปิด M/O และสถานะของแผนกนี้</p></div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        ${deptWsInfoBox('M/O, S/O', order.moSo)}
+                        ${deptWsInfoBox('ลูกค้า', order.customerName)}
+                        ${deptWsInfoBox('โปรเจกต์ / PO', order.customerPO)}
+                        ${deptWsInfoBox('กำหนดส่ง', order.dueDate)}
+                        ${deptWsInfoBox('วันที่เปิด M/O', order.openDate)}
+                        ${deptWsInfoBox('พื้นที่รวม (ตร.ม.)', order.totalSqm)}
+                        ${deptWsInfoBox('จำนวนชิ้น', order.totalPieces)}
+                        ${deptWsInfoBox('แผนกถัดไป', nextLabel)}
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                        <p class="text-[10px] text-slate-500">ความคืบหน้าแผนกนี้</p>
+                        <p class="text-sm font-bold text-slate-800" data-dept-progress>${escapeHtml(deptWsProgressText(stage, order))}</p>
+                        ${(stage === 'weaving' || stage === 'finishing') ? `<div class="h-2 bg-white border border-slate-200 rounded-full mt-1 overflow-hidden"><div class="h-full ${st.key === 'done' ? 'bg-emerald-500' : cfg.bar}" style="width:${Math.min(100, st.pct)}%"></div></div>` : ''}
+                    </div>
+                    ${durable ? `<div class="flex flex-wrap items-end gap-3">
+                        <div><label class="block text-[10px] text-slate-500 mb-0.5">ระยะเวลาแผนกนี้ (วัน)</label>
+                            <input type="number" min="0" step="0.5" data-dept-duration value="${dur === '' || dur === undefined || dur === null ? '' : dur}" onchange="deptWsSetDuration('${stage}', ${orderIndex}, this.value)" class="w-28 px-2 py-1.5 border border-slate-300 rounded text-sm"></div>
+                        <div><p class="text-[10px] text-slate-500">กำหนดเสร็จตามแผน</p><p class="text-sm font-semibold text-slate-700">${escapeHtml(finish || '-')}</p></div>
+                    </div>` : ''}
+                </section>`;
+
+            let stageBody;
+            if (stage === 'design') stageBody = renderDesignSectionHtml(order, orderIndex);
+            else if (stage === 'ready_to_ship') {
+                stageBody = `<div class="space-y-2">
+                    <p class="text-sm text-slate-700"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 text-[11px] font-semibold"><i class="fa-solid fa-clock text-[10px]"></i> รอจัดส่ง</span> งานเสร็จครบแล้ว พร้อมส่งมอบให้ลูกค้า</p>
+                    <div class="flex flex-wrap gap-2"><button type="button" onclick="attemptOpenPackagingQc(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded bg-white hover:bg-slate-50 text-slate-700"><i class="fa-solid fa-clipboard-check mr-1"></i>QC บรรจุภัณฑ์</button></div>
+                    <p class="text-[11px] text-slate-400">แก้ไขข้อมูลการจัดส่ง (ใบแจ้งหนี้ / Shipping Mark) ได้ที่เมนู "รายการรอส่ง" หรือปุ่ม "รายละเอียด M/O ทั้งหมด"</p>
+                </div>`;
+            } else stageBody = renderOrderDetailStageSection(order, orderIndex, stage);
+
+            const sec2 = `
+                <section class="bg-white border border-slate-200 rounded-lg p-4 space-y-3" data-dept-section="2">
+                    <div><h3 class="text-sm font-bold text-slate-800">2) งานของแผนก${escapeHtml(STAGE_LABELS[stage] || '')}</h3>
+                    <p class="text-[11px] text-slate-400">แก้ไขข้อมูลของแผนกนี้ได้ในหน้านี้เลย — บันทึกอัตโนมัติ</p></div>
+                    <div data-dept-stage-body>${stageBody}</div>
+                </section>`;
+
+            const sec3 = `
+                <section class="bg-white border border-slate-200 rounded-lg p-4 space-y-3" data-dept-section="3">
+                    <div><h3 class="text-sm font-bold text-slate-800">3) ประวัติ QC ของ M/O นี้</h3>
+                    <p class="text-[11px] text-slate-400">ทุกแผนก — แก้ไข/ดูรายละเอียดเพิ่มที่เมนู "รายงาน QC ทั้งหมด"</p></div>
+                    ${buildQcHistoryTableHtml(order.moSo)}
+                </section>`;
+
+            return `
+                <div class="space-y-4" data-dept-detail="${escapeHtml(order.moSo)}" data-dept-stage="${stage}">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                            <button type="button" onclick="closeDeptWorksheet('${stage}')" class="text-xs text-slate-500 hover:text-slate-800 mb-1"><i class="fa-solid fa-arrow-left mr-1"></i>กลับไปรายการ</button>
+                            <h2 class="text-2xl font-bold text-slate-900">${cfg.title}</h2>
+                            <p class="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-1.5"><span class="font-semibold text-slate-700">${escapeHtml(planningWsTitle(order))}</span> · ${escapeHtml(order.customerName || '-')} <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${st.cls}">${escapeHtml(st.label)}</span>${carry}</p>
+                        </div>
+                        <button type="button" onclick="openOrderDetailModal(${orderIndex}, '${stage === 'ready_to_ship' ? 'finishing' : stage}')" class="px-3 py-1.5 text-xs font-semibold text-indigo-700 border border-indigo-300 rounded bg-white hover:bg-indigo-50"><i class="fa-solid fa-pen-to-square"></i> รายละเอียด M/O ทั้งหมด</button>
+                    </div>
+                    ${sec1}${sec2}${sec3}
+                    <div class="flex flex-wrap items-center justify-end gap-2 bg-white border border-slate-200 rounded-lg p-3">
+                        <div class="mr-auto">${stage === 'ready_to_ship' ? '' : renderQcBadge(order.moSo, stage)}</div>
+                        <button type="button" onclick="closeDeptWorksheet('${stage}')" class="px-4 py-2 text-sm font-semibold border border-slate-300 text-slate-700 rounded bg-white hover:bg-slate-50">กลับไปรายการ</button>
+                        <button type="button" data-dept-pass onclick="deptWsPass('${stage}', ${orderIndex})" class="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700">${escapeHtml(cfg.passLabel)}</button>
+                    </div>
+                </div>`;
         }
 
         function computePlanningNextStage(order) {
@@ -21977,15 +22306,44 @@
         function importDyeingKpiOrderLog(fileInput) {
             const file = fileInput.files[0];
             if (!file) return;
+            // NEW (2026-10-06): "แผนกย้อม รายการ S/O นำเข้าไม่สำเร็จ ... นำเข้าสำเร็จ 0 รายการ, ไม่พบ M/O 10 รายการ" — ปุ่ม "นำเข้า Excel" ของตารางนี้
+            // รับเฉพาะไฟล์ที่ส่งออกจากตารางนี้ (หัวคอลัมน์ตายตัว, ชีตแรก) ถ้าเลือกไฟล์ "รายงานการผลิตแผนกย้อม" (ชีตชื่อวันที่) มาที่นี่ ทุกแถวจะอ่านไม่ได้
+            // → ตรวจดูก่อน ถ้าเป็นรายงานย้อมให้ส่งต่อไปหน้านำเข้ารายงานย้อม (พรีวิว + เลือกผูก/นอกระบบ)
+            const sniffReader = new FileReader();
+            sniffReader.onload = (e) => {
+                let isDailyReport = false;
+                try {
+                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+                    const agg = aggregateDyeingImport(wb);
+                    isDailyReport = agg.sheetsRead > 0 && Object.keys(agg.byMoSo).length > 0;
+                } catch (err) { isDailyReport = false; }
+                if (isDailyReport) {
+                    openImportDyeingModal();
+                    handleDyeingExcelFile({ files: [file] });
+                    fileInput.value = '';
+                    showToast('ไฟล์นี้เป็น "รายงานการผลิตแผนกย้อม" — เปิดหน้านำเข้ารายงานย้อมให้แล้ว ตรวจพรีวิวแล้วกดยืนยัน', 'fa-circle-info', 'text-sky-400');
+                    return;
+                }
+                importDyeingKpiOrderLogFlat(fileInput, file);
+            };
+            sniffReader.onerror = () => importDyeingKpiOrderLogFlat(fileInput, file);
+            sniffReader.readAsArrayBuffer(file);
+        }
+
+        function importDyeingKpiOrderLogFlat(fileInput, file) {
             readExcelAoaFromFile(file, (err, aoa) => {
                 fileInput.value = '';
                 if (err) { showToast('อ่านไฟล์ไม่สำเร็จ: ' + err.message, 'fa-triangle-exclamation', 'text-rose-400'); return; }
                 const rows = parseFlatRowsFromAoa(aoa, DYEING_ORDER_COLUMNS);
                 let added = 0, unmatched = 0;
+                const unmatchedNames = new Set();
                 const touchedIdx = new Set();
                 rows.forEach(r => {
-                    const orderIndex = productionOrders.findIndex(o => o.moSo === String(r.moSo || '').trim());
-                    if (orderIndex === -1) { unmatched++; return; }
+                    const moRaw = String(r.moSo || '').trim();
+                    // จับคู่แบบเดียวกับนำเข้ารายงานย้อม (ทน 0 นำหน้า/ช่องว่าง/ขีด) ก่อนถอยกลับเป็นตรงตัว
+                    let orderIndex = productionOrders.findIndex(o => o.moSo === moRaw);
+                    if (orderIndex === -1 && moRaw) { const k = normalizeDyeingMoSoMatchKey(moRaw); orderIndex = productionOrders.findIndex(o => normalizeDyeingMoSoMatchKey(o.moSo) === k); }
+                    if (orderIndex === -1) { unmatched++; unmatchedNames.add(moRaw || '(ไม่มีเลข M/O)'); return; }
                     touchedIdx.add(orderIndex);
                     const order = productionOrders[orderIndex];
                     if (!order.dyeing) order.dyeing = {};
@@ -22000,7 +22358,7 @@
                 const autoMoved = [];
                 touchedIdx.forEach(i => { if (checkAndAutoTransferDyeingIfComplete(i)) autoMoved.push(productionOrders[i].moSo); });
                 renderDyeOrderLogTable();
-                showToast(`นำเข้าสำเร็จ ${added} รายการ${unmatched > 0 ? `, ไม่พบ M/O ${unmatched} รายการ` : ''}${autoMoved.length ? ` • ไหมย้อมครบตามแผน โอนไปแผนกถัดไปอัตโนมัติ: ${autoMoved.join(', ')}` : ''}`, 'fa-check', 'text-emerald-400');
+                showToast(`นำเข้าสำเร็จ ${added} รายการ${unmatched > 0 ? `, ไม่พบ M/O ${unmatched} รายการ (${[...unmatchedNames].slice(0, 3).join(', ')}${unmatchedNames.size > 3 ? '…' : ''}) — ไฟล์รายงานย้อมรายวันให้ใช้ปุ่ม "นำเข้ารายงานย้อม" ด้านบน` : ''}${autoMoved.length ? ` • ไหมย้อมครบตามแผน โอนไปแผนกถัดไปอัตโนมัติ: ${autoMoved.join(', ')}` : ''}`, 'fa-check', 'text-emerald-400');
             });
         }
 
