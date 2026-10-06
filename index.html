@@ -1241,9 +1241,10 @@
                     </div>
                     <div id="boardColumn-design" class="flex flex-col gap-3"></div>
                 </div>
-                <div id="boardColWrap-dyeing" class="bg-violet-50/60 border border-violet-100 border-t-4 border-t-violet-400 rounded-2xl p-3 flex flex-col gap-3 min-h-[200px]">
-                    <div class="flex items-center justify-between px-1">
-                        <h4 class="font-bold text-violet-700 text-xs uppercase flex items-center gap-1.5"><i class="fa-solid fa-droplet text-violet-500"></i> ย้อม</h4>
+                <div id="boardColWrap-dyeing" class="flex flex-col gap-2 min-h-[200px]">
+                    <!-- UPDATED (2026-10-06): แผนกย้อมเป็น "ใบงานย้อม" (renderDyeingWorksheetPage() วาดกริด/รายละเอียดเองใน #boardColumn-dyeing) -->
+                    <div class="flex items-center justify-end gap-1.5 px-1">
+                        <span class="text-[11px] text-slate-400">งานที่อยู่แผนกย้อม</span>
                         <span id="boardCount-dyeing" class="text-[11px] bg-white text-violet-700 font-semibold px-2 py-0.5 rounded-full border border-violet-200">0</span>
                     </div>
                     <div id="boardColumn-dyeing" class="flex flex-col gap-3"></div>
@@ -7011,14 +7012,33 @@
         // Stripping leading zeros here too, the same way, makes the match symmetric regardless of which
         // side (or neither, or both) happens to carry the padding.
         function normalizeDyeingMoSoMatchKey(moSo) {
-            let s = String(moSo || '').trim();
+            let s = String(moSo || '');
+            // UPDATED (2026-10-06): "s/o sc390/26 มีในระบบ แต่คีย์ไม่เหมือนกัน" — ทนความต่างที่มองไม่เห็น: ตัวอักษรเต็มความกว้าง,
+            // zero-width/nbsp, ขีด/แบ็กสแลชแทน "/", และข้อความต่อท้ายเลขปี (เช่น "SC0390/26 (WAYNE LAW)")
+            try { s = s.normalize('NFKC'); } catch (e) { /* old engines */ }
+            s = s.replace(/[\u200B-\u200F\u2060\uFEFF]/g, '').replace(/\u00A0/g, ' ').trim();
             s = s.replace(/^(M\/O|S\/O|MO|SO)[\s:.]*/i, '').trim();
-            const m = s.match(/^([A-Za-z]*\s*)(\d+)\s*\/\s*(\d+)$/);
+            const m = s.match(/^([A-Za-z]*\s*)(\d+)\s*[\/\\-]\s*(\d{2})(?!\d)/);
             if (m) {
                 const prefix = m[1] || '';
                 s = `${prefix}${String(Number(m[2]))}/${m[3]}`.trim();
             }
             return normalizeMoSoKey(s);
+        }
+
+        // NEW (2026-10-06): แกนเลขของ M/O, S/O (เลขลำดับไม่มี 0 นำหน้า + ปี 2 หลัก) ไว้หา "รายการใกล้เคียง" ตอนจับคู่ตรงๆ ไม่ได้ — ไม่สนคำนำหน้า (SC/TH/D)
+        function dyeingMoSoCore(moSo) {
+            let s = String(moSo || '');
+            try { s = s.normalize('NFKC'); } catch (e) { /* ignore */ }
+            const all = [...s.matchAll(/(\d+)\s*[\/\\-]\s*(\d{2})(?!\d)/g)];
+            if (all.length === 0) return '';
+            const m = all[all.length - 1];
+            return `${Number(m[1])}/${m[2]}`;
+        }
+        function findDyeingCandidateOrders(key) {
+            const core = dyeingMoSoCore(key);
+            if (!core) return [];
+            return productionOrders.map((o, i) => ({ o, i })).filter(x => dyeingMoSoCore(x.o.moSo) === core);
         }
 
         // Reads every date-named sheet (e.g. "1-9-2026") of the รายงานการผลิตแผนกย้อม Excel format and
@@ -7162,14 +7182,49 @@
                     }
 
                     splitDyeingOrderNoCell(orderNoRaw).forEach(disp => {
-                        const key = normalizeMoSoKey(disp);
+                        const key = normalizeDyeingMoSoMatchKey(disp);
                         if (!key) return;
-                        if (!byMoSo[key]) byMoSo[key] = { moSoDisplay: disp, rows: [] };
+                        if (!byMoSo[key]) byMoSo[key] = { moSoDisplay: disp, rows: [], typeHint: /^\s*(S\/O|SO)\b/i.test(String(orderNoRaw || '')) ? 'SO' : 'MO' };
                         byMoSo[key].rows.push({ dateKey, sheetName, colorNo, colorCode, yarnType, lotNo, hang, batchNo, kg, remark, requisitionKg, orderKg, dyeTubNo });
                     });
                 }
             });
             return { byMoSo, sheetsRead };
+        }
+
+        // NEW (2026-10-06): "แผนกย้อมนำเข้าข้อมูลไม่ขึ้นรายงาน" — รายงานย้อมของวันที่ 1 (M/O 183/26) และ 5 (S/O SC 390/26)
+        // ไม่ขึ้นในตาราง "บันทึกสั่งย้อม" เพราะ M/O, S/O เหล่านั้นยังไม่ได้เปิดในระบบ → เดิมถูก "ข้าม" เงียบๆ (ตารางนี้เก็บ
+        // ในตัว order.dyeing.dyeOrderLog จึงไม่มีที่เก็บให้แถวที่ไม่มี order). ตอนนี้ให้เลือกสร้างเป็นรายการ "นอกระบบ" —
+        // order เปล่าที่มีแค่เลขที่ + ชนิด (ติดข้อความ DYE_OFFSYSTEM_REMARK ใน orderRemark) อยู่แผนกย้อม ซึ่งซิงก์ลง Google
+        // Sheet ได้ตามปกติ และเมื่อเปิด M/O จริงภายหลัง (นำเข้า/เปิดใหม่ด้วยเลขเดียวกัน) ระบบจะเติมข้อมูลเข้า order เดิมนี้
+        const DYE_OFFSYSTEM_REMARK = 'สร้างจากรายงานย้อม — ยังไม่ได้เปิด M/O, S/O นี้ในระบบ';
+        function isDyeOffSystemOrder(order) {
+            return !!(order && String(order.orderRemark || '').startsWith(DYE_OFFSYSTEM_REMARK));
+        }
+        // "183/26" -> "0183/26", "SC 390/26" -> "SC0390/26" (รูปแบบเดียวกับที่ระบบเก็บ); เลขที่รูปแบบอื่น (เช่น "AX SO 0112/26") คงเดิม
+        function buildOffSystemMoSoFromDyeKey(disp) {
+            const s = String(disp || '').trim();
+            const m = s.match(/^([A-Za-z]*)\s*(\d+)\s*\/\s*(\d+)$/);
+            if (!m) return s;
+            return `${m[1].toUpperCase()}${m[2].padStart(4, '0')}/${m[3]}`;
+        }
+        function guessMarketFromMoSoPrefix(moSo, orderType) {
+            const m = String(moSo || '').trim().match(/^([A-Za-z]+)/);
+            const prefix = m ? m[1].toUpperCase() : '';
+            if (prefix === 'TH' || prefix === 'DM' || prefix === 'D') return 'domestic';
+            return 'export'; // SC / เลขล้วน (M/O ต่างประเทศ) / อื่นๆ
+        }
+        function createOffSystemOrderFromDyeGroup(group) {
+            const moSo = buildOffSystemMoSoFromDyeKey(group.moSoDisplay);
+            const orderType = group.typeHint === 'SO' ? 'SO' : 'MO';
+            const d = new Date();
+            const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const order = normalizeOrder({
+                moSo, orderType, market: guessMarketFromMoSoPrefix(moSo, orderType), currentStage: 'dyeing',
+                openDate: today, createdAt: today, orderRemark: DYE_OFFSYSTEM_REMARK
+            });
+            productionOrders.push(order);
+            return { order, orderIndex: productionOrders.length - 1 };
         }
 
         function handleDyeingExcelFile(input) {
@@ -7211,13 +7266,20 @@
                     const matchedCount = rows.filter(r => r.orderIndex !== -1).length;
                     const unmatchedRows = rows.filter(r => r.orderIndex === -1);
 
-                    status.textContent = `อ่านข้อมูลจาก ${sheetsRead} วัน พบ ${rows.length} M/O, S/O — ตรงกับระบบ ${matchedCount} รายการ${unmatchedRows.length > 0 ? `, ไม่พบในระบบ ${unmatchedRows.length} รายการ (จะข้ามให้อัตโนมัติ)` : ''}`;
+                    status.textContent = `อ่านข้อมูลจาก ${sheetsRead} วัน พบ ${rows.length} M/O, S/O — ตรงกับระบบ ${matchedCount} รายการ${unmatchedRows.length > 0 ? `, ไม่พบในระบบ ${unmatchedRows.length} รายการ (เลือกผูกกับรายการใกล้เคียง หรือสร้างเป็นรายการ "นอกระบบ" ให้ข้อมูลขึ้นในรายงาน)` : ''}`;
 
                     preview.classList.remove('hidden');
                     preview.innerHTML = rows.map(r => {
                         const foundBadge = r.orderIndex !== -1
                             ? `<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> พบในระบบ${r.canAutoTransfer ? ' · ครบแผนแล้วจะโอนแผนกทอให้อัตโนมัติ' : ''}${(r.orderIndex !== -1 && productionOrders[r.orderIndex].currentStage === 'planning') ? ' · ยังอยู่แผนกวางแผน จะย้ายมาแผนกย้อมให้' : ''}</span>`
-                            : `<span class="text-rose-500"><i class="fa-solid fa-circle-exclamation"></i> ไม่พบ M/O, S/O นี้ในระบบ</span>`;
+                            : (() => {
+                                const cands = findDyeingCandidateOrders(r.key);
+                                const pfx = k => (String(k).match(/^[A-Z]*/) || [''])[0];
+                                const sameIdx = cands.findIndex(c => pfx(normalizeDyeingMoSoMatchKey(c.o.moSo)) === pfx(r.key)); // ผูกให้อัตโนมัติเฉพาะคำนำหน้า (SC/TH/D) เดียวกัน
+                                const opts = cands.map((c, n) => `<option value="${c.i}"${n === sameIdx ? ' selected' : ''}>ผูกกับรายการในระบบ: ${escapeHtml(c.o.moSo)}${c.o.customerName ? ' · ' + escapeHtml(c.o.customerName) : ''}</option>`).join('');
+                                return `<span class="text-rose-500 flex items-center gap-1.5 flex-wrap justify-end"><i class="fa-solid fa-circle-exclamation"></i> ${cands.length ? 'เลขไม่ตรงเป๊ะ แต่พบเลขใกล้เคียง' : 'ไม่พบ M/O, S/O นี้ในระบบ'}
+                                    <select data-dye-link="${escapeHtml(r.key)}" class="border border-slate-300 rounded px-1.5 py-0.5 text-[11px] text-slate-700 bg-white">${opts}<option value="offsys"${sameIdx !== -1 ? '' : ' selected'}>สร้างเป็นรายการนอกระบบ</option><option value="skip">ข้าม ไม่นำเข้า</option></select></span>`;
+                            })();
                         return `<div class="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                             <div><span class="font-semibold text-slate-700">${escapeHtml(r.moSoDisplay)}</span>
                                 <span class="text-slate-400 ml-1">${r.distinctColors} สี, รวม ${r.totalKgInFile.toFixed(2)} กก.</span></div>
@@ -7225,7 +7287,7 @@
                         </div>`;
                     }).join('');
 
-                    if (matchedCount > 0) {
+                    if (matchedCount > 0 || unmatchedRows.length > 0) {
                         pendingDyeingImport = { byMoSo };
                         confirmBtn.classList.remove('hidden');
                     } else {
@@ -7269,16 +7331,30 @@
             const importDetails = []; // NEW (2026-10-05): ต่อ M/O — แถวไปอยู่ที่ไหน (บันทึกสั่งย้อม / ย้อมเพิ่ม) และตอนนี้อยู่แผนกไหน
             let unmatchedCount = 0;
 
+            const createdOffSystem = [];
             Object.keys(byMoSo).forEach(key => {
                 const group = byMoSo[key];
-                const orderIndex = productionOrders.findIndex(o => normalizeDyeingMoSoMatchKey(o.moSo) === key);
+                let orderIndex = productionOrders.findIndex(o => normalizeDyeingMoSoMatchKey(o.moSo) === key);
+                if (orderIndex === -1) {
+                    // NEW (2026-10-06): ตัวเลือกในพรีวิว — ผูกกับรายการในระบบที่เลขใกล้เคียง / สร้างเป็นรายการนอกระบบ / ข้าม (ไม่มีตัวเลือก = ข้ามเหมือนเดิม)
+                    const sel = document.querySelector(`[data-dye-link="${(window.CSS && CSS.escape) ? CSS.escape(key) : key}"]`);
+                    if (sel) {
+                        if (sel.value === 'offsys') {
+                            const made = createOffSystemOrderFromDyeGroup(group);
+                            orderIndex = made.orderIndex;
+                            createdOffSystem.push(made.order.moSo);
+                        } else if (sel.value !== 'skip' && productionOrders[Number(sel.value)]) {
+                            orderIndex = Number(sel.value);
+                        }
+                    }
+                }
                 if (orderIndex === -1) { unmatchedCount++; return; } // unmatched — already flagged in the preview, nothing to do
                 const order = productionOrders[orderIndex];
                 if (!order.dyeing) order.dyeing = {};
                 if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
                 const log = order.dyeing.dyeOrderLog;
                 const usedThisRound = new Set();
-                const detail = { moSo: order.moSo, regular: 0, extra: 0, stage: '' };
+                const detail = { moSo: order.moSo, regular: 0, extra: 0, stage: '', offSystem: createdOffSystem.includes(order.moSo) };
 
                 // Consolidate raw rows by colorKey|isExtra|month before touching dyeOrderLog at all.
                 const colorGroups = {};
@@ -7425,11 +7501,12 @@
             if (matched.length > 0) {
                 const detailLines = importDetails.map(d => {
                     const where = [d.regular > 0 ? `บันทึกสั่งย้อม ${d.regular} แถว` : '', d.extra > 0 ? `ย้อมเพิ่ม ${d.extra} แถว (แท็บ "ย้อมเพิ่ม")` : ''].filter(Boolean).join(' • ') || 'ไม่มีแถวใหม่';
-                    return `<div class="text-[11px] text-slate-600"><span class="font-semibold">${escapeHtml(d.moSo)}</span> → ${where} • ${d.movedFromPlanning ? ' • ย้ายจากแผนกวางแผนมาแผนกย้อมให้แล้ว' : ''} • ตอนนี้อยู่แผนก${escapeHtml(STAGE_LABELS[d.stage] || d.stage || '-')}</div>`;
+                    return `<div class="text-[11px] text-slate-600"><span class="font-semibold">${escapeHtml(d.moSo)}</span> → ${where} • ${d.offSystem ? ' • สร้างเป็นรายการนอกระบบ (ยังไม่มี M/O นี้ในระบบ)' : ''}${d.movedFromPlanning ? ' • ย้ายจากแผนกวางแผนมาแผนกย้อมให้แล้ว' : ''} • ตอนนี้อยู่แผนก${escapeHtml(STAGE_LABELS[d.stage] || d.stage || '-')}</div>`;
                 }).join('');
                 status.innerHTML = `<span class="text-emerald-600 font-medium"><i class="fa-solid fa-circle-check"></i> นำเข้าสำเร็จ ${matched.length} M/O, S/O</span>` +
                     `<div class="mt-1 space-y-0.5 max-h-40 overflow-y-auto">${detailLines}</div>` +
                     (unmatchedCount > 0 ? `<div class="text-[11px] text-amber-600 mt-1"><i class="fa-solid fa-triangle-exclamation"></i> ข้าม ${unmatchedCount} M/O, S/O ที่ไม่พบในระบบ</div>` : '') +
+                    (createdOffSystem.length > 0 ? `<div class="text-[11px] text-amber-700 mt-1"><i class="fa-solid fa-keyboard"></i> สร้างรายการนอกระบบ ${createdOffSystem.length} รายการ: ${createdOffSystem.map(escapeHtml).join(', ')} — เมื่อเปิด M/O จริงด้วยเลขเดียวกัน ให้นำเข้า/เปิดทับเลขนี้ ระบบจะเติมข้อมูลเข้ารายการเดิม</div>` : '') +
                     `<div class="text-[11px] text-slate-400 mt-1">ดูรายการได้ที่ แผนกย้อม (KPI) > บันทึกสั่งย้อม / ย้อมเพิ่ม และการ์ดของ M/O ในบอร์ดแผนกย้อม</div>` +
                     `<button type="button" onclick="closeImportDyeingModal()" class="mt-2 w-full bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium py-2 rounded-lg shadow transition"><i class="fa-solid fa-table-list mr-1"></i> ปิดหน้าต่าง แล้วดูรายการย้อม</button>` +
                     (autoTransferred.length > 0 ? `<br><span class="text-violet-600"><i class="fa-solid fa-arrow-right"></i> โอนไปแผนกทออัตโนมัติ ${autoTransferred.length} รายการ: ${autoTransferred.map(escapeHtml).join(', ')}</span>` : '');
@@ -11917,6 +11994,12 @@
                     return;
                 }
 
+                // NEW (2026-10-06): แผนกย้อม แสดงเป็นกริดการ์ด M/O → กดเข้าไปเจอ "ใบงานย้อม" (เหมือนแผนกวางแผน)
+                if (stage === 'dyeing') {
+                    renderDyeingWorksheetPage(ordersHere, searchTerm);
+                    return;
+                }
+
                 if (ordersHere.length === 0) {
                     column.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">${searchTerm ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : 'ไม่มีรายการ'}</p>`;
                     return;
@@ -14645,6 +14728,266 @@
                             <tbody>${Object.keys(PLANNING_WS_FINISHING_INFO).map(k => `<tr><td class="${td} font-bold">${k}</td><td class="${td}">${PLANNING_WS_FINISHING_INFO[k].grind}</td><td class="${td}">${escapeHtml(PLANNING_WS_FINISHING_INFO[k].note)}</td><td class="${td} text-right">${PLANNING_WS_FINISHING_INFO[k].target.toFixed(2)}</td></tr>`).join('')}</tbody></table></div>
                     </div>
                 </div>`;
+        }
+
+        // =========================================================================================
+        // NEW (2026-10-06): แผนกย้อม → "ใบงานย้อม (Dyeing Worksheet)" — "หน้าบอร์ดแผนกย้อมให้ทำเหมือนแผนกวางแผน"
+        // (ผู้ใช้เลือก: กริดการ์ด M/O → กดเข้าไปเจอใบงานย้อม). แทนคอลัมน์การ์ดคัมบังเดิมของแผนกย้อม
+        // (แท็บ KPI/รายงานย้อมและแผนกอื่นไม่เปลี่ยน). ไม่มีโครงข้อมูลใหม่ — ใช้ของเดิมทั้งหมด:
+        // dyeing.colorOrders (แผน), dyeing.dyeOrderLog (รายงานย้อมที่นำเข้า), dyeing.mode, planDurations.dyeing,
+        // transferOrderStage() (โอนไปทอ/ตกแต่ง). สถานะต่างๆ (ย้อมครบ/กำลังย้อม/รอเริ่ม) คำนวณสดจาก buildDyeingLogSummary().
+        // =========================================================================================
+        let dyeingWsUi = { currentMo: '' };
+
+        function dyeingWsStatus(order) {
+            const ds = buildDyeingLogSummary(order);
+            const external = (order.dyeing || {}).mode === 'external';
+            const planKg = ds.rows.reduce((t, r) => t + (r.planKg || 0), 0);
+            const covered = (typeof isDyeingFullyDyedVsPlan === 'function') ? !!isDyeingFullyDyedVsPlan(order) : false;
+            let key = 'waiting', label = 'รอเริ่มย้อม', cls = 'bg-slate-100 text-slate-600';
+            if (external) { key = 'external'; label = 'ย้อมนอกบริษัท'; cls = 'bg-amber-100 text-amber-800'; }
+            else if (covered) { key = 'done'; label = 'ย้อมครบตามแผน'; cls = 'bg-emerald-50 text-emerald-700'; }
+            else if (ds.totalActualKg > 0 || ds.logCount > 0) { key = 'working'; label = 'กำลังย้อม'; cls = 'bg-violet-100 text-violet-800'; }
+            return { key, label, cls, ds, planKg };
+        }
+        function dyeingWsNextStage(order) {
+            return (order.weaving && order.weaving.mode === 'external') ? 'finishing' : 'weaving';
+        }
+
+        function renderDyeingWorksheetPage(ordersHere, searchTerm) {
+            const column = document.getElementById('boardColumn-dyeing');
+            if (!column) return;
+            const scrollY = window.scrollY;
+            const current = dyeingWsUi.currentMo ? productionOrders.find(o => o.moSo === dyeingWsUi.currentMo) : null;
+            if (current && getEffectiveStage(current) === 'dyeing') {
+                column.innerHTML = buildDyeingWorksheetDetailHtml(current, productionOrders.indexOf(current));
+            } else {
+                dyeingWsUi.currentMo = '';
+                column.innerHTML = buildDyeingWorksheetGridHtml(ordersHere || [], searchTerm || '');
+            }
+            window.scrollTo(0, scrollY);
+        }
+
+        function dyeingWsHeaderHtml(showImport) {
+            return `
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">ใบงานย้อม (Dyeing Worksheet)</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">รับงานจากแผนกวางแผน → ดูแผนสั่งย้อมรายสี → เทียบกับรายงานย้อมที่นำเข้า → โอนไปแผนกถัดไปเมื่อย้อมครบ</p>
+                    </div>
+                    ${showImport ? `<button type="button" onclick="openImportDyeingModal()" class="px-3 py-1.5 text-xs font-semibold text-violet-700 border border-violet-300 rounded bg-white hover:bg-violet-50"><i class="fa-solid fa-file-import"></i> นำเข้ารายงานย้อม (Excel)</button>` : ''}
+                </div>`;
+        }
+
+        function buildDyeingWorksheetGridHtml(ordersHere, searchTerm) {
+            const rank = { working: 0, waiting: 1, done: 2, external: 3 };
+            const infos = ordersHere.map(order => ({ order, st: dyeingWsStatus(order) }));
+            infos.sort((a, b) => {
+                const ra = rank[a.st.key], rb = rank[b.st.key];
+                if (ra !== rb) return ra - rb;
+                const da = a.order.dueDate || '9999', db = b.order.dueDate || '9999';
+                if (da !== db) return da < db ? -1 : 1;
+                return planningWsSeq(b.order) - planningWsSeq(a.order);
+            });
+            const cards = infos.map(({ order, st }) => {
+                const idx = productionOrders.indexOf(order);
+                const sub = order.customerPO || order.customerName || '';
+                const nextLabel = STAGE_LABELS[dyeingWsNextStage(order)] || '';
+                const ds = st.ds;
+                const prog = st.key === 'external'
+                    ? 'ส่งย้อมนอกบริษัท'
+                    : (ds.planned > 0 ? `ย้อมครบ ${ds.doneCount}/${ds.planned} สี · ${ds.totalActualKg.toFixed(2)}${st.planKg > 0 ? ` / ${st.planKg.toFixed(2)}` : ''} กก.`
+                        : (ds.logCount > 0 ? `บันทึกย้อม ${ds.logCount} รายการ · ${ds.totalActualKg.toFixed(2)} กก.` : 'ยังไม่มีแผนสี/รายงานย้อม'));
+                const pct = st.planKg > 0 ? Math.min(100, Math.round(ds.totalActualKg / st.planKg * 100)) : 0;
+                const warn = getDeadlineWarning(order);
+                const borderCls = st.key === 'done' ? 'border-l-emerald-500' : (st.key === 'working' ? 'border-l-violet-500' : (st.key === 'external' ? 'border-l-amber-500' : 'border-l-slate-300'));
+                return `
+                    <div data-dw-card="${escapeHtml(order.moSo)}" onclick="openDyeingWorksheet(${idx})" class="relative cursor-pointer bg-white border ${warn ? (warn.level === 'overdue' ? 'border-rose-300' : 'border-amber-300') : 'border-slate-200'} border-l-4 ${borderCls} rounded-md px-3 py-2.5 hover:shadow-md hover:border-slate-300 transition">
+                        <button type="button" onclick="event.stopPropagation(); dyeingWsPass(${idx})" title="โอนงานไปแผนก${escapeHtml(nextLabel)}" class="absolute top-2 right-2 px-2 py-0.5 text-[11px] text-slate-500 bg-white border border-slate-300 rounded hover:bg-slate-50 hover:text-slate-700 transition">โอน → ${escapeHtml(nextLabel)}</button>
+                        <p class="font-bold text-[13px] text-slate-900 pr-24 truncate">${escapeHtml(planningWsTitle(order))}${isDyeOffSystemOrder(order) ? ' <span class="inline-block px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-300 text-[10px] font-semibold align-middle">นอกระบบ</span>' : ''}</p>
+                        <p class="text-xs text-slate-700 truncate" title="${escapeHtml(sub)}">${escapeHtml(sub) || '&nbsp;'}</p>
+                        <p class="text-[11px] text-slate-400 truncate">${escapeHtml(planningWsMoLine(order))}${order.dueDate ? ` · กำหนดส่ง ${escapeHtml(order.dueDate)}` : ''}</p>
+                        <p class="text-[11px] text-slate-600 mt-1 truncate" title="${escapeHtml(prog)}">${escapeHtml(prog)}</p>
+                        ${st.planKg > 0 ? `<div class="h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden"><div class="h-full ${st.key === 'done' ? 'bg-emerald-500' : 'bg-violet-500'}" style="width:${pct}%"></div></div>` : ''}
+                        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${st.cls}">${st.label}</span>
+                            ${ds.extraCount > 0 ? `<span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-fuchsia-50 text-fuchsia-700">ย้อมเพิ่ม ${ds.extraCount}</span>` : ''}
+                            ${warn ? `<span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${warn.level === 'overdue' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}">${escapeHtml(warn.level === 'overdue' ? 'เลยกำหนด' : 'ใกล้กำหนด')}</span>` : ''}
+                        </div>
+                    </div>`;
+            }).join('');
+            return `
+                <div class="space-y-4">
+                    ${dyeingWsHeaderHtml(true)}
+                    <div class="bg-white border border-slate-200 rounded-lg">
+                        <div class="px-4 py-3 border-b border-slate-100">
+                            <p class="font-bold text-sm text-slate-800">งานที่อยู่แผนกย้อม</p>
+                            <p class="text-[10px] text-slate-400">คลิกเพื่อเปิดใบงานย้อม — เรียงงานที่กำลังย้อมก่อน แล้วตามกำหนดส่ง</p>
+                        </div>
+                        <div class="p-3">
+                            ${infos.length === 0
+                                ? `<p class="text-xs text-slate-400 text-center py-10">${searchTerm ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : 'ไม่มีรายการในแผนกย้อม'}</p>`
+                                : `<div id="dyeingWsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2.5">${cards}</div>`}
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function openDyeingWorksheet(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            dyeingWsUi.currentMo = order.moSo;
+            renderDyeingWorksheetPage(productionOrders.filter(o => getEffectiveStage(o) === 'dyeing'), '');
+            window.scrollTo(0, 0);
+        }
+        function closeDyeingWorksheet() {
+            dyeingWsUi.currentMo = '';
+            renderProductionBoard();
+            window.scrollTo(0, 0);
+        }
+        function dyeingWsPass(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            dyeingWsUi.currentMo = '';
+            transferOrderStage(orderIndex, 'dyeing', dyeingWsNextStage(order));
+        }
+
+        function dyeingWsInfoBox(label, value) {
+            return `<div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2"><p class="text-[10px] text-slate-400">${escapeHtml(label)}</p><p class="text-sm font-bold text-slate-800 truncate" title="${escapeHtml(String(value || ''))}">${value ? escapeHtml(String(value)) : '-'}</p></div>`;
+        }
+
+        function buildDyeingWorksheetDetailHtml(order, orderIndex) {
+            const st = dyeingWsStatus(order);
+            const ds = st.ds;
+            const dye = order.dyeing || {};
+            const external = dye.mode === 'external';
+            const sug = computeDyeingSuggestion(order);
+            const dur = (order.planDurations || {}).dyeing;
+            const finish = (order.planDates || {}).dyeing;
+            const nextStage = dyeingWsNextStage(order);
+            const planTotal = st.planKg;
+            const remaining = Math.max(0, planTotal - ds.totalActualKg);
+            const pct = planTotal > 0 ? Math.min(100, Math.round(ds.totalActualKg / planTotal * 100)) : 0;
+
+            // ---- ส่วน 1: ข้อมูลงาน ----
+            const sec1 = `
+                <section class="bg-white border border-slate-200 rounded-lg p-4 space-y-3" data-dw-section="1">
+                    <div><h3 class="text-base font-bold text-slate-900">1) ข้อมูลงาน + ความคืบหน้าการย้อม</h3>
+                    <p class="text-xs text-slate-500">ข้อมูลจากใบวางแผนและรายงานย้อมที่นำเข้า — ปรับการย้อมในบริษัท/นอกบริษัท และจำนวนวันที่ใช้ได้ที่นี่</p></div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        ${dyeingWsInfoBox('M/O, S/O', planningWsMoLine(order))}
+                        ${dyeingWsInfoBox('ลูกค้า', order.customerName)}
+                        ${dyeingWsInfoBox('โปรเจกต์ / PO', order.customerPO)}
+                        ${dyeingWsInfoBox('กำหนดส่ง', order.dueDate)}
+                        ${dyeingWsInfoBox('คุณภาพ', order.quality)}
+                        ${dyeingWsInfoBox('จำนวนสี (แผน)', (ds.planned || order.colorsCount || '') && String(ds.planned || order.colorsCount))}
+                        ${dyeingWsInfoBox('พื้นที่รวม (ตร.ม.)', order.totalSqm)}
+                        ${dyeingWsInfoBox('แผนกถัดไป', 'แผนก' + (STAGE_LABELS[nextStage] || ''))}
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <div class="rounded-lg border border-violet-200 bg-violet-50/50 px-3 py-2"><p class="text-[10px] text-slate-500">ไหมตามแผน (กก.)</p><p class="text-xl font-bold text-violet-800" id="dwPlanKg">${planTotal > 0 ? planningWsFmt(planTotal, 2) : '-'}</p></div>
+                        <div class="rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2"><p class="text-[10px] text-slate-500">ย้อมแล้ว (กก.)</p><p class="text-xl font-bold text-emerald-700" id="dwActualKg">${planningWsFmt(ds.totalActualKg, 2)}</p></div>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"><p class="text-[10px] text-slate-500">คงเหลือ (กก.)</p><p class="text-xl font-bold text-slate-800" id="dwRemainKg">${planTotal > 0 ? planningWsFmt(remaining, 2) : '-'}</p></div>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"><p class="text-[10px] text-slate-500">ความคืบหน้า</p><p class="text-xl font-bold text-slate-800">${planTotal > 0 ? pct + '%' : '-'}</p><div class="h-1.5 bg-slate-200 rounded-full mt-1 overflow-hidden"><div class="h-full bg-violet-500" style="width:${pct}%"></div></div></div>
+                    </div>
+                    <div class="flex flex-wrap items-end gap-4">
+                        <div><p class="text-[11px] font-semibold text-slate-600 mb-1">การย้อม</p>${renderStageModeToggleHtml(orderIndex, 'dyeing', dye.mode, 'ย้อมในบริษัท', 'ย้อมนอกบริษัท')}</div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">ระยะเวลาย้อม (วัน)</label>
+                            <div class="flex items-center gap-2">
+                                <input type="number" min="0" step="1" value="${dur === '' || dur === undefined || dur === null ? '' : dur}" placeholder="${sug.days !== null ? sug.days : '-'}" onchange="dyeingWsSetDuration(${orderIndex}, this.value)" class="w-24 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs">
+                                ${sug.days !== null ? `<span class="text-[11px] text-fuchsia-600">แนะนำ ${sug.days} วัน</span><button type="button" onclick="dyeingWsSetDuration(${orderIndex}, ${sug.days})" class="px-2 py-1 text-[11px] bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded">ใช้ค่านี้</button>` : '<span class="text-[11px] text-slate-400">ตั้งค่ากำลังผลิตแผนกย้อมเพื่อให้ระบบแนะนำ</span>'}
+                            </div>
+                        </div>
+                        <div><p class="text-[11px] font-semibold text-slate-600 mb-1">กำหนดย้อมเสร็จตามแผน</p><p class="text-sm font-bold text-slate-800">${finish ? escapeHtml(finish) : '-'}</p></div>
+                    </div>
+                    ${external ? '<p class="text-xs px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800"><i class="fa-solid fa-truck-ramp-box mr-1"></i>งานนี้สั่งย้อมนอกบริษัท — แผนกย้อมไม่ต้องบันทึกการย้อม กดโอนงานไปแผนกถัดไปได้เลย</p>' : ''}
+                </section>`;
+
+            // ---- ส่วน 2: แผนรายสี vs ย้อมจริง ----
+            const colorRowsHtml = ds.rows.length === 0
+                ? '<tr><td colspan="7" class="text-center text-xs text-slate-400 py-6">ยังไม่มีแผนสีจากแผนกวางแผน และยังไม่มีรายงานย้อม</td></tr>'
+                : ds.rows.map((r, i) => {
+                    const diff = r.planKg !== null ? r.actualKg - r.planKg : null;
+                    return `<tr data-dw-color-row="${escapeHtml(r.key)}" class="border-t border-slate-100 ${r.done ? 'bg-emerald-50/40' : ''}">
+                        <td class="py-1.5 px-2 text-slate-400">${i + 1}</td>
+                        <td class="py-1.5 px-2 font-mono font-semibold text-slate-800">${escapeHtml(r.code)}</td>
+                        <td class="py-1.5 px-2 text-right">${r.planKg !== null ? planningWsFmt(r.planKg, 2) : '<span class="text-slate-300">-</span>'}</td>
+                        <td class="py-1.5 px-2 text-right font-semibold">${planningWsFmt(r.actualKg, 2)}</td>
+                        <td class="py-1.5 px-2 text-right ${diff === null ? 'text-slate-300' : (diff < -0.01 ? 'text-rose-600' : 'text-emerald-600')}">${diff === null ? '-' : (diff > 0 ? '+' : '') + planningWsFmt(diff, 2)}</td>
+                        <td class="py-1.5 px-2">${r.planKg === null ? '<span class="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600">ไม่อยู่ในแผน</span>' : (r.done ? '<span class="text-[11px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold">✓ ครบ</span>' : (r.actualKg > 0 ? '<span class="text-[11px] px-2 py-0.5 rounded bg-violet-100 text-violet-800 font-semibold">กำลังย้อม</span>' : '<span class="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600">รอย้อม</span>'))}</td>
+                    </tr>`;
+                }).join('');
+            const sec2 = `
+                <section class="bg-white border border-slate-200 rounded-lg p-4 space-y-3" data-dw-section="2">
+                    <div><h3 class="text-base font-bold text-slate-900">2) แผนสั่งย้อมรายสี เทียบกับย้อมจริง</h3>
+                    <p class="text-xs text-slate-500">แผน = แผนสั่งย้อมจากแผนกวางแผน · ย้อมจริง = รวมจากรายงานย้อมที่นำเข้า (ตาม Code สี) — ครบเมื่อย้อมได้ตามแผนทุกสี ระบบจะโอนไปแผนกถัดไปให้เองตามเดิม</p></div>
+                    <div class="overflow-x-auto"><table class="w-full text-xs" data-dw-color-table>
+                        <thead class="text-[11px] text-slate-500"><tr><th class="py-1.5 px-2 text-left w-8">#</th><th class="py-1.5 px-2 text-left">Code สี</th><th class="py-1.5 px-2 text-right">แผน (กก.)</th><th class="py-1.5 px-2 text-right">ย้อมจริง (กก.)</th><th class="py-1.5 px-2 text-right">ส่วนต่าง</th><th class="py-1.5 px-2 text-left">สถานะ</th></tr></thead>
+                        <tbody>${colorRowsHtml}</tbody></table></div>
+                    <details class="group">
+                        <summary class="flex items-center gap-1 text-xs font-semibold text-slate-600 cursor-pointer select-none [&::-webkit-details-marker]:hidden" style="list-style: none"><i class="fa-solid fa-chevron-right text-[10px] transition-transform group-open:rotate-90"></i> แก้ไขแผนสั่งย้อมรายสี (Code สี / กก. / ใช้ไหม Surplus)</summary>
+                        <div class="pt-2">${renderDyeingColorOrdersHtml(order, orderIndex, false)}</div>
+                    </details>
+                </section>`;
+
+            // ---- ส่วน 3: บันทึกการย้อม (รายงานย้อม) ----
+            const log = (Array.isArray(dye.dyeOrderLog) ? dye.dyeOrderLog : []).filter(r => r && typeof r === 'object').slice().sort((a, b) => String(a.orderDate || a.actualDate || '').localeCompare(String(b.orderDate || b.actualDate || '')));
+            const logRows = log.length === 0
+                ? '<tr><td colspan="9" class="text-center text-xs text-slate-400 py-6">ยังไม่มีรายงานย้อมของ M/O นี้ — กด "นำเข้ารายงานย้อม (Excel)"</td></tr>'
+                : log.map(r => `<tr data-dw-log-row class="border-t border-slate-100">
+                        <td class="py-1.5 px-2 whitespace-nowrap">${escapeHtml(r.orderDate || '-')}${r.actualDate && r.actualDate !== r.orderDate ? `<span class="text-slate-400"> → ${escapeHtml(r.actualDate)}</span>` : ''}</td>
+                        <td class="py-1.5 px-2 font-mono font-semibold">${escapeHtml(r.colorCode || '-')}${r.isExtra ? ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-fuchsia-50 text-fuchsia-700 font-semibold">ย้อมเพิ่ม</span>' : ''}${r.isDamaged ? ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 font-semibold">ย้อมเสีย</span>' : ''}</td>
+                        <td class="py-1.5 px-2">${escapeHtml(r.yarnType || '')}</td>
+                        <td class="py-1.5 px-2">${escapeHtml(String(r.lotNo || ''))}</td>
+                        <td class="py-1.5 px-2 text-right">${r.orderKg ? planningWsFmt(r.orderKg, 2) : '-'}</td>
+                        <td class="py-1.5 px-2 text-center">${escapeHtml(String(r.dyeTubNo || '-'))}</td>
+                        <td class="py-1.5 px-2 text-right">${r.requisitionKg ? planningWsFmt(r.requisitionKg, 3) : '-'}</td>
+                        <td class="py-1.5 px-2 text-right font-semibold">${planningWsFmt(r.actualTransferKg || 0, 3)}</td>
+                        <td class="py-1.5 px-2 text-slate-500">${escapeHtml(r.remark || '')}</td>
+                    </tr>`).join('');
+            const sec3 = `
+                <section class="bg-white border border-slate-200 rounded-lg p-4 space-y-3" data-dw-section="3">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div><h3 class="text-base font-bold text-slate-900">3) บันทึกการย้อม (จากรายงานย้อม)</h3>
+                        <p class="text-xs text-slate-500">${log.length} รายการ · รวมย้อมจริง ${planningWsFmt(ds.totalActualKg, 2)} กก. — แก้ไขรายแถวได้ที่ แผนกย้อม (KPI) &gt; บันทึกสั่งย้อม</p></div>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="openImportDyeingModal()" class="px-3 py-1.5 text-xs font-semibold text-violet-700 border border-violet-300 rounded bg-white hover:bg-violet-50"><i class="fa-solid fa-file-import"></i> นำเข้ารายงานย้อม (Excel)</button>
+                            <button type="button" onclick="dyeingWsOpenKpi()" class="px-3 py-1.5 text-xs font-semibold text-indigo-700 border border-indigo-300 rounded bg-white hover:bg-indigo-50"><i class="fa-solid fa-table-list"></i> เปิดตารางบันทึกสั่งย้อม</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto"><table class="w-full text-xs" data-dw-log-table>
+                        <thead class="text-[11px] text-slate-500"><tr><th class="py-1.5 px-2 text-left">วันที่</th><th class="py-1.5 px-2 text-left">Code สี</th><th class="py-1.5 px-2 text-left">ชนิดไหม</th><th class="py-1.5 px-2 text-left">Lot</th><th class="py-1.5 px-2 text-right">นน.ใบสั่งย้อม</th><th class="py-1.5 px-2 text-center">ตู้ย้อม</th><th class="py-1.5 px-2 text-right">โอนจากใบเบิก</th><th class="py-1.5 px-2 text-right">โอนจริง (กก.)</th><th class="py-1.5 px-2 text-left">หมายเหตุ</th></tr></thead>
+                        <tbody>${logRows}</tbody></table></div>
+                </section>`;
+
+            return `
+                <div class="space-y-4" data-dw-detail="${escapeHtml(order.moSo)}">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div class="flex items-start gap-3">
+                            <button type="button" onclick="closeDyeingWorksheet()" class="mt-1 px-2.5 py-1 text-xs font-semibold border border-slate-300 rounded bg-white hover:bg-slate-50">← กลับ</button>
+                            <div>
+                                <h2 class="text-2xl font-bold text-slate-900">ใบงานย้อม (Dyeing Worksheet)</h2>
+                                <p class="text-xs text-slate-500 mt-0.5"><span class="font-bold text-slate-800">${escapeHtml(planningWsTitle(order))}</span> · ${escapeHtml(order.customerName || '-')} <span class="ml-1 inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${st.cls}">${st.label}</span>${isDyeOffSystemOrder(order) ? ' <span class="ml-1 inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-300">นอกระบบ</span>' : ''}</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="openOrderDetailModal(${orderIndex}, 'dyeing')" class="px-3 py-1.5 text-xs font-semibold text-indigo-700 border border-indigo-300 rounded bg-white hover:bg-indigo-50"><i class="fa-solid fa-pen-to-square"></i> รายละเอียด M/O ทั้งหมด</button>
+                    </div>
+                    ${sec1}${sec2}${sec3}
+                    <div class="flex flex-wrap items-center justify-end gap-2 bg-white border border-slate-200 rounded-lg p-3">
+                        <div class="mr-auto">${renderQcBadge(order.moSo, 'dyeing')}</div>
+                        <button type="button" onclick="closeDyeingWorksheet()" class="px-4 py-2 text-sm font-semibold border border-slate-300 text-slate-700 rounded bg-white hover:bg-slate-50">กลับไปรายการ</button>
+                        <button type="button" onclick="dyeingWsPass(${orderIndex})" class="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700">โอนงาน → แผนก${escapeHtml(STAGE_LABELS[nextStage] || '')}</button>
+                    </div>
+                </div>`;
+        }
+
+        function dyeingWsSetDuration(orderIndex, raw) {
+            updateOrderField(orderIndex, 'planDurations.dyeing', raw === '' || raw === null || raw === undefined ? '' : Math.max(0, Number(raw) || 0));
+        }
+        function dyeingWsOpenKpi() {
+            dyeingWsUi.currentMo = '';
+            try { switchView('board'); setBoardDepartmentTab('dyeing'); setDeptKpiSubTab('dyeing', 'kpi'); setDyeingKpiTab('regular'); } catch (e) { console.error(e); }
         }
 
         function computePlanningNextStage(order) {
@@ -19469,7 +19812,7 @@
                 return `
                     <tr class="hover:bg-slate-50/80">
                         <td class="px-2 py-1.5">${dt(orderIndex, itemIndex, 'orderDate', item.orderDate)}</td>
-                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}${order.currentStage === 'dyeing' ? `<div class="mt-0.5 font-normal">${renderQcBadge(order.moSo, 'dyeing')}</div>` : ''}</td>
+                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}${isDyeOffSystemOrder(order) ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-300 text-[10px] font-semibold align-middle" title="สร้างจากรายงานย้อม — ยังไม่ได้เปิด M/O, S/O นี้ในระบบ"><i class="fa-solid fa-keyboard mr-1"></i>นอกระบบ</span>' : ''}${order.currentStage === 'dyeing' ? `<div class="mt-0.5 font-normal">${renderQcBadge(order.moSo, 'dyeing')}</div>` : ''}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'colorNo', item.colorNo, 'w-10')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'colorCode', item.colorCode, 'w-16')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'yarnType', item.yarnType, 'w-20')}</td>
