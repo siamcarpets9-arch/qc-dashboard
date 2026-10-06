@@ -4209,7 +4209,7 @@
 
                         return {
                             id: item.id || '',
-                            date: normalizeDateString(item.date),
+                            date: normalizeDateString(item.date) || normalizeDateString(parsedExtra.entryDate), // entryDate = สำเนาวันที่ที่เว็บเก็บไว้ใน extraData
                             department: item.department || '',
                             moSo: item.moSo || '',
                             status: validStatus,
@@ -5180,7 +5180,7 @@
                 tr.className = 'group hover:bg-slate-50/80 transition border-b border-slate-100';
                 const moSoWarningHtml = buildMoSoWarningBadge(item.moSo);
                 tr.innerHTML = `
-                    <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">${item.date ? escapeHtml(item.date) : '<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-300 text-[10px] font-semibold" title="Google Sheet ส่งวันที่มาเป็นค่าว่าง — แก้วันที่ได้ที่ปุ่มแก้ไข หรืออัปเดตสคริปต์ Apps Script">ไม่มีวันที่</span>'}</td>
+                    <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">${item.date ? escapeHtml(item.date) : '<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-300 text-[10px] font-semibold" title="Google Sheet ส่งวันที่มาเป็นค่าว่าง — คลิกเพื่อใส่วันที่ (หรืออัปเดตสคริปต์ Apps Script)" data-nodate-badge onclick="editItem(' + originalIndex + ')" style="cursor:pointer">ไม่มีวันที่ · คลิกแก้</span>'}</td>
                     <td class="py-3.5 px-4 font-semibold text-indigo-600 text-xs">${escapeHtml(item.id)}</td>
                     <td class="py-3.5 px-4 font-medium text-xs">${escapeHtml(item.department)}</td>
                     <td class="py-3.5 px-4 text-xs font-mono text-slate-600">${moSoWarningHtml || `${orderTypeBadgeHtml(getOrderTypeByMoSo(item.moSo))}${marketBadgeHtml(getMarketByMoSo(item.moSo))}${escapeHtml(item.moSo)}${(item.moSo && !isMoSoInSystem(item.moSo)) ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-300 text-[10px] font-semibold align-middle whitespace-nowrap" title="เลขที่นี้ไม่มีใน productionOrders — ตรวจงานนอกระบบ"><i class="fa-solid fa-keyboard mr-1"></i>นอกระบบ</span>' : ''}`}</td>
@@ -18738,7 +18738,9 @@
                 inspector: document.getElementById('formInspector').value,
                 stamp: document.getElementById('formStamp').value,
                 remark: remarkText,
-                extraData: extra
+                // NEW (2026-10-06): "รายงาน QC กรอกแล้วไม่ขึ้นวันที่" — เก็บสำเนาวันที่ไว้ใน extraData ด้วย (คอลัมน์ JSON ของชีต) เพราะคอลัมน์วันที่
+                // ของชีตถูก Google แปลงเป็น Date แล้ว Apps Script เวอร์ชันเก่าอ่านกลับมาเป็นค่าว่างในวันอังคาร/พฤหัส — ตอนโหลดถ้า date ว่างจะใช้ entryDate แทน
+                extraData: Object.assign({}, extra, document.getElementById('formDate').value ? { entryDate: document.getElementById('formDate').value } : {})
             };
 
             const isNewRecord = editIndex === '';
