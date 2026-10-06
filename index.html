@@ -2366,6 +2366,7 @@
 
     <footer class="no-print bg-white border-t border-slate-100 py-4 mt-auto text-center text-xs text-slate-400">
         <p>QC Check Sheet GitHub Pages Edition &copy; 2026. All rights reserved.</p>
+        <p class="mt-1">เวอร์ชัน <span id="appBuildLabel"></span> · <button type="button" onclick="checkForAppUpdate(true)" class="text-indigo-500 hover:underline">ตรวจสอบอัปเดต</button></p>
     </footer>
 
     <!-- Delete Confirmation Modal -->
@@ -3891,6 +3892,53 @@
             renderIssuesTable();
             showToast('ส่งคำตอบแล้วค่ะ', 'fa-reply', 'text-sky-400');
         }
+
+        // =========================================================================================
+        // NEW (2026-10-06): ตรวจเวอร์ชันใหม่อัตโนมัติ — "ใช้กับแท็บเล็ต/มือถือ กด Ctrl+Shift+R ไม่ได้"
+        // GitHub Pages ให้เบราว์เซอร์จำไฟล์ไว้ได้ราว 10 นาที เครื่องที่เปิดค้างไว้/เปิดลิงก์เดิมจึงอาจเห็นเวอร์ชันเก่า
+        // แอปจึงดึงไฟล์ตัวเองแบบข้ามแคช (cache: 'no-store') มาเทียบ APP_BUILD ตอนเปิดหน้า / ตอนกลับมาใช้แอป / ทุก 5 นาที
+        // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
+        // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
+        // =========================================================================================
+        const APP_BUILD = 'QCDashboard-59';
+        let appUpdateLastCheck = 0;
+        function showAppUpdateBanner(newBuild) {
+            if (document.getElementById('appUpdateBanner')) return;
+            const el = document.createElement('div');
+            el.id = 'appUpdateBanner';
+            el.className = 'no-print fixed top-3 left-1/2 -translate-x-1/2 z-[9999] bg-indigo-600 text-white rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-3 text-sm max-w-[92vw]';
+            el.innerHTML = `<i class="fa-solid fa-arrow-rotate-right"></i><span>มีเวอร์ชันใหม่ (${escapeHtml(newBuild)})</span><button type="button" onclick="applyAppUpdate()" class="bg-white text-indigo-700 font-semibold rounded-lg px-3 py-1 text-xs">แตะเพื่ออัปเดต</button><button type="button" onclick="this.parentElement.remove()" class="text-white/70 hover:text-white text-xs" aria-label="ปิด">✕</button>`;
+            document.body.appendChild(el);
+        }
+        function applyAppUpdate() {
+            // ลิงก์ใหม่ (มี _v=เวลา) → เบราว์เซอร์ต้องโหลดไฟล์ใหม่จากเซิร์ฟเวอร์ ไม่ใช้ของที่จำไว้
+            location.replace(location.origin + location.pathname + '?_v=' + Date.now());
+        }
+        async function checkForAppUpdate(manual) {
+            try {
+                if (location.protocol !== 'http:' && location.protocol !== 'https:') {
+                    if (manual) showToast('ตรวจอัปเดตได้เมื่อเปิดผ่านลิงก์เว็บเท่านั้น', 'fa-circle-info', 'text-sky-400');
+                    return false;
+                }
+                const now = Date.now();
+                if (!manual && now - appUpdateLastCheck < 60000) return false;
+                appUpdateLastCheck = now;
+                const res = await fetch(location.origin + location.pathname + '?_chk=' + now, { cache: 'no-store' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const text = await res.text();
+                const m = text.match(new RegExp("APP_BUILD\\s*=\\s*'(QCDashboard-[^']+)'"));
+                if (m && m[1] !== APP_BUILD) { showAppUpdateBanner(m[1]); return true; }
+                if (manual) showToast('คุณใช้เวอร์ชันล่าสุดแล้ว (' + APP_BUILD + ')');
+            } catch (e) {
+                if (manual) showToast('ตรวจอัปเดตไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วลองใหม่', 'fa-circle-xmark', 'text-rose-400');
+            }
+            return false;
+        }
+        try { if (/[?&]_v=/.test(location.search) && history.replaceState) history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ignore */ }
+        document.addEventListener('DOMContentLoaded', () => { const l = document.getElementById('appBuildLabel'); if (l) l.textContent = APP_BUILD; });
+        window.addEventListener('load', () => { setTimeout(() => checkForAppUpdate(false), 4000); });
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForAppUpdate(false); });
+        setInterval(() => checkForAppUpdate(false), 5 * 60 * 1000);
 
         window.addEventListener('DOMContentLoaded', () => {
             try { orderPendingSync = JSON.parse(localStorage.getItem('qc_pending_order_sync_v1') || '{}') || {}; } catch(e) { orderPendingSync = {}; }
