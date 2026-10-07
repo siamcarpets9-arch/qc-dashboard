@@ -880,6 +880,16 @@
                 </div>
             </div>
 
+            <!-- NEW (2026-10-07): ตัวเลือกเดือนของ "หน้ารายงาน" — ใช้ค่าเดียวกับหน้าบอร์ด (boardMonthFilter): ค่าเริ่มต้น = เดือนปัจจุบัน, เลือก "ทุกเดือน" เพื่อดูทั้งหมด.
+                 โชว์เฉพาะตอนเปิดหน้ารายงาน/KPI ของแผนก, บันทึกการทอรายวัน และรายงานแผนกขาย (ซึ่งซ่อนแถบค้นหาบอร์ดด้านบน) -->
+            <div id="reportMonthBar" class="hidden bg-white rounded-2xl shadow-sm border border-slate-100 p-3 mb-4 flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <label for="reportMonthSelect" class="text-xs font-semibold text-slate-600"><i class="fa-solid fa-calendar-days text-indigo-500 mr-1"></i>เดือนที่แสดงในรายงาน</label>
+                    <select id="reportMonthSelect" onchange="setBoardMonthFilter(this.value)" class="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                </div>
+                <span id="reportMonthHint" class="text-[11px] text-slate-400"></span>
+            </div>
+
             <!-- "แผนกขาย" tab content — the "เพิ่ม M/O, S/O ใหม่" form, moved here inline from its old
                  popup (id="newOrderModal") so the Sales department has a dedicated home for it instead
                  of a modal. Same ids/functions as before (openNewOrderModal(), submitNewOrder(), the
@@ -1451,7 +1461,7 @@
                     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                         <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-table-list mr-2 text-teal-600"></i> ประวัติการทอทั้งหมด — เทียบ % กับเกรดการทอ</h3>
                         <div class="flex items-center gap-1.5">
-                            <input type="month" id="weavingLogTableMonth" onchange="renderWeavingLogTable()" class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            <input type="month" id="weavingLogTableMonth" onchange="renderWeavingLogTable()" title="เว้นว่าง = ตามเดือนที่เลือกในแถบ &quot;เดือนที่แสดงในรายงาน&quot; ด้านบน" class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
                             <input type="text" id="weavingLogTableSearch" oninput="renderWeavingLogTable()" placeholder="ค้นหา M/O, คุณภาพ, ชื่อพนักงาน..." class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs w-56">
                         </div>
                     </div>
@@ -1810,7 +1820,7 @@
                             <div>
                                 <label class="block text-[10px] text-slate-500 font-medium mb-1">เดือน</label>
                                 <select id="dyeingSummaryMonthFilter" onchange="renderDyeingSummaryTab()" class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                                    <option value="">ทั้งหมด</option>
+                                    <option value="">ตามเดือนด้านบน</option>
                                 </select>
                             </div>
                             <div>
@@ -3900,7 +3910,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-59';
+        const APP_BUILD = 'QCDashboard-61';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -7157,7 +7167,11 @@
             dateSheetNames.forEach(sheetName => {
                 const ws = workbook.Sheets[sheetName];
                 const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
-                const dateCell = aoa[0] ? aoa[0][8] : null;
+                // ตำแหน่งวันที่ในแถวหัวเรื่องต่างกันตามเวอร์ชันของไฟล์ (เดิมคอลัมน์ I; ไฟล์ 5-6/10 ย้ายไปคอลัมน์ M) → หา Date ตัวแรกในแถว 1
+                let dateCell = aoa[0] ? aoa[0][8] : null;
+                if (!(dateCell instanceof Date && !isNaN(dateCell)) && aoa[0]) {
+                    dateCell = aoa[0].find(c => c instanceof Date && !isNaN(c)) || null;
+                }
                 let sheetDateKey = null;
                 if (dateCell instanceof Date && !isNaN(dateCell)) {
                     sheetDateKey = excelCellDateToDateKey(dateCell);
@@ -7177,7 +7191,12 @@
 
                 // Row 2's first cell literally reading "DATE" is the new layout's signature — the old
                 // layout's row 2 is a sub-header ('', 'Dyeing date', <date>, ...) whose first cell is blank.
-                const isNewLayout = String((aoa[1] || [])[0] || '').trim().toUpperCase() === 'DATE';
+                const firstHeader = String((aoa[1] || [])[0] || '').trim();
+                const hasDateCol = firstHeader.toUpperCase() === 'DATE';
+                // NEW (2026-10-07): ไฟล์รายงานย้อมวันที่ 5-6/10 ตัดคอลัมน์ DATE/Item/ลำดับ ออก — แถวหัวตารางเริ่มที่ "Order NO." ตั้งแต่คอลัมน์ A
+                // และวันที่อยู่ที่หัวชีต (M1). เดิมถูกมองเป็นรูปแบบเก่า (ต้องมีเลขลำดับคอลัมน์ A) → ทุกแถวถูกข้ามเงียบๆ
+                const noDateCol = !hasDateCol && /order/i.test(firstHeader);
+                const isNewLayout = hasDateCol || noDateCol;
                 const colMap = isNewLayout ? mapNewDyeingLayoutColumns(aoa[1]) : {};
 
                 const lastValue = {}; // ditto-mark carry-forward, per column index
@@ -7198,10 +7217,20 @@
                     let orderNoRaw, yarnType, lotNo, colorNo, colorCode, hang, batchNo, kg, remark, requisitionKg, orderKg, dyeTubNo;
 
                     if (isNewLayout) {
-                        const dateColIdx = colMap.date !== undefined ? colMap.date : 0;
-                        const rowDate = row[dateColIdx];
-                        if (!(rowDate instanceof Date) || isNaN(rowDate)) continue; // footer/blank row — no real date
-                        dateKey = excelCellDateToDateKey(rowDate); // each row carries its own date in this layout
+                        if (noDateCol) {
+                            // ไม่มีคอลัมน์วันที่ → ใช้วันที่ของชีต; แถวจริงต้องมีทั้งเลขที่ M/O,S/O และรหัสสีของตัวเอง (กันแถวหมายเหตุ/ยอดรวมท้ายตาราง)
+                            const oc = colMap.orderNo !== undefined ? row[colMap.orderNo] : null;
+                            const cc = colMap.colorCode !== undefined ? row[colMap.colorCode] : null;
+                            const hasOrder = oc !== null && oc !== undefined && String(oc).trim() !== '';
+                            const hasColor = cc !== null && cc !== undefined && String(cc).trim() !== '';
+                            if (!hasOrder || !hasColor) continue;
+                            if (!/\d+\s*\/\s*\d+/.test(String(oc)) && String(oc).trim() !== '"') continue; // ไม่ใช่เลขที่รูปแบบ nnn/yy
+                        } else {
+                            const dateColIdx = colMap.date !== undefined ? colMap.date : 0;
+                            const rowDate = row[dateColIdx];
+                            if (!(rowDate instanceof Date) || isNaN(rowDate)) continue; // footer/blank row — no real date
+                            dateKey = excelCellDateToDateKey(rowDate); // each row carries its own date in this layout
+                        }
                         const getText = (field) => colMap[field] !== undefined ? carryForward(row, colMap[field]) : '';
                         const getNum = (field) => {
                             if (colMap[field] === undefined) return null;
@@ -7386,6 +7415,7 @@
             const autoTransferred = [];
             const importDetails = []; // NEW (2026-10-05): ต่อ M/O — แถวไปอยู่ที่ไหน (บันทึกสั่งย้อม / ย้อมเพิ่ม) และตอนนี้อยู่แผนกไหน
             let unmatchedCount = 0;
+            const importedMonths = new Set(); // NEW (2026-10-07): เดือนของแถวที่นำเข้า — ถ้าไม่ใช่เดือนที่หน้ารายงานกรองอยู่ จะเปลี่ยนเป็น "ทุกเดือน" ให้เห็นรายการที่เพิ่งนำเข้า
 
             const createdOffSystem = [];
             Object.keys(byMoSo).forEach(key => {
@@ -7406,6 +7436,7 @@
                 }
                 if (orderIndex === -1) { unmatchedCount++; return; } // unmatched — already flagged in the preview, nothing to do
                 const order = productionOrders[orderIndex];
+                group.rows.forEach(r => { const m = String(r.dateKey || '').slice(0, 7); if (m) importedMonths.add(m); });
                 if (!order.dyeing) order.dyeing = {};
                 if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
                 const log = order.dyeing.dyeOrderLog;
@@ -7458,7 +7489,8 @@
                 Object.values(colorGroups).forEach(g => {
                     const sortedDates = g.dates.slice().sort();
                     const orderDate = sortedDates[0] || '';
-                    const actualDate = sortedDates[sortedDates.length - 1] || '';
+                    // รายการที่ยังไม่มี นน.โอนจริง (ใบเบิกแล้วแต่ยังไม่ได้ย้อม — เช่น แถวที่ช่อง "นน.โอนจริง" เป็น 0) ไม่ถือว่าย้อมเสร็จ → ไม่ใส่วันที่ย้อมจริง
+                    const actualDate = g.kg > 0 ? (sortedDates[sortedDates.length - 1] || '') : '';
                     const remarkParts = [];
                     // "Batch No" has no clean existing home in dyeOrderLog's schema (it is NOT the same
                     // thing as dyeTubNo, a much-smaller-scale physical dye-vat number) — folded into
@@ -7542,6 +7574,10 @@
             if (importDetails.length > 0) {
                 const anyRegular = importDetails.some(d => d.regular > 0);
                 try {
+                    if (boardMonthFilter !== 'all' && [...importedMonths].some(m => m !== getBoardMonthSelection())) {
+                        boardMonthFilter = 'all';
+                        showToast('ข้อมูลที่นำเข้ามีหลายเดือน — เปลี่ยนตัวกรองเดือนเป็น "ทุกเดือน" ให้แล้ว', 'fa-calendar-days', 'text-sky-400');
+                    }
                     switchView('board');
                     setDeptKpiSubTab('dyeing', 'kpi');
                     setDyeingKpiTab(anyRegular ? 'regular' : 'extra');
@@ -10001,7 +10037,9 @@
             if (selectWrap) selectWrap.innerHTML = periodDropdownHtml('weavingLogPeriodSelect', 'setWeavingLogPeriod', weavingLogPeriodGranularity);
 
             let rows = flattenAllWeavingLogEntries();
+            // NEW (2026-10-07): ช่องเดือนของตารางนี้ว่าง → ใช้เดือนเดียวกับหน้ารายงานทุกแผนก (กรอกเอง = ใช้ค่าที่กรอกแทน)
             if (monthFilter) rows = rows.filter(r => String(r.date || '').startsWith(monthFilter));
+            else rows = rows.filter(r => reportMonthMatchDate(r.date, productionOrders[r.orderIndex]));
             if (searchTerm) {
                 rows = rows.filter(r => [r.moSo, r.quality, ...(r.employees || [])].map(v => String(v || '').toLowerCase()).some(v => v.includes(searchTerm)));
             }
@@ -12372,6 +12410,12 @@
             });
 
             if (searchCard) searchCard.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi);
+            // NEW (2026-10-07): หน้ารายงาน (KPI/บันทึกการทอรายวัน/รายงานแผนกขาย) ซ่อนแถบค้นหาบอร์ด → โชว์ตัวเลือกเดือนของรายงานแทน
+            const reportMonthBar = document.getElementById('reportMonthBar');
+            if (reportMonthBar) {
+                reportMonthBar.classList.toggle('hidden', !(isSales || isWeavingLog || isAnyDeptKpi));
+                if (isSales || isWeavingLog || isAnyDeptKpi) updateBoardMonthOptions();
+            }
 
             const grid = document.getElementById('boardColumnsGrid');
             if (grid) {
@@ -15117,6 +15161,50 @@
         function setBoardMonthFilter(value) {
             boardMonthFilter = value === 'all' ? 'all' : (/^\d{4}-\d{2}$/.test(value) && value !== boardCurrentMonthKey() ? value : '');
             renderProductionBoard();
+            refreshReportsForMonth();
+        }
+
+        // NEW (2026-10-07): "รายงานทุกแผนกให้แสดงเดือนปัจจุบัน" — หน้ารายงาน/KPI ของทุกแผนกใช้ตัวเลือกเดือนเดียวกับหน้าบอร์ด
+        // (boardMonthFilter: '' = เดือนปัจจุบัน, 'all' = ทุกเดือน, 'YYYY-MM' = เลือกเอง) เกณฑ์เดือน = "วันที่ของแถวนั้น" ถ้าไม่มีใช้วันที่เปิด M/O
+        // (order.openDate → createdAt); แถวที่ไม่ทราบเดือนเลยยังแสดง (ไม่ซ่อนข้อมูลทิ้ง). รายงานไม่แสดง "งานค้างจากเดือนก่อน" — เฉพาะเดือนที่เลือกจริง
+        function reportMonthSelection() { return boardMonthFilter === 'all' ? '' : getBoardMonthSelection(); }
+        function reportMonthMatchDate(dateStr, order) {
+            const sel = reportMonthSelection();
+            if (!sel) return true;
+            const norm = normalizeDateString(dateStr);
+            let k = norm ? String(norm).slice(0, 7) : '';
+            if (!/^\d{4}-\d{2}$/.test(k)) k = order ? boardOrderMonthKey(order) : '';
+            return !k || k === sel;
+        }
+        function reportMonthMatchOrder(order) { return reportMonthMatchDate('', order); }
+        // เดือนที่มีข้อมูลอยู่ในตารางรายงาน (นอกเหนือจากเดือนที่เปิด M/O) — ให้เลือกดูได้ด้วย
+        function collectReportMonthKeys(keys) {
+            const add = (d) => { const n = normalizeDateString(d); const k = n ? String(n).slice(0, 7) : ''; if (/^\d{4}-\d{2}$/.test(k) && k !== '2000-01') keys.add(k); };
+            try {
+                productionOrders.forEach(o => {
+                    ((o.dyeing || {}).dyeOrderLog || []).forEach(i => { add(i.orderDate); add(i.actualDate); });
+                    ((o.dyeing || {}).extraDyeingLog || []).forEach(i => add(i.date));
+                    ((o.design || {}).patternTransferLog || []).forEach(i => add(i.receivedDate));
+                    ((o.finishing || {}).efficiencyLog || []).forEach(i => add(i.date));
+                    ((o.finishing || {}).glueUsageLog || []).forEach(i => add(i.date));
+                });
+                if (Array.isArray(designJobLogs)) designJobLogs.forEach(j => add(j.receivedDate));
+                flattenAllWeavingLogEntries().forEach(r => add(r.date));
+            } catch (e) { /* month list is best-effort */ }
+        }
+        // เปลี่ยนเดือนแล้วต้อง render ตารางรายงานที่เปิดอยู่ใหม่ (หน้าบอร์ดถูก render ใน setBoardMonthFilter แล้ว)
+        function refreshReportsForMonth() {
+            try {
+                const dept = boardDepartmentFilter;
+                if (dept === 'sales') { if (typeof renderSalesReportTables === 'function') renderSalesReportTables(); return; }
+                if (dept === 'weaving' && typeof weavingActiveSubTab !== 'undefined' && weavingActiveSubTab === 'log') { renderWeavingLogTable(); return; }
+                if (deptKpiActiveSubTab[dept] === 'kpi') {
+                    if (dept === 'planning') renderPlanningKpiReports();
+                    else if (dept === 'design') renderDesignKpiReports();
+                    else if (dept === 'dyeing') renderDyeingKpiReports();
+                    else if (dept === 'finishing') renderFinishingKpiReports();
+                }
+            } catch (e) { console.error('refreshReportsForMonth failed:', e); }
         }
         // เติมตัวเลือกเดือน: เดือนปัจจุบัน + ทุกเดือนที่มี M/O เปิดไว้ (ใหม่ → เก่า) + ทุกเดือน
         function updateBoardMonthOptions() {
@@ -15125,9 +15213,16 @@
             const cur = boardCurrentMonthKey();
             const keys = new Set([cur]);
             productionOrders.forEach(o => { const k = boardOrderMonthKey(o); if (/^\d{4}-\d{2}$/.test(k)) keys.add(k); });
+            collectReportMonthKeys(keys);
+            if (/^\d{4}-\d{2}$/.test(boardMonthFilter)) keys.add(boardMonthFilter);
             const list = [...keys].sort().reverse();
-            sel.innerHTML = list.map(k => `<option value="${k}">${k === cur ? 'เดือนนี้ — ' : ''}${escapeHtml(boardMonthLabel(k))}</option>`).join('') + '<option value="all">ทุกเดือน</option>';
+            const optionsHtml = list.map(k => `<option value="${k}">${k === cur ? 'เดือนนี้ — ' : ''}${escapeHtml(boardMonthLabel(k))}</option>`).join('') + '<option value="all">ทุกเดือน</option>';
+            sel.innerHTML = optionsHtml;
             sel.value = boardMonthFilter === 'all' ? 'all' : getBoardMonthSelection();
+            const repSel = document.getElementById('reportMonthSelect');
+            if (repSel) { repSel.innerHTML = optionsHtml; repSel.value = sel.value; }
+            const repHint = document.getElementById('reportMonthHint');
+            if (repHint) repHint.textContent = boardMonthFilter === 'all' ? 'แสดงรายงานทุกเดือน' : 'แสดงเฉพาะรายการของเดือนที่เลือก — เลือก "ทุกเดือน" เพื่อดูทั้งหมด';
             const hint = document.getElementById('boardMonthHint');
             if (hint) hint.textContent = boardMonthFilter === 'all' ? 'แสดงทุกเดือน' : (getBoardMonthSelection() === cur ? 'งานค้างจากเดือนก่อนแสดงด้วย (ติดป้าย "ค้างจาก")' : 'เฉพาะ M/O ที่เปิดในเดือนที่เลือก');
         }
@@ -16668,12 +16763,14 @@
                 if (ad !== bd) return ad < bd ? -1 : 1;
                 return String(a.moSo || '').localeCompare(String(b.moSo || ''));
             };
-            const emptyMsg = searchTerm ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : 'ยังไม่มีรายการ';
+            const emptyMsg = searchTerm ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : (reportMonthSelection() ? 'ไม่มีรายการในเดือนที่เลือก — เลือก "ทุกเดือน" เพื่อดูทั้งหมด' : 'ยังไม่มีรายการ');
+            // NEW (2026-10-07): ตารางรายการ M/O, S/O ของแผนกขายแสดงเฉพาะเดือนที่เลือก (ค่าเริ่มต้น = เดือนปัจจุบัน) — ยอดสะสมรวมด้านบน (renderSalesReportTotals) ยังนับทั้งหมดเหมือนเดิม
+            const matchesMonth = (order) => reportMonthMatchOrder(order);
 
             // แท็บ M/O, S/O แสดงจำนวนรวมของประเภทนั้น (กรองแค่คำค้นหา ไม่กรองตามตลาด) เหมือนรูปตัวอย่าง
             // "M/O (183)".
             ['MO', 'SO'].forEach(type => {
-                const count = productionOrders.filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === type && matchesSearch(o)).length;
+                const count = productionOrders.filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === type && matchesSearch(o) && matchesMonth(o)).length;
                 const countEl = document.getElementById(`salesReportTypeCount-${type}`);
                 if (countEl) countEl.textContent = count;
             });
@@ -16682,7 +16779,7 @@
             // จะ render ทุกตารางพร้อมกัน ตอนนี้ render แค่ตารางเดียวของ salesReportActiveMarket เท่านั้น — ดู
             // คอมเมนต์ใหญ่เหนือ renderSalesReportMarketSectionHtml() ด้านบน.
             const ofType = productionOrders
-                .filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === salesReportActiveOrderType && matchesSearch(o))
+                .filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === salesReportActiveOrderType && matchesSearch(o) && matchesMonth(o))
                 .sort(sortByOpenDateThenMoSo);
             const exportList = ofType.filter(o => o.market === 'export');
             const domesticList = ofType.filter(o => o.market === 'domestic');
@@ -19245,7 +19342,7 @@
             const searchEl = document.getElementById('kpiDueSearchInput');
             const searchTerm = (searchEl ? searchEl.value : '').trim().toLowerCase();
 
-            let list = productionOrders.map((order, orderIndex) => ({ order, orderIndex }));
+            let list = productionOrders.map((order, orderIndex) => ({ order, orderIndex })).filter(({ order }) => reportMonthMatchOrder(order));
             if (searchTerm) {
                 list = list.filter(({ order }) => [order.moSo, order.customerName, order.customerPO]
                     .map(v => String(v || '').toLowerCase()).join(' ').includes(searchTerm));
@@ -19329,7 +19426,7 @@
             const selectWrap = document.getElementById('kpiYarnPeriodSelectWrap');
             if (selectWrap) selectWrap.innerHTML = periodDropdownHtml('kpiYarnPeriodSelect', 'setKpiYarnPeriod', kpiYarnPeriodGranularity);
 
-            const list = productionOrders.map((order, orderIndex) => ({ order, orderIndex }));
+            const list = productionOrders.map((order, orderIndex) => ({ order, orderIndex })).filter(({ order }) => reportMonthMatchOrder(order));
 
             const periodSummaryEl = document.getElementById('kpiYarnPeriodSummary');
             if (periodSummaryEl) {
@@ -19601,6 +19698,7 @@
                 const log = Array.isArray((order.dyeing || {}).extraDyeingLog) ? order.dyeing.extraDyeingLog : [];
                 log.forEach((item, itemIndex) => flatRows.push({ order, orderIndex, item, itemIndex }));
             });
+            flatRows = flatRows.filter(r => reportMonthMatchDate(r.item.date, r.order));
             flatRows.sort((a, b) => String(b.item.date || '').localeCompare(String(a.item.date || '')));
 
             const periodSummaryEl = document.getElementById('kpiExtraDyePeriodSummary');
@@ -19713,9 +19811,10 @@
         function renderDesignKpiJobsTable() {
             const selectWrap = document.getElementById('designKpiJobsPeriodSelectWrap');
             if (selectWrap) selectWrap.innerHTML = periodDropdownHtml('designKpiJobsPeriodSelect', 'setDesignKpiJobsPeriod', designKpiJobsPeriodGranularity);
+            const jobsInMonth = designJobLogs.filter(j => reportMonthMatchDate(j.receivedDate, null)); // NEW (2026-10-07): เฉพาะเดือนที่เลือก
             const periodSummaryEl = document.getElementById('designKpiJobsPeriodSummary');
             if (periodSummaryEl) {
-                periodSummaryEl.innerHTML = renderPeriodSummaryTableHtml(designJobLogs, 'receivedDate', designKpiJobsPeriodGranularity, [
+                periodSummaryEl.innerHTML = renderPeriodSummaryTableHtml(jobsInMonth, 'receivedDate', designKpiJobsPeriodGranularity, [
                     { key: 'revisionCount', label: 'จำนวนแก้ไขรวม (ครั้ง)' }
                 ]);
             }
@@ -19734,7 +19833,11 @@
             const dt = (id, field, val) => `<input type="date" value="${val || ''}" onchange="updateDesignJobLogField('${id}', '${field}', this.value)" class="px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs">`;
             const n = (id, field, val, width = 'w-14') => `<input type="number" step="1" value="${val || ''}" onchange="updateDesignJobLogField('${id}', '${field}', Number(this.value))" class="${width} px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-right">`;
 
-            tbody.innerHTML = designJobLogs.map(job => {
+            if (jobsInMonth.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="15" class="text-center text-slate-400 py-8 text-xs">ไม่มีรายการในเดือนที่เลือก — เลือก "ทุกเดือน" เพื่อดูทั้งหมด</td></tr>';
+                return;
+            }
+            tbody.innerHTML = jobsInMonth.map(job => {
                 const { daysTaken, onTime } = computeDesignJobDerived(job);
                 const statusHtml = onTime === null ? '<span class="text-slate-400">-</span>' : (onTime ? '<span class="text-emerald-600">🟢 ตรงเวลา</span>' : '<span class="text-rose-600">🔴 ล่าช้า</span>');
                 return `
@@ -19763,7 +19866,7 @@
             const emptyState = document.getElementById('designKpiSummaryEmptyState');
             if (!tbody) return;
             const byDesigner = {};
-            designJobLogs.forEach(job => {
+            designJobLogs.filter(j => reportMonthMatchDate(j.receivedDate, null)).forEach(job => { // NEW (2026-10-07): เฉพาะเดือนที่เลือก
                 const name = (job.designer || '').trim();
                 if (!name) return;
                 if (!byDesigner[name]) byDesigner[name] = { completed: 0, totalDays: 0, daysCount: 0, revisions: 0, onTimeCount: 0, onTimeTotal: 0 };
@@ -19862,6 +19965,7 @@
                 const log = Array.isArray((order.design || {}).patternTransferLog) ? order.design.patternTransferLog : [];
                 log.forEach((item, itemIndex) => flatRows.push({ order, orderIndex, item, itemIndex }));
             });
+            flatRows = flatRows.filter(r => reportMonthMatchDate(r.item.receivedDate, r.order));
             flatRows.sort((a, b) => String(b.item.receivedDate || '').localeCompare(String(a.item.receivedDate || '')));
 
             const periodSummaryEl = document.getElementById('designKpiTransferPeriodSummary');
@@ -20005,6 +20109,8 @@
                 if (moSoNeedle && !String(order.moSo || '').toLowerCase().includes(moSoNeedle)) return false;
                 const actualNorm = normalizeDateString(item.actualDate);
                 if (monthFilter && (!actualNorm || actualNorm.slice(0, 7) !== monthFilter)) return false;
+                // NEW (2026-10-07): ตัวเลือก "เดือน" ของแท็บนี้ว่าง (= ตามเดือนด้านบน) → ใช้เดือนเดียวกับหน้ารายงานทุกแผนก (วันที่ย้อมเสร็จจริง → วันที่สั่งย้อม → วันที่เปิด M/O)
+                if (!monthFilter && !dateFrom && !dateTo && !reportMonthMatchDate(item.actualDate || item.orderDate, order)) return false;
                 if (dateFrom && (!actualNorm || actualNorm < dateFrom)) return false;
                 if (dateTo && (!actualNorm || actualNorm > dateTo)) return false;
                 return true;
@@ -20033,7 +20139,7 @@
                     const norm = normalizeDateString(item.actualDate);
                     return norm ? norm.slice(0, 7) : null;
                 }).filter(Boolean))).sort().reverse();
-                monthSelect.innerHTML = '<option value="">ทั้งหมด</option>' +
+                monthSelect.innerHTML = '<option value="">ตามเดือนด้านบน</option>' +
                     months.map(m => `<option value="${m}">${escapeHtml(formatBucketLabel(m, 'month'))}</option>`).join('');
                 if (months.includes(currentVal)) monthSelect.value = currentVal;
             }
@@ -20171,6 +20277,7 @@
                 const log = Array.isArray((order.dyeing || {}).dyeOrderLog) ? order.dyeing.dyeOrderLog : [];
                 log.forEach((item, itemIndex) => { if (!!item.isExtra === wantExtra) flatRows.push({ order, orderIndex, item, itemIndex }); });
             });
+            flatRows = flatRows.filter(r => reportMonthMatchDate(r.item.orderDate, r.order));
             flatRows.sort((a, b) => String(b.item.orderDate || '').localeCompare(String(a.item.orderDate || '')));
 
             const periodSummaryEl = document.getElementById('dyeingKpiPeriodSummary');
@@ -20445,6 +20552,7 @@
                 cumulativeByOrder.set(orderIndex, cumByItemIndex);
                 log.forEach((item, itemIndex) => flatRows.push({ order, orderIndex, item, itemIndex }));
             });
+            flatRows = flatRows.filter(r => reportMonthMatchDate(r.item.date, r.order)); // เฉพาะเดือนที่เลือก (ยอดสะสม/คงเหลือคำนวณจากประวัติทั้งหมดไว้แล้วข้างบน)
 
             const periodSummaryEl = document.getElementById('finishingKpiEfficiencyPeriodSummary');
             if (periodSummaryEl) {
@@ -20626,6 +20734,7 @@
                 const log = Array.isArray((order.finishing || {}).glueUsageLog) ? order.finishing.glueUsageLog : [];
                 log.forEach((item, itemIndex) => flatRows.push({ order, orderIndex, item, itemIndex }));
             });
+            flatRows = flatRows.filter(r => reportMonthMatchDate(r.item.date, r.order));
             flatRows.sort((a, b) => String(b.item.date || '').localeCompare(String(a.item.date || '')));
 
             const periodSummaryEl = document.getElementById('finishingKpiGluePeriodSummary');
