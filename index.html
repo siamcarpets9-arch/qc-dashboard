@@ -1772,6 +1772,10 @@
                         <button onclick="setDyeingKpiTab('extra')" id="dyeingKpiTabExtraBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                             <i class="fa-solid fa-droplet-slash"></i> ย้อมเพิ่ม
                         </button>
+                        <!-- NEW (2026-10-08): ไหมจ้างย้อมภายนอก (เช่น Siam Dyemaster) แยกออกจาก KPI แผนกย้อม -->
+                        <button onclick="setDyeingKpiTab('external')" id="dyeingKpiTabExternalBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                            <i class="fa-solid fa-truck-fast"></i> ไหมจ้างย้อม
+                        </button>
                         <!-- NEW (2026-10-02): "ช่วยทำสรุป ไหมแต่ละชนิดที่เบิกใช้ต่อเดือน สรุปย้อมเพิ่ม ย้อมขาด
                              ย้อมเสีย แล้วเพิ่ม กรองเลขที่ M/O,S/O กรองวันที่ กรองเดือนให้ด้วย" — see
                              dyeingKpiSummarySection below / renderDyeingSummaryTab(). -->
@@ -3911,7 +3915,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-62';
+        const APP_BUILD = 'QCDashboard-63';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -4929,7 +4933,7 @@
             // --- ย้อม: จำนวนคำสั่งย้อมทั้งหมด (ปกติ+เพิ่ม) และจำนวนที่ย้อมเพิ่ม ---
             let dyeRegularCount = 0, dyeExtraCount = 0;
             productionOrders.forEach(o => {
-                ((o.dyeing && o.dyeing.dyeOrderLog) || []).forEach(item => item.isExtra ? dyeExtraCount++ : dyeRegularCount++);
+                ((o.dyeing && o.dyeing.dyeOrderLog) || []).forEach(item => { if (isOutsourcedDyeRow(item)) return; item.isExtra ? dyeExtraCount++ : dyeRegularCount++; });
             });
 
             // --- ทากาวตกแต่ง: ประสิทธิภาพเฉลี่ย (ตร.ม./ชม.) + จำนวนรายการใช้กาวเกินมาตรฐาน ---
@@ -7616,6 +7620,7 @@
         function confirmDyeingImport() {
             if (!pendingDyeingImport) return;
             // NEW (2026-10-08): ใบ Packing Slip ไหมจ้างย้อม → แปลงตามน้ำหนักที่ผู้ใช้ตรวจ/แก้ในพรีวิว แล้วเข้า flow เดียวกัน
+            const isOutsourcedImport = !!pendingDyeingImport.siam; // ไหมจ้างย้อมภายนอก → แยกอยู่แท็บ "ไหมจ้างย้อม" ไม่ปนกับ KPI แผนกย้อม
             const byMoSo = pendingDyeingImport.siam ? materializeSiamImport(pendingDyeingImport.siam) : pendingDyeingImport.byMoSo;
             const matched = [];
             const autoTransferred = [];
@@ -7790,7 +7795,7 @@
                     }
                     switchView('board');
                     setDeptKpiSubTab('dyeing', 'kpi');
-                    setDyeingKpiTab(anyRegular ? 'regular' : 'extra');
+                    setDyeingKpiTab(isOutsourcedImport ? 'external' : (anyRegular ? 'regular' : 'extra'));
                 } catch (navErr) { console.error('post-import dyeing navigation failed:', navErr); }
             }
 
@@ -7802,14 +7807,14 @@
             status.classList.remove('hidden');
             if (matched.length > 0) {
                 const detailLines = importDetails.map(d => {
-                    const where = [d.regular > 0 ? `บันทึกสั่งย้อม ${d.regular} แถว` : '', d.extra > 0 ? `ย้อมเพิ่ม ${d.extra} แถว (แท็บ "ย้อมเพิ่ม")` : ''].filter(Boolean).join(' • ') || 'ไม่มีแถวใหม่';
+                    const where = isOutsourcedImport ? `ไหมจ้างย้อม ${d.regular + d.extra} แถว (แท็บ "ไหมจ้างย้อม" — แยกจาก KPI แผนกย้อม)` : [d.regular > 0 ? `บันทึกสั่งย้อม ${d.regular} แถว` : '', d.extra > 0 ? `ย้อมเพิ่ม ${d.extra} แถว (แท็บ "ย้อมเพิ่ม")` : ''].filter(Boolean).join(' • ') || 'ไม่มีแถวใหม่';
                     return `<div class="text-[11px] text-slate-600"><span class="font-semibold">${escapeHtml(d.moSo)}</span> → ${where} • ${d.offSystem ? ' • สร้างเป็นรายการนอกระบบ (ยังไม่มี M/O นี้ในระบบ)' : ''}${d.movedFromPlanning ? ' • ย้ายจากแผนกวางแผนมาแผนกย้อมให้แล้ว' : ''} • ตอนนี้อยู่แผนก${escapeHtml(STAGE_LABELS[d.stage] || d.stage || '-')}</div>`;
                 }).join('');
                 status.innerHTML = `<span class="text-emerald-600 font-medium"><i class="fa-solid fa-circle-check"></i> นำเข้าสำเร็จ ${matched.length} M/O, S/O</span>` +
                     `<div class="mt-1 space-y-0.5 max-h-40 overflow-y-auto">${detailLines}</div>` +
                     (unmatchedCount > 0 ? `<div class="text-[11px] text-amber-600 mt-1"><i class="fa-solid fa-triangle-exclamation"></i> ข้าม ${unmatchedCount} M/O, S/O ที่ไม่พบในระบบ</div>` : '') +
                     (createdOffSystem.length > 0 ? `<div class="text-[11px] text-amber-700 mt-1"><i class="fa-solid fa-keyboard"></i> สร้างรายการนอกระบบ ${createdOffSystem.length} รายการ: ${createdOffSystem.map(escapeHtml).join(', ')} — เมื่อเปิด M/O จริงด้วยเลขเดียวกัน ให้นำเข้า/เปิดทับเลขนี้ ระบบจะเติมข้อมูลเข้ารายการเดิม</div>` : '') +
-                    `<div class="text-[11px] text-slate-400 mt-1">ดูรายการได้ที่ แผนกย้อม (KPI) > บันทึกสั่งย้อม / ย้อมเพิ่ม และการ์ดของ M/O ในบอร์ดแผนกย้อม</div>` +
+                    `<div class="text-[11px] text-slate-400 mt-1">ดูรายการได้ที่ แผนกย้อม (KPI) > ${isOutsourcedImport ? 'ไหมจ้างย้อม' : 'บันทึกสั่งย้อม / ย้อมเพิ่ม'} และการ์ดของ M/O ในบอร์ดแผนกย้อม</div>` +
                     `<button type="button" onclick="closeImportDyeingModal()" class="mt-2 w-full bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium py-2 rounded-lg shadow transition"><i class="fa-solid fa-table-list mr-1"></i> ปิดหน้าต่าง แล้วดูรายการย้อม</button>` +
                     (autoTransferred.length > 0 ? `<br><span class="text-violet-600"><i class="fa-solid fa-arrow-right"></i> โอนไปแผนกทออัตโนมัติ ${autoTransferred.length} รายการ: ${autoTransferred.map(escapeHtml).join(', ')}</span>` : '');
                 showToast(`นำเข้ารายงานย้อมสำเร็จ ${matched.length} M/O, S/O${autoTransferred.length > 0 ? ` (โอนแผนกทออัตโนมัติ ${autoTransferred.length} รายการ)` : ''}`, 'fa-droplet', 'text-violet-500');
@@ -15270,7 +15275,7 @@
                 ? '<tr><td colspan="9" class="text-center text-xs text-slate-400 py-6">ยังไม่มีรายงานย้อมของ M/O นี้ — กด "นำเข้ารายงานย้อม (Excel)"</td></tr>'
                 : log.map(r => `<tr data-dw-log-row class="border-t border-slate-100">
                         <td class="py-1.5 px-2 whitespace-nowrap">${escapeHtml(r.orderDate || '-')}${r.actualDate && r.actualDate !== r.orderDate ? `<span class="text-slate-400"> → ${escapeHtml(r.actualDate)}</span>` : ''}</td>
-                        <td class="py-1.5 px-2 font-mono font-semibold">${escapeHtml(r.colorCode || '-')}${r.isExtra ? ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-fuchsia-50 text-fuchsia-700 font-semibold">ย้อมเพิ่ม</span>' : ''}${r.isDamaged ? ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 font-semibold">ย้อมเสีย</span>' : ''}</td>
+                        <td class="py-1.5 px-2 font-mono font-semibold">${escapeHtml(r.colorCode || '-')}${isOutsourcedDyeRow(r) ? ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 font-semibold">จ้างย้อม</span>' : ''}${r.isExtra ? ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-fuchsia-50 text-fuchsia-700 font-semibold">ย้อมเพิ่ม</span>' : ''}${r.isDamaged ? ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 font-semibold">ย้อมเสีย</span>' : ''}</td>
                         <td class="py-1.5 px-2">${escapeHtml(r.yarnType || '')}</td>
                         <td class="py-1.5 px-2">${escapeHtml(String(r.lotNo || ''))}</td>
                         <td class="py-1.5 px-2 text-right">${r.orderKg ? planningWsFmt(r.orderKg, 2) : '-'}</td>
@@ -20261,14 +20266,21 @@
         // is harmless everywhere else that reads it (addDyeOrderLogFromSelect/importDyeingKpiOrderLog's
         // `=== 'extra'` checks just fall through to the regular/false case), since the controls that
         // read it live inside the now-hidden order-log section and can't be reached while on 'summary'.
+        // NEW (2026-10-08): "ถ้าจ้างย้อมภายนอก ให้แยกออกจาก KPI แผนกย้อม" — แถวใน dyeOrderLog ที่ย้อมโดยผู้รับจ้างภายนอก (มี vendor / slipNo เช่น
+        // จาก Packing Slip ของ Siam Dyemaster) ไม่นับ/ไม่แสดงใน KPI ของแผนกย้อม (บันทึกสั่งย้อม, ย้อมเพิ่ม, สรุปรายเดือน, ตัวเลขบนหน้าภาพรวม, ส่งออก Excel)
+        // แต่ไปอยู่แท็บ "ไหมจ้างย้อม" ของตัวเอง. ยังนับเป็นน้ำหนักที่ย้อมได้ของ M/O นั้น (% ย้อม/โอนแผนกทออัตโนมัติ/ใบงาน) เพราะงานนั้นต้องการไหมชุดนี้
+        function isOutsourcedDyeRow(item) { return !!(item && typeof item === 'object' && (item.vendor || item.slipNo)); }
+
         function setDyeingKpiTab(tab) {
-            currentDyeingKpiTab = (tab === 'extra' || tab === 'summary') ? tab : 'regular';
+            currentDyeingKpiTab = (tab === 'extra' || tab === 'summary' || tab === 'external') ? tab : 'regular';
             const activeCls = "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition";
             const inactiveCls = "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
             document.getElementById('dyeingKpiTabRegularBtn').className = currentDyeingKpiTab === 'regular' ? activeCls : inactiveCls;
             document.getElementById('dyeingKpiTabExtraBtn').className = currentDyeingKpiTab === 'extra' ? activeCls : inactiveCls;
             const summaryBtn = document.getElementById('dyeingKpiTabSummaryBtn');
             if (summaryBtn) summaryBtn.className = currentDyeingKpiTab === 'summary' ? activeCls : inactiveCls;
+            const externalBtn = document.getElementById('dyeingKpiTabExternalBtn');
+            if (externalBtn) externalBtn.className = currentDyeingKpiTab === 'external' ? activeCls : inactiveCls;
 
             const orderLogSection = document.getElementById('dyeingKpiOrderLogSection');
             const summarySection = document.getElementById('dyeingKpiSummarySection');
@@ -20279,7 +20291,9 @@
             if (titleEl) {
                 titleEl.innerHTML = currentDyeingKpiTab === 'extra'
                     ? '<i class="fa-solid fa-droplet-slash mr-2 text-indigo-600"></i> ย้อมเพิ่ม'
-                    : '<i class="fa-solid fa-droplet mr-2 text-indigo-600"></i> บันทึกสั่งย้อม';
+                    : (currentDyeingKpiTab === 'external'
+                        ? '<i class="fa-solid fa-truck-fast mr-2 text-sky-600"></i> ไหมจ้างย้อมภายนอก <span class="ml-1 text-[11px] font-normal text-slate-500">(แยกจาก KPI แผนกย้อม — ไม่นับรวมในบันทึกสั่งย้อม/ย้อมเพิ่ม/สรุปรายเดือน)</span>'
+                        : '<i class="fa-solid fa-droplet mr-2 text-indigo-600"></i> บันทึกสั่งย้อม');
             }
 
             if (currentDyeingKpiTab === 'summary') {
@@ -20312,7 +20326,7 @@
             const all = [];
             productionOrders.forEach(order => {
                 const log = Array.isArray((order.dyeing || {}).dyeOrderLog) ? order.dyeing.dyeOrderLog : [];
-                log.forEach(item => all.push({ order, item }));
+                log.forEach(item => { if (!isOutsourcedDyeRow(item)) all.push({ order, item }); }); // จ้างภายนอกแยกออกจาก KPI แผนกย้อม
             });
 
             const filtered = all.filter(({ order, item }) => {
@@ -20482,10 +20496,14 @@
                 if (productionOrders.some(o => o.moSo === currentVal)) select.value = currentVal;
             }
             const wantExtra = currentDyeingKpiTab === 'extra';
+            const wantExternal = currentDyeingKpiTab === 'external';
             let flatRows = [];
             productionOrders.forEach((order, orderIndex) => {
                 const log = Array.isArray((order.dyeing || {}).dyeOrderLog) ? order.dyeing.dyeOrderLog : [];
-                log.forEach((item, itemIndex) => { if (!!item.isExtra === wantExtra) flatRows.push({ order, orderIndex, item, itemIndex }); });
+                log.forEach((item, itemIndex) => {
+                    // แท็บ "ไหมจ้างย้อม" = เฉพาะแถวจ้างภายนอก; บันทึกสั่งย้อม/ย้อมเพิ่ม = เฉพาะย้อมในบริษัท (ไม่เอาแถวจ้างภายนอก)
+                    if (wantExternal ? isOutsourcedDyeRow(item) : (!isOutsourcedDyeRow(item) && !!item.isExtra === wantExtra)) flatRows.push({ order, orderIndex, item, itemIndex });
+                });
             });
             flatRows = flatRows.filter(r => reportMonthMatchDate(r.item.orderDate, r.order));
             flatRows.sort((a, b) => String(b.item.orderDate || '').localeCompare(String(a.item.orderDate || '')));
@@ -20551,7 +20569,8 @@
             order.dyeing.dyeOrderLog.push({
                 isExtra: currentDyeingKpiTab === 'extra', orderDate: '', colorNo: '', colorCode: '', yarnType: '', lotNo: '', hang: '',
                 orderKg: 0, dyeTubNo: '', requisitionKg: 0, actualTransferKg: 0, plannedDate: '', actualDate: '', dueDate: '', remark: '',
-                isDamaged: false
+                isDamaged: false,
+                ...(currentDyeingKpiTab === 'external' ? { vendor: 'จ้างย้อมภายนอก' } : {})
             });
             persistOrderChange(order);
             renderDyeOrderLogTable();
@@ -22661,15 +22680,20 @@
             { key: 'dueDate', label: 'วันที่กำหนดส่ง', type: 'date' },
             { key: 'remark', label: 'หมายเหตุ' },
             // NEW (2026-10-02): "ย้อมเสีย" manual flag — see DYEING_ORDER_THEAD_HTML's comment.
-            { key: 'isDamaged', label: 'ย้อมเสีย (TRUE/FALSE)', type: 'bool' }
+            { key: 'isDamaged', label: 'ย้อมเสีย (TRUE/FALSE)', type: 'bool' },
+            // NEW (2026-10-08): แถวจ้างย้อมภายนอก (เว้นว่าง = ย้อมในบริษัท) — แยกออกจาก KPI แผนกย้อม
+            { key: 'vendor', label: 'ผู้รับจ้างย้อม (เว้นว่าง = ย้อมในบริษัท)' },
+            { key: 'slipNo', label: 'เลขที่ใบส่งไหมจ้างย้อม' }
         ];
 
         function exportDyeingKpiOrderLog() {
+            // ส่งออกตามแท็บที่เปิดอยู่: "ไหมจ้างย้อม" = เฉพาะจ้างภายนอก, แท็บอื่น = เฉพาะย้อมในบริษัท
+            const wantExternal = currentDyeingKpiTab === 'external';
             let flatRows = [];
             productionOrders.forEach(order => {
-                (((order.dyeing || {}).dyeOrderLog) || []).forEach(item => flatRows.push(Object.assign({ moSo: order.moSo }, item)));
+                (((order.dyeing || {}).dyeOrderLog) || []).forEach(item => { if (isOutsourcedDyeRow(item) === wantExternal) flatRows.push(Object.assign({ moSo: order.moSo }, item)); });
             });
-            exportFlatRowsToExcel('บันทึกสั่งย้อม.xlsx', 'สั่งย้อม', DYEING_ORDER_COLUMNS, flatRows);
+            exportFlatRowsToExcel(wantExternal ? 'ไหมจ้างย้อม.xlsx' : 'บันทึกสั่งย้อม.xlsx', wantExternal ? 'ไหมจ้างย้อม' : 'สั่งย้อม', DYEING_ORDER_COLUMNS, flatRows);
         }
 
         function importDyeingKpiOrderLog(fileInput) {
@@ -22719,6 +22743,9 @@
                     if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
                     const item = Object.assign({}, r); delete item.moSo;
                     if (item.isExtra === '') item.isExtra = currentDyeingKpiTab === 'extra';
+                    if (currentDyeingKpiTab === 'external' && !item.vendor && !item.slipNo) item.vendor = 'จ้างย้อมภายนอก'; // นำเข้าที่แท็บไหมจ้างย้อม → แถวจ้างภายนอก
+                    if (!item.vendor) delete item.vendor;
+                    if (!item.slipNo) delete item.slipNo;
                     order.dyeing.dyeOrderLog.push(item);
                     persistOrderChange(order);
                     added++;
