@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -873,15 +871,6 @@
                     <i class="fa-solid fa-scroll"></i> แผนกทากาวตกแต่ง (KPI)
                 </button>
             </div>
-            <!-- NEW (2026-10-08): แผนกรอส่ง → แท็บย่อย "เครื่องคำนวณพื้นที่พรม" (สลับกับบอร์ดรายการรอส่ง) -->
-            <div id="readyToShipSubTabBar" class="hidden flex items-center gap-2 mb-4">
-                <button onclick="setReadyToShipSubTab('board')" id="readyToShipSubTabBtn-board" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition">
-                    <i class="fa-solid fa-table-columns"></i> รายการรอส่ง
-                </button>
-                <button onclick="setReadyToShipSubTab('calc')" id="readyToShipSubTabBtn-calc" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
-                    <i class="fa-solid fa-calculator"></i> เครื่องคำนวณพื้นที่พรม
-                </button>
-            </div>
 
             <div id="boardSearchCard" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 mb-4 flex flex-wrap items-center gap-3">
                 <div class="flex items-center gap-2">
@@ -1324,148 +1313,6 @@
                         <h5 class="font-bold text-orange-700 text-[10px] uppercase flex items-center gap-1.5"><i class="fa-solid fa-box"></i> รอส่ง — ผลิตเสร็จแล้ว</h5>
                     </div>
                     <div id="boardColumn-ready_to_ship" class="flex flex-col gap-3"></div>
-                </div>
-            </div>
-
-            <!-- NEW (2026-10-08): เครื่องคำนวณพื้นที่พรม (แผนกรอส่ง → แท็บย่อย). คำนวณสดทุกครั้งที่พิมพ์ ไม่เก็บข้อมูลลง Sheet.
-                 ส่วนที่ 5 "ขนาดม้วนพรม" เพิ่มแล้ว (QCDashboard-66) ตาม Excel ตารางคำนวณเส้นผ่านศูนย์กลางม้วนพรม. -->
-            <div id="areaCalcContainer" class="hidden space-y-4">
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <div class="flex items-center gap-1.5 mb-1">
-                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Design</span>
-                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Sales</span>
-                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Planning</span>
-                        </div>
-                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-calculator mr-2 text-teal-600"></i>เครื่องคำนวณพื้นที่พรมและม้วนพรม</h3>
-                        <p class="text-[11px] text-slate-400 mt-0.5">กรอกเฉพาะช่องที่ต้องการ — ผลลัพธ์คำนวณอัตโนมัติ (ไม่บันทึกลงระบบ)</p>
-                    </div>
-                    <button onclick="clearAreaCalc()" id="areaCalcClearBtn" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-teal-700 border border-teal-300 hover:bg-teal-50 transition"><i class="fa-solid fa-eraser mr-1"></i>ล้างทุกช่อง</button>
-                </div>
-
-                <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                    <!-- 1) ฟุต/นิ้ว → ตร.ม. -->
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
-                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">1</span>ฟุต / นิ้ว → ตารางเมตร</h4>
-                        <p class="text-[11px] text-slate-400">1 ฟุต = 30.48 ซม. · 1 นิ้ว = 2.54 ซม. · 1 ตร.ฟุต = 0.09290304 ตร.ม.</p>
-                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                            <label class="text-[11px] font-semibold text-slate-600">กว้าง (ฟุต)<input id="rcFtW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">กว้าง (นิ้ว)<input id="rcInW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">ยาว (ฟุต)<input id="rcFtL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">ยาว (นิ้ว)<input id="rcInL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">จำนวน (ชิ้น)<input id="rcQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                        </div>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            <div class="rc-tile"><div class="rc-tile-l">กว้าง (ซม.)</div><div class="rc-tile-v" id="rcOutWcm">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">ยาว (ซม.)</div><div class="rc-tile-v" id="rcOutLcm">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">กว้าง (ม.)</div><div class="rc-tile-v" id="rcOutWm">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">ยาว (ม.)</div><div class="rc-tile-v" id="rcOutLm">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ 1 ชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcOutA1m2">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ 1 ชิ้น (ตร.ฟุต)</div><div class="rc-tile-v" id="rcOutA1ft2">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcOutAtm2">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ฟุต)</div><div class="rc-tile-v" id="rcOutAtft2">-</div></div>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            <button onclick="areaCalcCopy('rcOutA1m2')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. ต่อชิ้น</button>
-                            <button onclick="areaCalcCopy('rcOutAtm2')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. รวม</button>
-                        </div>
-                        <div class="border-t border-slate-100 pt-3">
-                            <p class="text-[11px] font-semibold text-slate-600 mb-1.5">แปลงพื้นที่ตรง ๆ: ตร.ฟุต ⇄ ตร.ม.</p>
-                            <div class="grid grid-cols-2 gap-2">
-                                <label class="text-[11px] font-semibold text-slate-600">ตร.ฟุต<input id="rcSqft" type="number" min="0" step="any" oninput="areaCalcConvert('ft')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                                <label class="text-[11px] font-semibold text-slate-600">ตร.ม.<input id="rcSqm" type="number" min="0" step="any" oninput="areaCalcConvert('m')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 2) วงกลม -->
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
-                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">2</span>พื้นที่วงกลม</h4>
-                        <p class="text-[11px] text-slate-400">พื้นที่ = π × r² · r = เส้นผ่านศูนย์กลาง ÷ 2</p>
-                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                            <label class="text-[11px] font-semibold text-slate-600">เส้นผ่านศูนย์กลาง<input id="rcCDia" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">หน่วย<select id="rcCUnit" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="m">เมตร</option><option value="cm">เซนติเมตร</option><option value="ft">ฟุต</option><option value="in">นิ้ว</option></select></label>
-                            <label class="text-[11px] font-semibold text-slate-600">ค่า π<select id="rcCPi" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="22/7">22/7 (ตามตารางเดิม)</option><option value="3.14">3.14</option><option value="pi">3.14159265…</option></select></label>
-                            <label class="text-[11px] font-semibold text-slate-600">เผื่อ (%)<input id="rcCAllow" type="number" min="0" step="any" value="10" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">จำนวน (ชิ้น)<input id="rcCQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                        </div>
-                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            <div class="rc-tile"><div class="rc-tile-l">รัศมี r (ม.)</div><div class="rc-tile-v" id="rcCOutR">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutA">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">ส่วนเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutAllow">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่รวมเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutWith">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutTotal">-</div></div>
-                        </div>
-                        <button onclick="areaCalcCopy('rcCOutWith')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. (รวมเผื่อ)</button>
-                    </div>
-
-                    <!-- 3) วงรี -->
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
-                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">3</span>พื้นที่วงรี</h4>
-                        <p class="text-[11px] text-slate-400">พื้นที่ = π × D × d ÷ 4 · D = ความยาวแกนนอก, d = ความยาวแกนใน</p>
-                        <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
-                            <label class="text-[11px] font-semibold text-slate-600">D (แกนนอก)<input id="rcEBig" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">d (แกนใน)<input id="rcESmall" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">หน่วย<select id="rcEUnit" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="m">เมตร</option><option value="cm">เซนติเมตร</option><option value="ft">ฟุต</option><option value="in">นิ้ว</option></select></label>
-                            <label class="text-[11px] font-semibold text-slate-600">ค่า π<select id="rcEPi" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="3.14">3.14 (ตามตารางเดิม)</option><option value="22/7">22/7</option><option value="pi">3.14159265…</option></select></label>
-                            <label class="text-[11px] font-semibold text-slate-600">เผื่อ (%)<input id="rcEAllow" type="number" min="0" step="any" value="10" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">จำนวน (ชิ้น)<input id="rcEQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                        </div>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutA">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">ส่วนเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutAllow">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่รวมเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutWith">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutTotal">-</div></div>
-                        </div>
-                        <button onclick="areaCalcCopy('rcEOutWith')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. (รวมเผื่อ)</button>
-                    </div>
-
-                    <!-- 4) Blank / พรมจริง -->
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
-                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">4</span>พื้นที่ Blank / พื้นที่พรมจริง</h4>
-                        <p class="text-[11px] text-slate-400">Design = กว้าง × ยาว · Blank = Design × % · พรมจริง = Design − Blank · กรอก % Blank หรือพื้นที่ว่างอย่างใดอย่างหนึ่งก็ได้</p>
-                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                            <label class="text-[11px] font-semibold text-slate-600">ขนาดกว้าง (ม.)<input id="rcBW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">ขนาดยาว (ม.)<input id="rcBL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">พื้นที่ตาม Plan (ตร.ม.)<input id="rcBPlan" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">% Blank<input id="rcBPct" type="number" min="0" step="any" oninput="areaCalcBlankEdit('pct')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">พื้นที่ว่าง Blank (ตร.ม.)<input id="rcBArea" type="number" min="0" step="any" oninput="areaCalcBlankEdit('area')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                        </div>
-                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ Design พรม (ตร.ม.)</div><div class="rc-tile-v" id="rcBOutDesign">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">เปอร์เซ็นต์ Blank</div><div class="rc-tile-v" id="rcBOutPct">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ว่าง Blank (ตร.ม.)</div><div class="rc-tile-v" id="rcBOutBlank">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่พรมจริง (ตร.ม.)</div><div class="rc-tile-v" id="rcBOutReal">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">Plan ÷ Design</div><div class="rc-tile-v" id="rcBOutRatio">-</div></div>
-                        </div>
-                        <button onclick="areaCalcCopy('rcBOutReal')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. พรมจริง</button>
-                    </div>
-                    <!-- 5) ขนาดม้วนพรม (ตารางคำนวณเส้นผ่านศูนย์กลางม้วนพรม ตาม Excel "ตารางการคำนวณเส้นผ่าศูนย์กลางของม้วนพรม") -->
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3 xl:col-span-2">
-                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">5</span>ขนาดม้วนพรม — ตารางเส้นผ่านศูนย์กลางของม้วน</h4>
-                        <p class="text-[11px] text-slate-400">ความหนาพรม = Fin Pile high + ความหนา Backing · แต่ละรอบเส้นผ่านศูนย์กลางเพิ่มขึ้น 2 × ความหนาพรม · Backing ปกติ ≈ 4 mm (ทากาวสองครั้งใช้ 5 mm) · แกนกระดาษใหญ่ 12.15 cm / เล็ก 7.00 cm · ใส่ความยาวพรมจริงเพื่อหาเส้นผ่านศูนย์กลางของม้วนนั้น</p>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            <label class="text-[11px] font-semibold text-slate-600">Fin Pile high (mm.)<input id="rcRPile" type="number" min="0" step="any" value="10" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">ความหนา Backing (mm.)<input id="rcRBack" type="number" min="0" step="any" value="4" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">แกนกระดาษ<select id="rcRCore" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="12.15">ใหญ่ 12.15 cm.</option><option value="7">เล็ก 7.00 cm.</option></select></label>
-                            <label class="text-[11px] font-semibold text-slate-600">ความยาวพรมจริง (เมตร)<input id="rcRLen" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                        </div>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            <div class="rc-tile"><div class="rc-tile-l">ความหนาของพรม (mm.)</div><div class="rc-tile-v" id="rcROutThick">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">เส้นผ่านศูนย์กลางแกน (cm.)</div><div class="rc-tile-v" id="rcROutCore">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">จำนวนรอบที่ม้วน (ที่ความยาวนี้)</div><div class="rc-tile-v" id="rcROutTurns">-</div></div>
-                            <div class="rc-tile"><div class="rc-tile-l">เส้นผ่านศูนย์กลางม้วน (cm.)</div><div class="rc-tile-v" id="rcROutDia">-</div></div>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            <button onclick="areaCalcCopy('rcROutDia')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก เส้นผ่านศูนย์กลาง (cm.)</button>
-                        </div>
-                        <div class="overflow-auto max-h-80 border border-slate-100 rounded-xl">
-                            <table class="w-full text-xs">
-                                <thead class="bg-slate-50 text-slate-500 text-[11px] sticky top-0"><tr><th class="px-3 py-1.5 text-center">ม้วนพรมรอบที่</th><th class="px-3 py-1.5 text-right">ความยาวพรม (เมตร)</th><th class="px-3 py-1.5 text-right">เส้นผ่านศูนย์กลาง (cm.)</th></tr></thead>
-                                <tbody id="rcRTableBody" class="divide-y divide-slate-100"></tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -2473,6 +2320,151 @@
                 <button onclick="switchShippingSubTab('marknos')" id="shippingSubTabMarkNosBtn" class="px-3.5 py-2 rounded-t-lg text-xs font-semibold text-emerald-800/70 hover:text-emerald-700">
                     <i class="fa-solid fa-tags mr-1.5"></i> ใบส่งสินค้า + Marks &amp; Nos
                 </button>
+                <button onclick="switchShippingSubTab('calc')" id="shippingSubTabCalcBtn" class="px-3.5 py-2 rounded-t-lg text-xs font-semibold text-emerald-800/70 hover:text-emerald-700">
+                    <i class="fa-solid fa-calculator mr-1.5"></i> เครื่องคำนวณพื้นที่พรม
+                </button>
+            </div>
+
+            <!-- NEW (2026-10-08): เครื่องคำนวณพื้นที่พรม (แท็บหลัก "รายการรอส่ง" → แท็บย่อย "เครื่องคำนวณพื้นที่พรม"). คำนวณสดทุกครั้งที่พิมพ์ ไม่เก็บข้อมูลลง Sheet.
+                 ส่วนที่ 5 "ขนาดม้วนพรม" เพิ่มแล้ว (QCDashboard-66) ตาม Excel ตารางคำนวณเส้นผ่านศูนย์กลางม้วนพรม. -->
+            <div id="areaCalcContainer" class="hidden p-4 space-y-4">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-1.5 mb-1">
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Design</span>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Sales</span>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Planning</span>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-calculator mr-2 text-teal-600"></i>เครื่องคำนวณพื้นที่พรมและม้วนพรม</h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5">กรอกเฉพาะช่องที่ต้องการ — ผลลัพธ์คำนวณอัตโนมัติ (ไม่บันทึกลงระบบ)</p>
+                    </div>
+                    <button onclick="clearAreaCalc()" id="areaCalcClearBtn" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-teal-700 border border-teal-300 hover:bg-teal-50 transition"><i class="fa-solid fa-eraser mr-1"></i>ล้างทุกช่อง</button>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <!-- 1) ฟุต/นิ้ว → ตร.ม. -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">1</span>ฟุต / นิ้ว → ตารางเมตร</h4>
+                        <p class="text-[11px] text-slate-400">1 ฟุต = 30.48 ซม. · 1 นิ้ว = 2.54 ซม. · 1 ตร.ฟุต = 0.09290304 ตร.ม.</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">กว้าง (ฟุต)<input id="rcFtW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">กว้าง (นิ้ว)<input id="rcInW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ยาว (ฟุต)<input id="rcFtL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ยาว (นิ้ว)<input id="rcInL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">จำนวน (ชิ้น)<input id="rcQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div class="rc-tile"><div class="rc-tile-l">กว้าง (ซม.)</div><div class="rc-tile-v" id="rcOutWcm">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">ยาว (ซม.)</div><div class="rc-tile-v" id="rcOutLcm">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">กว้าง (ม.)</div><div class="rc-tile-v" id="rcOutWm">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">ยาว (ม.)</div><div class="rc-tile-v" id="rcOutLm">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ 1 ชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcOutA1m2">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ 1 ชิ้น (ตร.ฟุต)</div><div class="rc-tile-v" id="rcOutA1ft2">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcOutAtm2">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ฟุต)</div><div class="rc-tile-v" id="rcOutAtft2">-</div></div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="areaCalcCopy('rcOutA1m2')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. ต่อชิ้น</button>
+                            <button onclick="areaCalcCopy('rcOutAtm2')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. รวม</button>
+                        </div>
+                        <div class="border-t border-slate-100 pt-3">
+                            <p class="text-[11px] font-semibold text-slate-600 mb-1.5">แปลงพื้นที่ตรง ๆ: ตร.ฟุต ⇄ ตร.ม.</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="text-[11px] font-semibold text-slate-600">ตร.ฟุต<input id="rcSqft" type="number" min="0" step="any" oninput="areaCalcConvert('ft')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                                <label class="text-[11px] font-semibold text-slate-600">ตร.ม.<input id="rcSqm" type="number" min="0" step="any" oninput="areaCalcConvert('m')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2) วงกลม -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">2</span>พื้นที่วงกลม</h4>
+                        <p class="text-[11px] text-slate-400">พื้นที่ = π × r² · r = เส้นผ่านศูนย์กลาง ÷ 2</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">เส้นผ่านศูนย์กลาง<input id="rcCDia" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">หน่วย<select id="rcCUnit" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="m">เมตร</option><option value="cm">เซนติเมตร</option><option value="ft">ฟุต</option><option value="in">นิ้ว</option></select></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ค่า π<select id="rcCPi" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="22/7">22/7 (ตามตารางเดิม)</option><option value="3.14">3.14</option><option value="pi">3.14159265…</option></select></label>
+                            <label class="text-[11px] font-semibold text-slate-600">เผื่อ (%)<input id="rcCAllow" type="number" min="0" step="any" value="10" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">จำนวน (ชิ้น)<input id="rcCQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <div class="rc-tile"><div class="rc-tile-l">รัศมี r (ม.)</div><div class="rc-tile-v" id="rcCOutR">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutA">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">ส่วนเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutAllow">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่รวมเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutWith">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutTotal">-</div></div>
+                        </div>
+                        <button onclick="areaCalcCopy('rcCOutWith')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. (รวมเผื่อ)</button>
+                    </div>
+
+                    <!-- 3) วงรี -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">3</span>พื้นที่วงรี</h4>
+                        <p class="text-[11px] text-slate-400">พื้นที่ = π × D × d ÷ 4 · D = ความยาวแกนนอก, d = ความยาวแกนใน</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">D (แกนนอก)<input id="rcEBig" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">d (แกนใน)<input id="rcESmall" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">หน่วย<select id="rcEUnit" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="m">เมตร</option><option value="cm">เซนติเมตร</option><option value="ft">ฟุต</option><option value="in">นิ้ว</option></select></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ค่า π<select id="rcEPi" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="3.14">3.14 (ตามตารางเดิม)</option><option value="22/7">22/7</option><option value="pi">3.14159265…</option></select></label>
+                            <label class="text-[11px] font-semibold text-slate-600">เผื่อ (%)<input id="rcEAllow" type="number" min="0" step="any" value="10" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">จำนวน (ชิ้น)<input id="rcEQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutA">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">ส่วนเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutAllow">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่รวมเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutWith">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutTotal">-</div></div>
+                        </div>
+                        <button onclick="areaCalcCopy('rcEOutWith')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. (รวมเผื่อ)</button>
+                    </div>
+
+                    <!-- 4) Blank / พรมจริง -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">4</span>พื้นที่ Blank / พื้นที่พรมจริง</h4>
+                        <p class="text-[11px] text-slate-400">Design = กว้าง × ยาว · Blank = Design × % · พรมจริง = Design − Blank · กรอก % Blank หรือพื้นที่ว่างอย่างใดอย่างหนึ่งก็ได้</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">ขนาดกว้าง (ม.)<input id="rcBW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ขนาดยาว (ม.)<input id="rcBL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">พื้นที่ตาม Plan (ตร.ม.)<input id="rcBPlan" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">% Blank<input id="rcBPct" type="number" min="0" step="any" oninput="areaCalcBlankEdit('pct')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">พื้นที่ว่าง Blank (ตร.ม.)<input id="rcBArea" type="number" min="0" step="any" oninput="areaCalcBlankEdit('area')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ Design พรม (ตร.ม.)</div><div class="rc-tile-v" id="rcBOutDesign">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">เปอร์เซ็นต์ Blank</div><div class="rc-tile-v" id="rcBOutPct">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ว่าง Blank (ตร.ม.)</div><div class="rc-tile-v" id="rcBOutBlank">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่พรมจริง (ตร.ม.)</div><div class="rc-tile-v" id="rcBOutReal">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">Plan ÷ Design</div><div class="rc-tile-v" id="rcBOutRatio">-</div></div>
+                        </div>
+                        <button onclick="areaCalcCopy('rcBOutReal')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. พรมจริง</button>
+                    </div>
+                    <!-- 5) ขนาดม้วนพรม (ตารางคำนวณเส้นผ่านศูนย์กลางม้วนพรม ตาม Excel "ตารางการคำนวณเส้นผ่าศูนย์กลางของม้วนพรม") -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3 xl:col-span-2">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">5</span>ขนาดม้วนพรม — ตารางเส้นผ่านศูนย์กลางของม้วน</h4>
+                        <p class="text-[11px] text-slate-400">ความหนาพรม = Fin Pile high + ความหนา Backing · แต่ละรอบเส้นผ่านศูนย์กลางเพิ่มขึ้น 2 × ความหนาพรม · Backing ปกติ ≈ 4 mm (ทากาวสองครั้งใช้ 5 mm) · แกนกระดาษใหญ่ 12.15 cm / เล็ก 7.00 cm · ใส่ความยาวพรมจริงเพื่อหาเส้นผ่านศูนย์กลางของม้วนนั้น</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">Fin Pile high (mm.)<input id="rcRPile" type="number" min="0" step="any" value="10" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ความหนา Backing (mm.)<input id="rcRBack" type="number" min="0" step="any" value="4" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">แกนกระดาษ<select id="rcRCore" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="12.15">ใหญ่ 12.15 cm.</option><option value="7">เล็ก 7.00 cm.</option></select></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ความยาวพรมจริง (เมตร)<input id="rcRLen" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div class="rc-tile"><div class="rc-tile-l">ความหนาของพรม (mm.)</div><div class="rc-tile-v" id="rcROutThick">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">เส้นผ่านศูนย์กลางแกน (cm.)</div><div class="rc-tile-v" id="rcROutCore">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">จำนวนรอบที่ม้วน (ที่ความยาวนี้)</div><div class="rc-tile-v" id="rcROutTurns">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">เส้นผ่านศูนย์กลางม้วน (cm.)</div><div class="rc-tile-v" id="rcROutDia">-</div></div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="areaCalcCopy('rcROutDia')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก เส้นผ่านศูนย์กลาง (cm.)</button>
+                        </div>
+                        <div class="overflow-auto max-h-80 border border-slate-100 rounded-xl">
+                            <table class="w-full text-xs">
+                                <thead class="bg-slate-50 text-slate-500 text-[11px] sticky top-0"><tr><th class="px-3 py-1.5 text-center">ม้วนพรมรอบที่</th><th class="px-3 py-1.5 text-right">ความยาวพรม (เมตร)</th><th class="px-3 py-1.5 text-right">เส้นผ่านศูนย์กลาง (cm.)</th></tr></thead>
+                                <tbody id="rcRTableBody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="shippingListSubview">
@@ -4081,7 +4073,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-66';
+        const APP_BUILD = 'QCDashboard-67';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -5742,9 +5734,15 @@
             const inactiveCls = "px-3.5 py-2 rounded-t-lg text-xs font-semibold text-emerald-800/70 hover:text-emerald-700";
             if (listBtn) listBtn.className = tab === 'list' ? activeCls : inactiveCls;
             if (markNosBtn) markNosBtn.className = tab === 'marknos' ? activeCls : inactiveCls;
+            // NEW (2026-10-08): แท็บย่อย "เครื่องคำนวณพื้นที่พรม"
+            const calcBtn = document.getElementById('shippingSubTabCalcBtn');
+            const calcView = document.getElementById('areaCalcContainer');
+            if (calcBtn) calcBtn.className = tab === 'calc' ? activeCls : inactiveCls;
             if (listView) listView.classList.toggle('hidden', tab !== 'list');
             if (markNosView) markNosView.classList.toggle('hidden', tab !== 'marknos');
+            if (calcView) calcView.classList.toggle('hidden', tab !== 'calc');
             if (tab === 'marknos') renderMarkNosSubview();
+            if (tab === 'calc') areaCalcRecalc();
         }
 
         // =========================================================================================
@@ -12790,14 +12788,7 @@
                 if (kpiContainer) kpiContainer.classList.toggle('hidden', !isDeptKpi);
             });
 
-            // NEW (2026-10-08): แผนกรอส่ง → แท็บย่อย "เครื่องคำนวณพื้นที่พรม" (ไม่ใช่หน้ารายงาน → ไม่โชว์แถบเลือกเดือนรายงาน)
-            const isReadyDept = boardDepartmentFilter === 'ready_to_ship';
-            const isReadyCalc = isReadyDept && typeof readyToShipSubTab !== 'undefined' && readyToShipSubTab === 'calc';
-            const readySubTabBar = document.getElementById('readyToShipSubTabBar');
-            const areaCalcContainer = document.getElementById('areaCalcContainer');
-            if (readySubTabBar) readySubTabBar.classList.toggle('hidden', !isReadyDept);
-            if (areaCalcContainer) areaCalcContainer.classList.toggle('hidden', !isReadyCalc);
-            if (searchCard) searchCard.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi || isReadyCalc);
+            if (searchCard) searchCard.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi);
             // NEW (2026-10-07): หน้ารายงาน (KPI/บันทึกการทอรายวัน/รายงานแผนกขาย) ซ่อนแถบค้นหาบอร์ด → โชว์ตัวเลือกเดือนของรายงานแทน
             const reportMonthBar = document.getElementById('reportMonthBar');
             if (reportMonthBar) {
@@ -12807,12 +12798,12 @@
 
             const grid = document.getElementById('boardColumnsGrid');
             if (grid) {
-                grid.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi || isReadyCalc);
+                grid.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi);
             }
             BOARD_TABS.forEach(stage => {
                 const wrap = document.getElementById(`boardColWrap-${stage}`);
                 if (!wrap) return;
-                const shouldShow = !isSales && !isWeavingLog && !isAnyDeptKpi && !isReadyCalc && boardDepartmentFilter === stage;
+                const shouldShow = !isSales && !isWeavingLog && !isAnyDeptKpi && boardDepartmentFilter === stage;
                 wrap.classList.toggle('hidden', !shouldShow);
             });
         }
@@ -16960,30 +16951,12 @@
         }
 
         // =========================================================================================
-        // NEW (2026-10-08): เครื่องคำนวณพื้นที่พรม — แท็บย่อยในแผนกรอส่ง (รายการรอส่ง | เครื่องคำนวณพื้นที่พรม)
+        // NEW (2026-10-08): เครื่องคำนวณพื้นที่พรม — แท็บย่อยของแท็บหลัก "รายการรอส่ง" (switchShippingSubTab('calc'))
         // 4 ส่วน: (1) ฟุต/นิ้ว → ตร.ม. (2) วงกลม (3) วงรี (4) Blank/พรมจริง. คำนวณสดตอนพิมพ์ ไม่บันทึกข้อมูลลง Sheet.
         // ส่วน (5) ขนาดม้วนพรม รอผู้ใช้ส่งสูตร/รูปมาเพิ่ม.
         // =========================================================================================
         const AREA_CALC_FT_CM = 30.48, AREA_CALC_IN_CM = 2.54, AREA_CALC_SQFT_M2 = 0.09290304;
-        let readyToShipSubTab = 'board';
         let areaCalcBlankLast = 'pct'; // ช่อง Blank ที่ผู้ใช้พิมพ์ล่าสุด ('pct' | 'area')
-
-        function setReadyToShipSubTab(tab) {
-            readyToShipSubTab = (tab === 'calc') ? 'calc' : 'board';
-            const activeClasses = ['bg-indigo-600', 'text-white', 'shadow-sm'];
-            const inactiveClasses = ['bg-slate-100', 'text-slate-600', 'hover:bg-slate-200'];
-            [
-                { el: document.getElementById('readyToShipSubTabBtn-board'), isActive: readyToShipSubTab === 'board' },
-                { el: document.getElementById('readyToShipSubTabBtn-calc'), isActive: readyToShipSubTab === 'calc' }
-            ].forEach(({ el, isActive }) => {
-                if (!el) return;
-                if (isActive) { el.classList.remove(...inactiveClasses); el.classList.add(...activeClasses); }
-                else { el.classList.remove(...activeClasses); el.classList.add(...inactiveClasses); }
-            });
-            if (boardDepartmentFilter !== 'ready_to_ship') { setBoardDepartmentTab('ready_to_ship'); return; }
-            updateBoardColumnVisibility();
-            if (readyToShipSubTab === 'calc') areaCalcRecalc();
-        }
 
         function acNum(id) {
             const el = document.getElementById(id);
