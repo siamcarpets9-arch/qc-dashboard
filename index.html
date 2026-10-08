@@ -2828,6 +2828,7 @@
                 </button>
             </div>
             <p class="text-xs text-slate-500">เลือกไฟล์ Excel "รายงานการผลิตแผนกย้อม" ไฟล์เดียวกับที่แผนกย้อมกรอกอยู่ทุกวัน (มี sheet แยกตามวันที่ เช่น 1-9-2026) ระบบจะอ่านทุก sheet ที่ชื่อเป็นวันที่ให้อัตโนมัติ รวมรายละเอียดสี/Lot/Hang/น้ำหนักที่ย้อมได้จริงเข้าบันทึกสั่งย้อม (KPI) ต่อ M/O, S/O — และถ้าย้อมครบตามแผนที่วางไว้ทุกสีแล้ว จะโอนงานไปแผนกทอให้อัตโนมัติโดยไม่ต้องกดผ่านเอง — นำเข้าไฟล์เดิมซ้ำได้โดยไม่นับซ้ำ</p>
+            <p class="text-xs text-sky-700 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2"><i class="fa-solid fa-truck-fast mr-1"></i><b>ไหมจ้างย้อม:</b> เลือกไฟล์ <b>Packing Slip ของ Siam Dyemaster</b> ที่ช่องเดียวกันนี้ได้เลย — ระบบดูเลข M/O จากช่อง REMARK, Code สีจากช่อง COLOR และน้ำหนักจากช่อง NETT (รวมทุกถุงของสีเดียวกัน) สีที่ย้อมรวมหลาย M/O จะแบ่งน้ำหนักตามสัดส่วนแผน ปรับตัวเลขได้ในพรีวิวก่อนยืนยัน</p>
             <input type="file" id="importDyeingFileInput" accept=".xlsx,.xls" onchange="handleDyeingExcelFile(this)" class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-violet-50 file:text-violet-700 file:text-xs file:font-medium hover:file:bg-violet-100 cursor-pointer">
             <div id="importDyeingStatus" class="text-xs text-slate-500 hidden"></div>
             <div id="importDyeingPreview" class="overflow-y-auto flex-grow -mr-1 pr-1 space-y-1.5 hidden"></div>
@@ -3910,7 +3911,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-61';
+        const APP_BUILD = 'QCDashboard-62';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -7277,6 +7278,217 @@
             return { byMoSo, sheetsRead };
         }
 
+        // =========================================================================================
+        // NEW (2026-10-08): "นำเข้าไหมจ้าง Siam Dye ย้อม" — ใบ Packing Slip ของ Siam Dyemaster (ไหมที่จ้างย้อมนอกบริษัทส่งกลับมา)
+        // ดู M/O จากช่อง REMARK (ORDER NUMBER), Code สีจากช่อง COLOR, น้ำหนักจากช่อง NETT (รวมทุกถุงของสีเดียวกัน). 1 ถุง = 1 แถว.
+        // ช่อง REMARK ของแถวเดียวอาจมีหลาย M/O ("MO 0181/26 M/O 0182/26") = สีนั้นย้อมรวมกันหลาย M/O → แบ่งน้ำหนักตามสัดส่วนแผน
+        // (แก้ตัวเลขต่อ M/O ได้ในพรีวิว). ผลลัพธ์ถูกแปลงเป็นโครง byMoSo เดียวกับ "นำเข้ารายงานย้อม" แล้วใช้ confirmDyeingImport()
+        // ตัวเดิม (จับคู่ M/O, สร้างนอกระบบ, % ย้อม, โอนแผนกทออัตโนมัติ, ไปหน้า KPI) — แถวที่ได้ติดป้ายจ้างย้อม + เลขที่ใบ และ
+        // มี _importKey แยกจากแถวย้อมในบริษัท จึงไม่ทับกัน/นำเข้าใบเดิมซ้ำก็ไม่เกิดแถวซ้ำ
+        // =========================================================================================
+        const SIAM_DYE_VENDOR = 'Siam Dyemaster';
+
+        function isSiamDyeSlipWorkbook(wb) {
+            try {
+                return (wb.SheetNames || []).some(name => {
+                    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
+                    for (let i = 0; i < Math.min(aoa.length, 15); i++) {
+                        if ((aoa[i] || []).some(c => /PACKING\s*SLIP/i.test(String(c || '')))) return true;
+                    }
+                    return false;
+                });
+            } catch (e) { return false; }
+        }
+
+        // "MO 0181/26 M/O 0182/26" → [{key:'181/26', disp:'0181/26'}, {key:'182/26', ...}]; "M/O DM009/26" → DM9/26; "M/O0163/26" ได้
+        function parseSiamSlipOrders(remark) {
+            let s = String(remark || '');
+            try { s = s.normalize('NFKC'); } catch (e) { /* ignore */ }
+            const isSO = /(^|[^A-Za-z])S\/O|(^|[^A-Za-z])SO(?![A-Za-z])/i.test(s);
+            s = s.replace(/(^|[^A-Za-z])(M\/O|S\/O|MO|SO)(?![A-Za-z])\s*:?/gi, '$1 ');
+            const out = [];
+            const seen = new Set();
+            for (const m of s.matchAll(/([A-Za-z]{0,3})\s*(\d{1,6})\s*\/\s*(\d{2})(?!\d)/g)) {
+                const disp = `${(m[1] || '').toUpperCase()}${m[2]}/${m[3]}`;
+                const key = normalizeDyeingMoSoMatchKey(disp);
+                if (!key || seen.has(key)) continue;
+                seen.add(key);
+                out.push({ key, disp });
+            }
+            return { orders: out, typeHint: isSO ? 'SO' : 'MO' };
+        }
+
+        function siamMaterialLabel(raw) {
+            return String(raw || '').replace(/^\s*\d+\s*%\s*/, '').replace(/\bDYED\b|\bYARN\b/gi, '').replace(/\s+/g, ' ').trim()
+                .toLowerCase().replace(/^./, c => c.toUpperCase());
+        }
+
+        function aggregateSiamDyeSlip(wb) {
+            const slips = [];
+            const groups = {};
+            const unparsed = [];
+            (wb.SheetNames || []).forEach(sheetName => {
+                const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: null });
+                if (!aoa.some((r, i) => i < 15 && (r || []).some(c => /PACKING\s*SLIP/i.test(String(c || ''))))) return;
+                let slipNo = '', dateKey = '', grandTotal = null, headerIdx = -1;
+                const nextVal = (row, j) => { for (let k = j + 1; k < row.length; k++) { if (row[k] !== null && row[k] !== undefined && String(row[k]).trim() !== '') return row[k]; } return null; };
+                aoa.forEach((row, i) => {
+                    row = row || [];
+                    row.forEach((c, j) => {
+                        const t = String(c === null || c === undefined ? '' : c).trim();
+                        if (/^SLIP\s*NO/i.test(t) && !slipNo) slipNo = String(nextVal(row, j) || '').trim();
+                        if (/^DATE\s*:?$/i.test(t) && !dateKey) { const v = nextVal(row, j); if (v instanceof Date && !isNaN(v)) dateKey = excelCellDateToDateKey(v); }
+                        if (/GRAND\s*TOTAL/i.test(t)) { const nums = row.filter(x => typeof x === 'number'); if (nums.length) grandTotal = nums[nums.length - 1]; }
+                    });
+                    if (headerIdx === -1) {
+                        const up = row.map(c => String(c === null || c === undefined ? '' : c).trim().toUpperCase());
+                        if (up.includes('COLOR') && up.includes('REMARK') && up.includes('NETT')) headerIdx = i;
+                    }
+                });
+                if (headerIdx === -1) return;
+                const head = (aoa[headerIdx] || []).map(c => String(c === null || c === undefined ? '' : c).trim().toUpperCase());
+                const col = { material: head.indexOf('MATERIAL'), color: head.indexOf('COLOR'), nett: head.indexOf('NETT'), remark: head.indexOf('REMARK'), pack: head.indexOf('PACK') };
+                const slip = { sheetName, slipNo: slipNo || sheetName, dateKey, packs: 0, totalNett: 0, grandTotal };
+                for (let i = headerIdx + 1; i < aoa.length; i++) {
+                    const row = aoa[i] || [];
+                    const colorRaw = row[col.color];
+                    const color = (colorRaw === null || colorRaw === undefined) ? '' : String(colorRaw).trim();
+                    const nett = Number(row[col.nett]);
+                    if (!color || color.toUpperCase() === 'COLOR' || !isFinite(nett) || nett <= 0) continue; // หัวตารางซ้ำข้ามหน้า / แถวรวม
+                    const remark = col.remark !== -1 ? String(row[col.remark] || '').trim() : '';
+                    const material = col.material !== -1 ? siamMaterialLabel(row[col.material]) : '';
+                    slip.packs++; slip.totalNett += nett;
+                    const parsed = parseSiamSlipOrders(remark);
+                    if (parsed.orders.length === 0) { unparsed.push({ slipNo: slip.slipNo, color, nett, remark }); continue; }
+                    const keys = parsed.orders.map(o => o.key).sort();
+                    const gKey = `${slip.slipNo}|${keys.join('+')}|${normalizeDyeColorCodeKey(color)}|${material}`;
+                    if (!groups[gKey]) groups[gKey] = { id: 'g' + Object.keys(groups).length, slipNo: slip.slipNo, dateKey: slip.dateKey, colorCode: color, material, orders: parsed.orders.slice().sort((a, b) => a.key.localeCompare(b.key)), typeHint: parsed.typeHint, nett: 0, packs: 0 };
+                    groups[gKey].nett += nett; groups[gKey].packs++;
+                }
+                slip.totalNett = Math.round(slip.totalNett * 1000) / 1000;
+                slips.push(slip);
+            });
+            const list = Object.values(groups).map(g => { g.nett = Math.round(g.nett * 1000) / 1000; return g; });
+            return { slips, groups: list, unparsed };
+        }
+
+        // แบ่ง NETT ของสีที่ย้อมรวมหลาย M/O ตามน้ำหนักสีนั้นที่แผนวางไว้ใน M/O นั้น (ไม่มีแผน/ไม่พบในระบบ → ถ้าทุกตัวไม่มีเลย แบ่งเท่ากัน)
+        function siamDefaultAllocation(group) {
+            const colorKey = normalizeDyeColorCodeKey(group.colorCode);
+            const found = group.orders.map(o => productionOrders.findIndex(p => normalizeDyeingMoSoMatchKey(p.moSo) === o.key) !== -1);
+            const weights = group.orders.map((o, n) => {
+                if (!found[n]) return 0;
+                const idx = productionOrders.findIndex(p => normalizeDyeingMoSoMatchKey(p.moSo) === o.key);
+                return getDyeingRequiredKgByColor(productionOrders[idx]).get(colorKey) || 0;
+            });
+            const planSum = weights.reduce((a, b) => a + b, 0);
+            const unknownN = found.filter(f => !f).length;
+            let alloc;
+            if (planSum > 0 && unknownN > 0 && planSum < group.nett) {
+                // M/O ที่ยังไม่อยู่ในระบบไม่มีแผนให้เทียบ → M/O ที่มีแผนได้ตามแผน ส่วนที่เหลือแบ่งให้ M/O ที่ไม่พบเท่าๆ กัน
+                const rest = (group.nett - planSum) / unknownN;
+                alloc = weights.map((w, n) => Math.round((found[n] ? w : rest) * 100) / 100);
+            } else {
+                const w = planSum > 0 ? weights : weights.map(() => 1);
+                const sum = w.reduce((a, b) => a + b, 0);
+                alloc = w.map(x => Math.round(group.nett * x / sum * 100) / 100);
+            }
+            const diff = Math.round((group.nett - alloc.reduce((a, b) => a + b, 0)) * 100) / 100;
+            if (diff !== 0) { let mx = 0; alloc.forEach((x, i) => { if (x > alloc[mx]) mx = i; }); alloc[mx] = Math.round((alloc[mx] + diff) * 100) / 100; }
+            return { alloc, planned: weights };
+        }
+
+        function dyeingMatchBadgeHtml(key, orderIndex, canAutoTransfer) {
+            if (orderIndex !== -1) {
+                return `<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> พบในระบบ${canAutoTransfer ? ' · ครบแผนแล้วจะโอนแผนกทอให้อัตโนมัติ' : ''}${(productionOrders[orderIndex].currentStage === 'planning') ? ' · ยังอยู่แผนกวางแผน จะย้ายมาแผนกย้อมให้' : ''}</span>`;
+            }
+            const cands = findDyeingCandidateOrders(key);
+            const pfx = k => (String(k).match(/^[A-Z]*/) || [''])[0];
+            const sameIdx = cands.findIndex(c => pfx(normalizeDyeingMoSoMatchKey(c.o.moSo)) === pfx(key)); // ผูกให้อัตโนมัติเฉพาะคำนำหน้า (SC/TH/D) เดียวกัน
+            const opts = cands.map((c, n) => `<option value="${c.i}"${n === sameIdx ? ' selected' : ''}>ผูกกับรายการในระบบ: ${escapeHtml(c.o.moSo)}${c.o.customerName ? ' · ' + escapeHtml(c.o.customerName) : ''}</option>`).join('');
+            return `<span class="text-rose-500 flex items-center gap-1.5 flex-wrap justify-end"><i class="fa-solid fa-circle-exclamation"></i> ${cands.length ? 'เลขไม่ตรงเป๊ะ แต่พบเลขใกล้เคียง' : 'ไม่พบ M/O, S/O นี้ในระบบ'}
+                <select data-dye-link="${escapeHtml(key)}" class="border border-slate-300 rounded px-1.5 py-0.5 text-[11px] text-slate-700 bg-white">${opts}<option value="offsys"${sameIdx !== -1 ? '' : ' selected'}>สร้างเป็นรายการนอกระบบ</option><option value="skip">ข้าม ไม่นำเข้า</option></select></span>`;
+        }
+
+        function renderSiamDyeSlipPreview(wb) {
+            const status = document.getElementById('importDyeingStatus');
+            const preview = document.getElementById('importDyeingPreview');
+            const confirmBtn = document.getElementById('importDyeingConfirmBtn');
+            const parsed = aggregateSiamDyeSlip(wb);
+            if (parsed.groups.length === 0) {
+                status.textContent = 'อ่านใบ Packing Slip แล้ว แต่ไม่พบแถวที่มีทั้ง Code สี, น้ำหนัก NETT และเลข M/O ในช่อง REMARK — ตรวจสอบไฟล์';
+                pendingDyeingImport = null;
+                return;
+            }
+            const slipText = parsed.slips.map(s => {
+                const ok = s.grandTotal === null || s.grandTotal === undefined || Math.abs(s.grandTotal - s.totalNett) < 0.5;
+                return `ใบ ${s.slipNo}${s.dateKey ? ' (' + s.dateKey + ')' : ''}: ${s.packs} ถุง รวม NETT ${s.totalNett.toFixed(2)} กก.${ok ? '' : ` ⚠ ไม่ตรงกับยอดรวมในใบ ${Number(s.grandTotal).toFixed(2)} กก.`}`;
+            }).join(' · ');
+            const orderKeys = [];
+            const dispByKey = {};
+            const kgByKey = {};
+            parsed.groups.forEach(g => g.orders.forEach(o => { if (!dispByKey[o.key]) { dispByKey[o.key] = o.disp; orderKeys.push(o.key); } }));
+            orderKeys.sort((a, b) => dispByKey[a].localeCompare(dispByKey[b]));
+            status.classList.remove('hidden');
+            status.innerHTML = `<b>ไหมจ้างย้อม ${escapeHtml(SIAM_DYE_VENDOR)}</b> — ${escapeHtml(slipText)}`;
+
+            const matchRows = orderKeys.map(key => {
+                const orderIndex = productionOrders.findIndex(o => normalizeDyeingMoSoMatchKey(o.moSo) === key);
+                const canAuto = orderIndex !== -1 && productionOrders[orderIndex].currentStage === 'dyeing' && Array.isArray((productionOrders[orderIndex].dyeing || {}).colorOrders) && productionOrders[orderIndex].dyeing.colorOrders.length > 0;
+                return `<div class="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <div><span class="font-semibold text-slate-700">${escapeHtml(dispByKey[key])}</span></div>${dyeingMatchBadgeHtml(key, orderIndex, canAuto)}</div>`;
+            }).join('');
+
+            const groupRows = parsed.groups.map(g => {
+                const { alloc, planned } = siamDefaultAllocation(g);
+                const shared = g.orders.length > 1;
+                const inputs = g.orders.map((o, n) => `<label class="flex items-center gap-1 text-[11px] text-slate-600">${escapeHtml(o.disp)}
+                    <input type="number" step="0.01" min="0" value="${alloc[n]}" data-sdm-alloc="${g.id}|${escapeHtml(o.key)}" oninput="siamRecalcGroup('${g.id}', ${g.nett})" class="w-20 px-1.5 py-0.5 border border-slate-300 rounded text-right text-xs">
+                    <span class="text-slate-400">กก.${planned[n] > 0 ? ` (แผน ${planned[n].toFixed(2)})` : ''}</span></label>`).join('');
+                return `<div class="text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 space-y-1">
+                    <div class="flex items-center justify-between gap-2 flex-wrap"><div><span class="font-semibold text-slate-700">${escapeHtml(g.colorCode)}</span>
+                        <span class="text-slate-400 ml-1">${escapeHtml(g.material)} · ${g.packs} ถุง · NETT ${g.nett.toFixed(2)} กก.${shared ? ' · ย้อมรวมหลาย M/O' : ''}</span></div>
+                        <span id="sdmWarn-${g.id}" class="text-[11px] text-rose-600"></span></div>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1">${shared ? inputs : `<span class="text-[11px] text-slate-600">${escapeHtml(g.orders[0].disp)} → ${alloc[0].toFixed(2)} กก.</span><input type="hidden" value="${alloc[0]}" data-sdm-alloc="${g.id}|${escapeHtml(g.orders[0].key)}">`}</div>
+                </div>`;
+            }).join('');
+            const unparsedHtml = parsed.unparsed.length ? `<div class="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>ข้าม ${parsed.unparsed.length} ถุงที่อ่านเลข M/O จากช่อง REMARK ไม่ได้ (${parsed.unparsed.slice(0, 5).map(u => escapeHtml(u.color) + ' "' + escapeHtml(u.remark) + '"').join(', ')}${parsed.unparsed.length > 5 ? '…' : ''})</div>` : '';
+            preview.classList.remove('hidden');
+            preview.innerHTML = `<p class="text-[11px] font-semibold text-slate-500">1) จับคู่ M/O, S/O</p>${matchRows}
+                <p class="text-[11px] font-semibold text-slate-500 pt-1">2) น้ำหนักต่อ Code สี (สีที่ย้อมรวมหลาย M/O แบ่งตามสัดส่วนแผน — แก้ตัวเลขได้)</p>${groupRows}${unparsedHtml}`;
+            pendingDyeingImport = { siam: parsed };
+            parsed.groups.forEach(g => siamRecalcGroup(g.id, g.nett));
+            confirmBtn.classList.remove('hidden');
+        }
+
+        function siamRecalcGroup(gid, nett) {
+            const inputs = [...document.querySelectorAll(`[data-sdm-alloc^="${gid}|"]`)];
+            const sum = Math.round(inputs.reduce((s, el) => s + (Number(el.value) || 0), 0) * 100) / 100;
+            const warn = document.getElementById('sdmWarn-' + gid);
+            if (warn) warn.textContent = Math.abs(sum - nett) > 0.01 ? `รวม ${sum.toFixed(2)} ≠ NETT ${Number(nett).toFixed(2)} กก.` : '';
+        }
+
+        // แปลงใบ packing slip ที่ผู้ใช้ตรวจ/แก้น้ำหนักแล้ว → โครง byMoSo ของ confirmDyeingImport()
+        function materializeSiamImport(parsed) {
+            const byMoSo = {};
+            parsed.groups.forEach(g => {
+                const shared = g.orders.length > 1;
+                g.orders.forEach(o => {
+                    const el = document.querySelector(`[data-sdm-alloc="${g.id}|${(window.CSS && CSS.escape) ? CSS.escape(o.key) : o.key}"]`);
+                    const kg = el ? (Number(el.value) || 0) : 0;
+                    if (!(kg > 0)) return;
+                    if (!byMoSo[o.key]) byMoSo[o.key] = { moSoDisplay: o.disp, rows: [], typeHint: g.typeHint };
+                    const others = g.orders.filter(x => x.key !== o.key).map(x => x.disp).join(', ');
+                    byMoSo[o.key].rows.push({
+                        dateKey: g.dateKey, sheetName: g.slipNo, colorNo: '', colorCode: g.colorCode, yarnType: g.material, lotNo: '', hang: '', batchNo: '',
+                        kg, remark: `จ้างย้อม ${SIAM_DYE_VENDOR} · ใบ ${g.slipNo} · ${g.packs} ถุง${shared ? ` · ย้อมรวมกับ ${others} (NETT รวม ${g.nett.toFixed(2)} กก.)` : ''}`,
+                        requisitionKg: null, orderKg: null, dyeTubNo: '', ext: { vendor: SIAM_DYE_VENDOR, slipNo: g.slipNo }
+                    });
+                });
+            });
+            return byMoSo;
+        }
+
         // NEW (2026-10-06): "แผนกย้อมนำเข้าข้อมูลไม่ขึ้นรายงาน" — รายงานย้อมของวันที่ 1 (M/O 183/26) และ 5 (S/O SC 390/26)
         // ไม่ขึ้นในตาราง "บันทึกสั่งย้อม" เพราะ M/O, S/O เหล่านั้นยังไม่ได้เปิดในระบบ → เดิมถูก "ข้าม" เงียบๆ (ตารางนี้เก็บ
         // ในตัว order.dyeing.dyeOrderLog จึงไม่มีที่เก็บให้แถวที่ไม่มี order). ตอนนี้ให้เลือกสร้างเป็นรายการ "นอกระบบ" —
@@ -7328,6 +7540,8 @@
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    // NEW (2026-10-08): ใบ Packing Slip ไหมจ้างย้อม (Siam Dyemaster) ใช้ตัวเลือกไฟล์เดียวกัน
+                    if (isSiamDyeSlipWorkbook(workbook)) { renderSiamDyeSlipPreview(workbook); return; }
                     const { byMoSo, sheetsRead } = aggregateDyeingImport(workbook);
                     const moSoKeys = Object.keys(byMoSo);
                     if (sheetsRead === 0) {
@@ -7355,16 +7569,7 @@
 
                     preview.classList.remove('hidden');
                     preview.innerHTML = rows.map(r => {
-                        const foundBadge = r.orderIndex !== -1
-                            ? `<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> พบในระบบ${r.canAutoTransfer ? ' · ครบแผนแล้วจะโอนแผนกทอให้อัตโนมัติ' : ''}${(r.orderIndex !== -1 && productionOrders[r.orderIndex].currentStage === 'planning') ? ' · ยังอยู่แผนกวางแผน จะย้ายมาแผนกย้อมให้' : ''}</span>`
-                            : (() => {
-                                const cands = findDyeingCandidateOrders(r.key);
-                                const pfx = k => (String(k).match(/^[A-Z]*/) || [''])[0];
-                                const sameIdx = cands.findIndex(c => pfx(normalizeDyeingMoSoMatchKey(c.o.moSo)) === pfx(r.key)); // ผูกให้อัตโนมัติเฉพาะคำนำหน้า (SC/TH/D) เดียวกัน
-                                const opts = cands.map((c, n) => `<option value="${c.i}"${n === sameIdx ? ' selected' : ''}>ผูกกับรายการในระบบ: ${escapeHtml(c.o.moSo)}${c.o.customerName ? ' · ' + escapeHtml(c.o.customerName) : ''}</option>`).join('');
-                                return `<span class="text-rose-500 flex items-center gap-1.5 flex-wrap justify-end"><i class="fa-solid fa-circle-exclamation"></i> ${cands.length ? 'เลขไม่ตรงเป๊ะ แต่พบเลขใกล้เคียง' : 'ไม่พบ M/O, S/O นี้ในระบบ'}
-                                    <select data-dye-link="${escapeHtml(r.key)}" class="border border-slate-300 rounded px-1.5 py-0.5 text-[11px] text-slate-700 bg-white">${opts}<option value="offsys"${sameIdx !== -1 ? '' : ' selected'}>สร้างเป็นรายการนอกระบบ</option><option value="skip">ข้าม ไม่นำเข้า</option></select></span>`;
-                            })();
+                        const foundBadge = dyeingMatchBadgeHtml(r.key, r.orderIndex, r.canAutoTransfer);
                         return `<div class="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                             <div><span class="font-semibold text-slate-700">${escapeHtml(r.moSoDisplay)}</span>
                                 <span class="text-slate-400 ml-1">${r.distinctColors} สี, รวม ${r.totalKgInFile.toFixed(2)} กก.</span></div>
@@ -7410,7 +7615,8 @@
         // recorded total for a color that happens to keep being dyed into the following month.
         function confirmDyeingImport() {
             if (!pendingDyeingImport) return;
-            const { byMoSo } = pendingDyeingImport;
+            // NEW (2026-10-08): ใบ Packing Slip ไหมจ้างย้อม → แปลงตามน้ำหนักที่ผู้ใช้ตรวจ/แก้ในพรีวิว แล้วเข้า flow เดียวกัน
+            const byMoSo = pendingDyeingImport.siam ? materializeSiamImport(pendingDyeingImport.siam) : pendingDyeingImport.byMoSo;
             const matched = [];
             const autoTransferred = [];
             const importDetails = []; // NEW (2026-10-05): ต่อ M/O — แถวไปอยู่ที่ไหน (บันทึกสั่งย้อม / ย้อมเพิ่ม) และตอนนี้อยู่แผนกไหน
@@ -7450,10 +7656,12 @@
                     if (!colorKey) return; // nothing to key this batch's dyeing to
                     const isExtraRow = /ย้อมเพิ่ม/.test(r.remark || '');
                     const monthKey = String(r.dateKey || '').slice(0, 7); // "YYYY-MM"
-                    const gKey = `${colorKey}|${isExtraRow ? 1 : 0}|${monthKey}`;
+                    // NEW (2026-10-08): แถวไหมจ้างย้อม (r.ext) แยกกลุ่ม/คีย์นำเข้าตามเลขที่ใบ — ไม่ปนกับแถวย้อมในบริษัทของสีเดียวกันในเดือนเดียวกัน
+                    const extTag = r.ext ? `|EXT:${r.ext.slipNo}` : '';
+                    const gKey = `${colorKey}|${isExtraRow ? 1 : 0}|${monthKey}${extTag}`;
                     if (!colorGroups[gKey]) {
                         colorGroups[gKey] = {
-                            colorKey, isExtra: isExtraRow, monthKey, colorNo: '', colorCode: '', yarnType: '',
+                            ext: r.ext || null, extTag, colorKey, isExtra: isExtraRow, monthKey, colorNo: '', colorCode: '', yarnType: '',
                             lotNo: '', hang: '', dyeTubNo: '', batchNos: [], extraRemarks: [], dates: [],
                             kg: 0, requisitionKg: null, orderKg: null
                         };
@@ -7499,13 +7707,13 @@
                     if (g.batchNos.length > 0) remarkParts.push(`Batch ${g.batchNos.join(', ')}`);
                     remarkParts.push(...g.extraRemarks);
                     const mergedRemark = remarkParts.join(' · ');
-                    const importKey = `${g.colorKey}|${g.isExtra ? 1 : 0}|${g.monthKey}`;
+                    const importKey = `${g.colorKey}|${g.isExtra ? 1 : 0}|${g.monthKey}${g.extTag || ''}`;
                     if (g.isExtra) detail.extra++; else detail.regular++;
                     const hasRequisitionKg = g.requisitionKg !== null;
                     const hasOrderKg = g.orderKg !== null;
 
                     let idx = log.findIndex((row, i) => row && row._importKey === importKey && !usedThisRound.has(i));
-                    if (idx === -1) {
+                    if (idx === -1 && !g.ext) {
                         idx = log.findIndex((row, i) => row && !usedThisRound.has(i) && !row._importKey &&
                             !!row.isExtra === g.isExtra && normalizeDyeColorCodeKey(row.colorCode) === g.colorKey && !row.actualDate);
                     }
@@ -7524,6 +7732,7 @@
                         if (!row.orderDate) row.orderDate = orderDate;
                         row.actualDate = actualDate;
                         row.remark = mergedRemark || row.remark || '';
+                        if (g.ext) { row.vendor = g.ext.vendor; row.slipNo = g.ext.slipNo; }
                         row._importKey = importKey;
                         usedThisRound.add(idx);
                     } else {
@@ -7534,6 +7743,7 @@
                             requisitionKg: hasRequisitionKg ? g.requisitionKg : 0, actualTransferKg: g.kg,
                             plannedDate: '', actualDate, dueDate: order.dueDate || '',
                             hang: g.hang || '', remark: mergedRemark, _importKey: importKey,
+                            ...(g.ext ? { vendor: g.ext.vendor, slipNo: g.ext.slipNo } : {}),
                             isDamaged: false // no source in the Excel report — stays a manual flag, see toggleDyeOrderLogDamaged()
                         });
                         usedThisRound.add(log.length - 1);
@@ -22474,7 +22684,7 @@
                 try {
                     const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
                     const agg = aggregateDyeingImport(wb);
-                    isDailyReport = agg.sheetsRead > 0 && Object.keys(agg.byMoSo).length > 0;
+                    isDailyReport = (agg.sheetsRead > 0 && Object.keys(agg.byMoSo).length > 0) || isSiamDyeSlipWorkbook(wb);
                 } catch (err) { isDailyReport = false; }
                 if (isDailyReport) {
                     openImportDyeingModal();
