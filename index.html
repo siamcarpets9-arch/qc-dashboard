@@ -296,7 +296,11 @@
             0%, 100% { transform: scale(1); }
             50%      { transform: scale(1.12); }
         }
-    </style>
+            /* NEW (2026-10-08): เครื่องคำนวณพื้นที่พรม (แท็บย่อยแผนกรอส่ง) */
+        .rc-tile { background:#f1f5f9; border-top:3px solid #0d9488; border-radius:10px; padding:8px 10px; min-width:0; }
+        .rc-tile-l { font-size:10px; font-weight:600; color:#64748b; line-height:1.3; }
+        .rc-tile-v { font-size:15px; font-weight:700; color:#0f172a; margin-top:2px; font-variant-numeric:tabular-nums; word-break:break-all; }
+</style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
@@ -867,6 +871,15 @@
                     <i class="fa-solid fa-scroll"></i> แผนกทากาวตกแต่ง (KPI)
                 </button>
             </div>
+            <!-- NEW (2026-10-08): แผนกรอส่ง → แท็บย่อย "เครื่องคำนวณพื้นที่พรม" (สลับกับบอร์ดรายการรอส่ง) -->
+            <div id="readyToShipSubTabBar" class="hidden flex items-center gap-2 mb-4">
+                <button onclick="setReadyToShipSubTab('board')" id="readyToShipSubTabBtn-board" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition">
+                    <i class="fa-solid fa-table-columns"></i> รายการรอส่ง
+                </button>
+                <button onclick="setReadyToShipSubTab('calc')" id="readyToShipSubTabBtn-calc" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                    <i class="fa-solid fa-calculator"></i> เครื่องคำนวณพื้นที่พรม
+                </button>
+            </div>
 
             <div id="boardSearchCard" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 mb-4 flex flex-wrap items-center gap-3">
                 <div class="flex items-center gap-2">
@@ -1309,6 +1322,148 @@
                         <h5 class="font-bold text-orange-700 text-[10px] uppercase flex items-center gap-1.5"><i class="fa-solid fa-box"></i> รอส่ง — ผลิตเสร็จแล้ว</h5>
                     </div>
                     <div id="boardColumn-ready_to_ship" class="flex flex-col gap-3"></div>
+                </div>
+            </div>
+
+            <!-- NEW (2026-10-08): เครื่องคำนวณพื้นที่พรม (แผนกรอส่ง → แท็บย่อย). คำนวณสดทุกครั้งที่พิมพ์ ไม่เก็บข้อมูลลง Sheet.
+                 ส่วนที่ 5 "ขนาดม้วนพรม" เพิ่มแล้ว (QCDashboard-66) ตาม Excel ตารางคำนวณเส้นผ่านศูนย์กลางม้วนพรม. -->
+            <div id="areaCalcContainer" class="hidden space-y-4">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-1.5 mb-1">
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Design</span>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Sales</span>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Planning</span>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-calculator mr-2 text-teal-600"></i>เครื่องคำนวณพื้นที่พรมและม้วนพรม</h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5">กรอกเฉพาะช่องที่ต้องการ — ผลลัพธ์คำนวณอัตโนมัติ (ไม่บันทึกลงระบบ)</p>
+                    </div>
+                    <button onclick="clearAreaCalc()" id="areaCalcClearBtn" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-teal-700 border border-teal-300 hover:bg-teal-50 transition"><i class="fa-solid fa-eraser mr-1"></i>ล้างทุกช่อง</button>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <!-- 1) ฟุต/นิ้ว → ตร.ม. -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">1</span>ฟุต / นิ้ว → ตารางเมตร</h4>
+                        <p class="text-[11px] text-slate-400">1 ฟุต = 30.48 ซม. · 1 นิ้ว = 2.54 ซม. · 1 ตร.ฟุต = 0.09290304 ตร.ม.</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">กว้าง (ฟุต)<input id="rcFtW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">กว้าง (นิ้ว)<input id="rcInW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ยาว (ฟุต)<input id="rcFtL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ยาว (นิ้ว)<input id="rcInL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">จำนวน (ชิ้น)<input id="rcQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div class="rc-tile"><div class="rc-tile-l">กว้าง (ซม.)</div><div class="rc-tile-v" id="rcOutWcm">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">ยาว (ซม.)</div><div class="rc-tile-v" id="rcOutLcm">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">กว้าง (ม.)</div><div class="rc-tile-v" id="rcOutWm">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">ยาว (ม.)</div><div class="rc-tile-v" id="rcOutLm">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ 1 ชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcOutA1m2">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ 1 ชิ้น (ตร.ฟุต)</div><div class="rc-tile-v" id="rcOutA1ft2">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcOutAtm2">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ฟุต)</div><div class="rc-tile-v" id="rcOutAtft2">-</div></div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="areaCalcCopy('rcOutA1m2')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. ต่อชิ้น</button>
+                            <button onclick="areaCalcCopy('rcOutAtm2')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. รวม</button>
+                        </div>
+                        <div class="border-t border-slate-100 pt-3">
+                            <p class="text-[11px] font-semibold text-slate-600 mb-1.5">แปลงพื้นที่ตรง ๆ: ตร.ฟุต ⇄ ตร.ม.</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="text-[11px] font-semibold text-slate-600">ตร.ฟุต<input id="rcSqft" type="number" min="0" step="any" oninput="areaCalcConvert('ft')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                                <label class="text-[11px] font-semibold text-slate-600">ตร.ม.<input id="rcSqm" type="number" min="0" step="any" oninput="areaCalcConvert('m')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2) วงกลม -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">2</span>พื้นที่วงกลม</h4>
+                        <p class="text-[11px] text-slate-400">พื้นที่ = π × r² · r = เส้นผ่านศูนย์กลาง ÷ 2</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">เส้นผ่านศูนย์กลาง<input id="rcCDia" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">หน่วย<select id="rcCUnit" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="m">เมตร</option><option value="cm">เซนติเมตร</option><option value="ft">ฟุต</option><option value="in">นิ้ว</option></select></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ค่า π<select id="rcCPi" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="22/7">22/7 (ตามตารางเดิม)</option><option value="3.14">3.14</option><option value="pi">3.14159265…</option></select></label>
+                            <label class="text-[11px] font-semibold text-slate-600">เผื่อ (%)<input id="rcCAllow" type="number" min="0" step="any" value="10" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">จำนวน (ชิ้น)<input id="rcCQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <div class="rc-tile"><div class="rc-tile-l">รัศมี r (ม.)</div><div class="rc-tile-v" id="rcCOutR">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutA">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">ส่วนเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutAllow">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่รวมเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutWith">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcCOutTotal">-</div></div>
+                        </div>
+                        <button onclick="areaCalcCopy('rcCOutWith')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. (รวมเผื่อ)</button>
+                    </div>
+
+                    <!-- 3) วงรี -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">3</span>พื้นที่วงรี</h4>
+                        <p class="text-[11px] text-slate-400">พื้นที่ = π × D × d ÷ 4 · D = ความยาวแกนนอก, d = ความยาวแกนใน</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">D (แกนนอก)<input id="rcEBig" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">d (แกนใน)<input id="rcESmall" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">หน่วย<select id="rcEUnit" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="m">เมตร</option><option value="cm">เซนติเมตร</option><option value="ft">ฟุต</option><option value="in">นิ้ว</option></select></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ค่า π<select id="rcEPi" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="3.14">3.14 (ตามตารางเดิม)</option><option value="22/7">22/7</option><option value="pi">3.14159265…</option></select></label>
+                            <label class="text-[11px] font-semibold text-slate-600">เผื่อ (%)<input id="rcEAllow" type="number" min="0" step="any" value="10" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">จำนวน (ชิ้น)<input id="rcEQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutA">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">ส่วนเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutAllow">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่รวมเผื่อ (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutWith">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">รวมทุกชิ้น (ตร.ม.)</div><div class="rc-tile-v" id="rcEOutTotal">-</div></div>
+                        </div>
+                        <button onclick="areaCalcCopy('rcEOutWith')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. (รวมเผื่อ)</button>
+                    </div>
+
+                    <!-- 4) Blank / พรมจริง -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">4</span>พื้นที่ Blank / พื้นที่พรมจริง</h4>
+                        <p class="text-[11px] text-slate-400">Design = กว้าง × ยาว · Blank = Design × % · พรมจริง = Design − Blank · กรอก % Blank หรือพื้นที่ว่างอย่างใดอย่างหนึ่งก็ได้</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">ขนาดกว้าง (ม.)<input id="rcBW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ขนาดยาว (ม.)<input id="rcBL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">พื้นที่ตาม Plan (ตร.ม.)<input id="rcBPlan" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">% Blank<input id="rcBPct" type="number" min="0" step="any" oninput="areaCalcBlankEdit('pct')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">พื้นที่ว่าง Blank (ตร.ม.)<input id="rcBArea" type="number" min="0" step="any" oninput="areaCalcBlankEdit('area')" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ Design พรม (ตร.ม.)</div><div class="rc-tile-v" id="rcBOutDesign">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">เปอร์เซ็นต์ Blank</div><div class="rc-tile-v" id="rcBOutPct">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่ว่าง Blank (ตร.ม.)</div><div class="rc-tile-v" id="rcBOutBlank">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">พื้นที่พรมจริง (ตร.ม.)</div><div class="rc-tile-v" id="rcBOutReal">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">Plan ÷ Design</div><div class="rc-tile-v" id="rcBOutRatio">-</div></div>
+                        </div>
+                        <button onclick="areaCalcCopy('rcBOutReal')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก ตร.ม. พรมจริง</button>
+                    </div>
+                    <!-- 5) ขนาดม้วนพรม (ตารางคำนวณเส้นผ่านศูนย์กลางม้วนพรม ตาม Excel "ตารางการคำนวณเส้นผ่าศูนย์กลางของม้วนพรม") -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3 xl:col-span-2">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">5</span>ขนาดม้วนพรม — ตารางเส้นผ่านศูนย์กลางของม้วน</h4>
+                        <p class="text-[11px] text-slate-400">ความหนาพรม = Fin Pile high + ความหนา Backing · แต่ละรอบเส้นผ่านศูนย์กลางเพิ่มขึ้น 2 × ความหนาพรม · Backing ปกติ ≈ 4 mm (ทากาวสองครั้งใช้ 5 mm) · แกนกระดาษใหญ่ 12.15 cm / เล็ก 7.00 cm · ใส่ความยาวพรมจริงเพื่อหาเส้นผ่านศูนย์กลางของม้วนนั้น</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">Fin Pile high (mm.)<input id="rcRPile" type="number" min="0" step="any" value="10" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ความหนา Backing (mm.)<input id="rcRBack" type="number" min="0" step="any" value="4" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">แกนกระดาษ<select id="rcRCore" onchange="areaCalcRecalc()" class="mt-1 w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="12.15">ใหญ่ 12.15 cm.</option><option value="7">เล็ก 7.00 cm.</option></select></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ความยาวพรมจริง (เมตร)<input id="rcRLen" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div class="rc-tile"><div class="rc-tile-l">ความหนาของพรม (mm.)</div><div class="rc-tile-v" id="rcROutThick">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">เส้นผ่านศูนย์กลางแกน (cm.)</div><div class="rc-tile-v" id="rcROutCore">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">จำนวนรอบที่ม้วน (ที่ความยาวนี้)</div><div class="rc-tile-v" id="rcROutTurns">-</div></div>
+                            <div class="rc-tile"><div class="rc-tile-l">เส้นผ่านศูนย์กลางม้วน (cm.)</div><div class="rc-tile-v" id="rcROutDia">-</div></div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="areaCalcCopy('rcROutDia')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก เส้นผ่านศูนย์กลาง (cm.)</button>
+                        </div>
+                        <div class="overflow-auto max-h-80 border border-slate-100 rounded-xl">
+                            <table class="w-full text-xs">
+                                <thead class="bg-slate-50 text-slate-500 text-[11px] sticky top-0"><tr><th class="px-3 py-1.5 text-center">ม้วนพรมรอบที่</th><th class="px-3 py-1.5 text-right">ความยาวพรม (เมตร)</th><th class="px-3 py-1.5 text-right">เส้นผ่านศูนย์กลาง (cm.)</th></tr></thead>
+                                <tbody id="rcRTableBody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1801,6 +1956,15 @@
                                     <input type="file" accept=".xlsx,.xls" class="hidden" onchange="importDyeingKpiOrderLog(this)">
                                 </label>
                             </div>
+                        </div>
+                        <!-- NEW (2026-10-08): ใบสั่งย้อมจากแผนกวางแผน เทียบกับไหมที่รับจากผู้รับจ้างจริง — เฉพาะแท็บ "ไหมจ้างย้อม" (renderDyeExternalPlanSection) -->
+                        <div id="dyeingExternalPlanSection" class="hidden border-b border-slate-100">
+                            <div class="px-4 py-2.5 flex flex-wrap items-center gap-2">
+                                <h4 class="font-bold text-sky-900 text-xs"><i class="fa-solid fa-clipboard-list mr-1.5 text-sky-600"></i>ใบสั่งย้อมจากแผนกวางแผน (เทียบกับที่ผู้รับจ้างส่งจริง)</h4>
+                                <span class="text-[10px] bg-sky-50 text-sky-700 font-semibold px-2 py-0.5 rounded-full border border-sky-200"><span id="dyeingExternalPlanCount">0</span> M/O</span>
+                                <span class="text-[10px] text-slate-400">อ่านอย่างเดียว — แก้ใบสั่งย้อมที่แผนกวางแผน · กด "+ จ้าง" เพื่อสร้างแถวจ้างย้อมในตารางด้านล่าง</span>
+                            </div>
+                            <div id="dyeingExternalPlanBody"></div>
                         </div>
                         <div class="p-3 flex flex-wrap items-center gap-2 border-b border-slate-100">
                             <span class="text-[11px] text-slate-500 font-medium">สรุปยอดรวมตามช่วงเวลา:</span>
@@ -3915,7 +4079,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-63';
+        const APP_BUILD = 'QCDashboard-66';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -12624,7 +12788,14 @@
                 if (kpiContainer) kpiContainer.classList.toggle('hidden', !isDeptKpi);
             });
 
-            if (searchCard) searchCard.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi);
+            // NEW (2026-10-08): แผนกรอส่ง → แท็บย่อย "เครื่องคำนวณพื้นที่พรม" (ไม่ใช่หน้ารายงาน → ไม่โชว์แถบเลือกเดือนรายงาน)
+            const isReadyDept = boardDepartmentFilter === 'ready_to_ship';
+            const isReadyCalc = isReadyDept && typeof readyToShipSubTab !== 'undefined' && readyToShipSubTab === 'calc';
+            const readySubTabBar = document.getElementById('readyToShipSubTabBar');
+            const areaCalcContainer = document.getElementById('areaCalcContainer');
+            if (readySubTabBar) readySubTabBar.classList.toggle('hidden', !isReadyDept);
+            if (areaCalcContainer) areaCalcContainer.classList.toggle('hidden', !isReadyCalc);
+            if (searchCard) searchCard.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi || isReadyCalc);
             // NEW (2026-10-07): หน้ารายงาน (KPI/บันทึกการทอรายวัน/รายงานแผนกขาย) ซ่อนแถบค้นหาบอร์ด → โชว์ตัวเลือกเดือนของรายงานแทน
             const reportMonthBar = document.getElementById('reportMonthBar');
             if (reportMonthBar) {
@@ -12634,12 +12805,12 @@
 
             const grid = document.getElementById('boardColumnsGrid');
             if (grid) {
-                grid.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi);
+                grid.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi || isReadyCalc);
             }
             BOARD_TABS.forEach(stage => {
                 const wrap = document.getElementById(`boardColWrap-${stage}`);
                 if (!wrap) return;
-                const shouldShow = !isSales && !isWeavingLog && !isAnyDeptKpi && boardDepartmentFilter === stage;
+                const shouldShow = !isSales && !isWeavingLog && !isAnyDeptKpi && !isReadyCalc && boardDepartmentFilter === stage;
                 wrap.classList.toggle('hidden', !shouldShow);
             });
         }
@@ -16786,6 +16957,188 @@
             }
         }
 
+        // =========================================================================================
+        // NEW (2026-10-08): เครื่องคำนวณพื้นที่พรม — แท็บย่อยในแผนกรอส่ง (รายการรอส่ง | เครื่องคำนวณพื้นที่พรม)
+        // 4 ส่วน: (1) ฟุต/นิ้ว → ตร.ม. (2) วงกลม (3) วงรี (4) Blank/พรมจริง. คำนวณสดตอนพิมพ์ ไม่บันทึกข้อมูลลง Sheet.
+        // ส่วน (5) ขนาดม้วนพรม รอผู้ใช้ส่งสูตร/รูปมาเพิ่ม.
+        // =========================================================================================
+        const AREA_CALC_FT_CM = 30.48, AREA_CALC_IN_CM = 2.54, AREA_CALC_SQFT_M2 = 0.09290304;
+        let readyToShipSubTab = 'board';
+        let areaCalcBlankLast = 'pct'; // ช่อง Blank ที่ผู้ใช้พิมพ์ล่าสุด ('pct' | 'area')
+
+        function setReadyToShipSubTab(tab) {
+            readyToShipSubTab = (tab === 'calc') ? 'calc' : 'board';
+            const activeClasses = ['bg-indigo-600', 'text-white', 'shadow-sm'];
+            const inactiveClasses = ['bg-slate-100', 'text-slate-600', 'hover:bg-slate-200'];
+            [
+                { el: document.getElementById('readyToShipSubTabBtn-board'), isActive: readyToShipSubTab === 'board' },
+                { el: document.getElementById('readyToShipSubTabBtn-calc'), isActive: readyToShipSubTab === 'calc' }
+            ].forEach(({ el, isActive }) => {
+                if (!el) return;
+                if (isActive) { el.classList.remove(...inactiveClasses); el.classList.add(...activeClasses); }
+                else { el.classList.remove(...activeClasses); el.classList.add(...inactiveClasses); }
+            });
+            if (boardDepartmentFilter !== 'ready_to_ship') { setBoardDepartmentTab('ready_to_ship'); return; }
+            updateBoardColumnVisibility();
+            if (readyToShipSubTab === 'calc') areaCalcRecalc();
+        }
+
+        function acNum(id) {
+            const el = document.getElementById(id);
+            const v = el ? parseFloat(el.value) : NaN;
+            return (isFinite(v) && v > 0) ? v : 0;
+        }
+        function acSet(id, n, dp, blankIfZero) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (!isFinite(n) || (blankIfZero && n === 0)) { el.textContent = '-'; el.dataset.raw = ''; return; }
+            el.textContent = n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+            el.dataset.raw = n.toFixed(dp);
+        }
+        function acPi(selId) {
+            const v = (document.getElementById(selId) || {}).value;
+            if (v === '22/7') return 22 / 7;
+            if (v === 'pi') return Math.PI;
+            return 3.14;
+        }
+        function acToMeters(val, unit) {
+            if (unit === 'cm') return val / 100;
+            if (unit === 'ft') return val * AREA_CALC_FT_CM / 100;
+            if (unit === 'in') return val * AREA_CALC_IN_CM / 100;
+            return val;
+        }
+        function acQty(id) { const q = Math.floor(acNum(id)); return q >= 1 ? q : 1; }
+
+
+        // ส่วนที่ 5: ม้วนพรม. ความหนา t = pile + backing (mm); เส้นผ่านศูนย์กลางหลังม้วนรอบที่ k: D_k = แกน + 2·t·k (cm);
+        // ความยาวสะสมถึงรอบที่ n: L_n = Σ π·D_k ÷ 100 (เมตร) — ตรงกับตารางใน Excel (ตรวจกับ pile 10 + backing 4 + แกน 12.15 ทั้ง 30 รอบ)
+        function areaCalcRollRows(coreCm, tCm, maxTurns, stopAtLen) {
+            const rows = []; let L = 0;
+            for (let n = 1; n <= maxTurns; n++) {
+                const D = coreCm + 2 * tCm * n;
+                L += Math.PI * D / 100;
+                rows.push({ n, len: L, dia: D });
+                if (stopAtLen != null && L >= stopAtLen) break;
+            }
+            return rows;
+        }
+        function areaCalcRoll() {
+            const tMm = acNum('rcRPile') + acNum('rcRBack');
+            const core = parseFloat((document.getElementById('rcRCore') || {}).value) || 12.15;
+            const tCm = tMm / 10;
+            const setTxt = (id, t) => { const e = document.getElementById(id); if (e) { e.textContent = t; e.dataset.raw = ''; } };
+            acSet('rcROutThick', tMm, 2, true); acSet('rcROutCore', core, 2, false);
+            const body = document.getElementById('rcRTableBody');
+            const targetLen = acNum('rcRLen');
+            if (!(tMm > 0)) { if (body) body.innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-center text-slate-400">กรอก Fin Pile high / ความหนา Backing เพื่อสร้างตาราง</td></tr>'; setTxt('rcROutTurns', '-'); setTxt('rcROutDia', '-'); return; }
+            const rows = areaCalcRollRows(core, tCm, 30);
+            let hiN = -1, turns = 0, dia = 0, found = false;
+            if (targetLen > 0) {
+                const r2 = areaCalcRollRows(core, tCm, 5000, targetLen);
+                const last = r2[r2.length - 1];
+                if (last.len >= targetLen) {
+                    const prev = r2.length > 1 ? r2[r2.length - 2] : { n: 0, len: 0, dia: core };
+                    const frac = (targetLen - prev.len) / (last.len - prev.len);
+                    turns = prev.n + frac; dia = prev.dia + frac * (last.dia - prev.dia); found = true; hiN = last.n;
+                }
+            }
+            if (body) body.innerHTML = rows.map(r => `<tr data-roll-turn="${r.n}" class="${found && r.n === hiN ? 'bg-teal-50 font-semibold' : ''}"><td class="px-3 py-1 text-center">${r.n}</td><td class="px-3 py-1 text-right tabular-nums">${r.len.toFixed(2)}</td><td class="px-3 py-1 text-right tabular-nums">${r.dia.toFixed(2)}</td></tr>`).join('');
+            if (found) { acSet('rcROutTurns', turns, 2, false); acSet('rcROutDia', dia, 2, false); }
+            else { setTxt('rcROutTurns', '-'); setTxt('rcROutDia', '-'); }
+        }
+
+        function areaCalcRecalc() {
+            try {
+                // 1) ฟุต/นิ้ว → ตร.ม.
+                const wCm = acNum('rcFtW') * AREA_CALC_FT_CM + acNum('rcInW') * AREA_CALC_IN_CM;
+                const lCm = acNum('rcFtL') * AREA_CALC_FT_CM + acNum('rcInL') * AREA_CALC_IN_CM;
+                const qty = acQty('rcQty');
+                const a1 = (wCm / 100) * (lCm / 100);
+                acSet('rcOutWcm', wCm, 2, true); acSet('rcOutLcm', lCm, 2, true);
+                acSet('rcOutWm', wCm / 100, 4, true); acSet('rcOutLm', lCm / 100, 4, true);
+                acSet('rcOutA1m2', a1, 4, true); acSet('rcOutA1ft2', a1 / AREA_CALC_SQFT_M2, 4, true);
+                acSet('rcOutAtm2', a1 * qty, 4, true); acSet('rcOutAtft2', a1 * qty / AREA_CALC_SQFT_M2, 4, true);
+
+                // 2) วงกลม
+                const rM = acToMeters(acNum('rcCDia'), (document.getElementById('rcCUnit') || {}).value) / 2;
+                const cA = acPi('rcCPi') * rM * rM;
+                const cAllow = cA * acNum('rcCAllow') / 100;
+                acSet('rcCOutR', rM, 4, true); acSet('rcCOutA', cA, 4, true); acSet('rcCOutAllow', cAllow, 4, true);
+                acSet('rcCOutWith', cA + cAllow, 4, true); acSet('rcCOutTotal', (cA + cAllow) * acQty('rcCQty'), 4, true);
+
+                // 3) วงรี  พื้นที่ = π × D × d ÷ 4
+                const eUnit = (document.getElementById('rcEUnit') || {}).value;
+                const eA = acPi('rcEPi') * acToMeters(acNum('rcEBig'), eUnit) * acToMeters(acNum('rcESmall'), eUnit) / 4;
+                const eAllow = eA * acNum('rcEAllow') / 100;
+                acSet('rcEOutA', eA, 4, true); acSet('rcEOutAllow', eAllow, 4, true);
+                acSet('rcEOutWith', eA + eAllow, 4, true); acSet('rcEOutTotal', (eA + eAllow) * acQty('rcEQty'), 4, true);
+
+                // 4) Blank / พรมจริง
+                const design = acNum('rcBW') * acNum('rcBL');
+                let pct = 0, blank = 0;
+                if (areaCalcBlankLast === 'area') {
+                    blank = acNum('rcBArea');
+                    pct = design > 0 ? blank / design * 100 : 0;
+                    const pe = document.getElementById('rcBPct');
+                    if (pe && document.activeElement !== pe) pe.value = (design > 0 && blank > 0) ? String(+pct.toFixed(4)) : '';
+                } else {
+                    pct = acNum('rcBPct');
+                    blank = design * pct / 100;
+                    const ae = document.getElementById('rcBArea');
+                    if (ae && document.activeElement !== ae) ae.value = (design > 0 && pct > 0) ? String(+blank.toFixed(4)) : '';
+                }
+                const real = design > 0 ? design - blank : 0;
+                acSet('rcBOutDesign', design, 4, true);
+                acSet('rcBOutPct', design > 0 ? pct : 0, 2, !(design > 0));
+                if (design > 0) { const e = document.getElementById('rcBOutPct'); if (e) e.textContent = pct.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'; }
+                acSet('rcBOutBlank', design > 0 ? blank : 0, 4, !(design > 0));
+                acSet('rcBOutReal', real, 4, !(design > 0));
+                const plan = acNum('rcBPlan');
+                acSet('rcBOutRatio', (design > 0 && plan > 0) ? plan / design : 0, 4, true);
+                areaCalcRoll();
+            } catch (e) { console.error('areaCalcRecalc failed:', e); }
+        }
+
+        function areaCalcBlankEdit(which) {
+            areaCalcBlankLast = (which === 'area') ? 'area' : 'pct';
+            areaCalcRecalc();
+        }
+
+        // ตร.ฟุต ⇄ ตร.ม. (แก้ช่องไหนก็อัปเดตอีกช่อง)
+        function areaCalcConvert(from) {
+            const ft = document.getElementById('rcSqft'), m = document.getElementById('rcSqm');
+            if (!ft || !m) return;
+            if (from === 'ft') { const v = parseFloat(ft.value); m.value = (isFinite(v) && v >= 0 && ft.value !== '') ? String(+(v * AREA_CALC_SQFT_M2).toFixed(6)) : ''; }
+            else { const v = parseFloat(m.value); ft.value = (isFinite(v) && v >= 0 && m.value !== '') ? String(+(v / AREA_CALC_SQFT_M2).toFixed(6)) : ''; }
+        }
+
+        function areaCalcCopy(outId) {
+            const el = document.getElementById(outId);
+            const raw = el ? (el.dataset.raw || '') : '';
+            if (!raw) { showToast('ยังไม่มีค่าให้คัดลอก — กรอกขนาดก่อน', 'fa-triangle-exclamation', 'text-amber-400'); return; }
+            const done = () => showToast(`คัดลอก ${raw} แล้ว`);
+            const fallback = () => {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = raw; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                    done();
+                } catch (e) { showToast('คัดลอกไม่สำเร็จ', 'fa-triangle-exclamation', 'text-amber-400'); }
+            };
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(raw).then(done, fallback);
+                else fallback();
+            } catch (e) { fallback(); }
+        }
+
+        function clearAreaCalc() {
+            ['rcFtW', 'rcInW', 'rcFtL', 'rcInL', 'rcSqft', 'rcSqm', 'rcCDia', 'rcEBig', 'rcESmall', 'rcBW', 'rcBL', 'rcBPlan', 'rcBPct', 'rcBArea', 'rcRLen'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+            [['rcQty', '1'], ['rcCQty', '1'], ['rcEQty', '1'], ['rcCAllow', '10'], ['rcEAllow', '10'], ['rcRPile', '10'], ['rcRBack', '4']].forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.value = v; });
+            [['rcCUnit', 'm'], ['rcEUnit', 'm'], ['rcCPi', '22/7'], ['rcEPi', '3.14'], ['rcRCore', '12.15']].forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.value = v; });
+            areaCalcBlankLast = 'pct';
+            areaCalcRecalc();
+        }
+
         // NEW (2026-09-16): generic version of the "แผนกทอ" board/log sub-tab switcher above, reused for
         // the 4 department KPI report tabs the user asked to move onto the board itself: "บอร์ด" (the
         // pre-existing Kanban column for that department) vs "รายงาน KPI" (the new report, one per dept,
@@ -20507,6 +20860,7 @@
             });
             flatRows = flatRows.filter(r => reportMonthMatchDate(r.item.orderDate, r.order));
             flatRows.sort((a, b) => String(b.item.orderDate || '').localeCompare(String(a.item.orderDate || '')));
+            try { renderDyeExternalPlanSection(); } catch (e) { console.error('renderDyeExternalPlanSection failed:', e); }
 
             const periodSummaryEl = document.getElementById('dyeingKpiPeriodSummary');
             if (periodSummaryEl) {
@@ -20556,6 +20910,156 @@
             // adding/removing a row, toggling ย้อมเสีย) even while that tab isn't the one showing —
             // cheap (it's just an array scan) and means switching to it never shows stale numbers.
             if (document.getElementById('dyeingKpiSummarySection')) renderDyeingSummaryTab();
+        }
+
+        // ============================================================================================
+        // NEW (2026-10-08): "รายการย้อมภายนอก ให้ดึงใบสั่งย้อมจากแผนกวางแผนมาด้วย" — ในแท็บ "ไหมจ้างย้อม" แสดงใบสั่งย้อมที่แผนกวางแผน
+        // ตั้งไว้ (order.dyeing.colorOrders — code สี + นน.) เทียบกับไหมที่รับจากผู้รับจ้างจริง (แถวจ้างภายนอกใน dyeOrderLog).
+        // อ่านอย่างเดียว ไม่แก้แผนและไม่ปนกับตารางบันทึก. M/O ที่แสดง = M/O ที่ตั้งเป็น "ไหมสั่งย้อมนอกบริษัท" (ทุกสีในใบสั่ง)
+        // + M/O ที่มีแถวจ้างภายนอกแล้ว (เฉพาะสีที่จ้างจริง + สีที่จ้างแต่ไม่อยู่ในใบสั่ง). ปุ่ม "+ จ้าง" สร้างแถวจ้างภายนอกล่วงหน้าจากใบสั่ง.
+        // ============================================================================================
+        function buildDyeExternalPlanRows() {
+            const groups = [];
+            (productionOrders || []).forEach((order, orderIndex) => {
+                const dyeing = (order && order.dyeing) || {};
+                const log = Array.isArray(dyeing.dyeOrderLog) ? dyeing.dyeOrderLog : [];
+                const extRows = log.filter(isOutsourcedDyeRow);
+                const isExtMode = dyeing.mode === 'external';
+                if (!isExtMode && extRows.length === 0) return;
+                // เดือน: ตามเดือนที่เลือกของหน้ารายงาน — M/O เปิดในเดือนนั้น หรือมีแถวจ้างภายนอกวันที่ในเดือนนั้น
+                if (!(reportMonthMatchOrder(order) || extRows.some(r => reportMonthMatchDate(r.orderDate || r.actualDate, order)))) return;
+
+                const plan = new Map(); // key → { code, kg }
+                (Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders : []).forEach(r => {
+                    if (!r || typeof r !== 'object') return;
+                    const key = normalizeDyeColorCodeKey(r.colorCode);
+                    if (!key) return;
+                    const p = plan.get(key) || { code: String(r.colorCode).trim(), kg: 0 };
+                    p.kg += Number(r.kg) || 0;
+                    plan.set(key, p);
+                });
+                const required = getDyeingRequiredKgByColor(order);
+                const got = new Map(); // key → { code, kg, vendors:Set, slips:Set }
+                extRows.forEach(r => {
+                    const key = normalizeDyeColorCodeKey(r.colorCode);
+                    if (!key) return;
+                    const g = got.get(key) || { code: String(r.colorCode).trim(), kg: 0, vendors: new Set(), slips: new Set() };
+                    g.kg += Number(r.actualTransferKg) || 0;
+                    if (r.vendor) g.vendors.add(String(r.vendor));
+                    if (r.slipNo) g.slips.add(String(r.slipNo));
+                    got.set(key, g);
+                });
+
+                const rows = [];
+                plan.forEach((p, key) => {
+                    if (!isExtMode && !got.has(key)) return; // M/O ย้อมในบริษัท: โชว์เฉพาะสีที่จ้างภายนอกจริง
+                    const req = required.has(key) ? required.get(key) : p.kg;
+                    const g = got.get(key);
+                    rows.push({ key, code: p.code, planKg: p.kg, surplusKg: Math.max(0, p.kg - req), requiredKg: req, gotKg: g ? g.kg : 0, inPlan: true,
+                        vendors: g ? [...g.vendors] : [], slips: g ? [...g.slips] : [] });
+                });
+                got.forEach((g, key) => {
+                    if (plan.has(key)) return;
+                    rows.push({ key, code: g.code, planKg: 0, surplusKg: 0, requiredKg: 0, gotKg: g.kg, inPlan: false, vendors: [...g.vendors], slips: [...g.slips] });
+                });
+                if (rows.length === 0 && !isExtMode) return;
+                rows.forEach(r => {
+                    const remain = r.requiredKg - r.gotKg;
+                    r.remainKg = r.inPlan ? Math.max(0, remain) : 0;
+                    if (!r.inPlan) r.status = 'extra';
+                    else if (r.gotKg <= 0.005) r.status = 'none';
+                    else if (r.gotKg < r.requiredKg - 0.01) r.status = 'partial';
+                    else if (r.gotKg > r.requiredKg + 0.01 && r.requiredKg > 0) r.status = 'over';
+                    else r.status = 'done';
+                });
+                groups.push({ order, orderIndex, isExtMode, rows });
+            });
+            return groups;
+        }
+
+        function renderDyeExternalPlanSection() {
+            const sec = document.getElementById('dyeingExternalPlanSection');
+            if (!sec) return;
+            const on = currentDyeingKpiTab === 'external';
+            sec.classList.toggle('hidden', !on);
+            if (!on) return;
+            const body = document.getElementById('dyeingExternalPlanBody');
+            const countEl = document.getElementById('dyeingExternalPlanCount');
+            if (!body) return;
+            const groups = buildDyeExternalPlanRows();
+            if (countEl) countEl.textContent = String(groups.length);
+            if (groups.length === 0) {
+                body.innerHTML = '<div class="p-4 text-center text-xs text-slate-400">ยังไม่มี M/O ที่จ้างย้อมภายนอกในเดือนที่เลือก — ตั้ง M/O เป็น "ไหมสั่งย้อมนอกบริษัท" ในแผนกวางแผน หรือนำเข้า Packing Slip ผู้รับจ้าง</div>';
+                return;
+            }
+            const f = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const STATUS = {
+                none: ['ยังไม่ได้รับ', 'bg-amber-50 text-amber-700 border-amber-200'],
+                partial: ['รับบางส่วน', 'bg-sky-50 text-sky-700 border-sky-200'],
+                done: ['ครบตามใบสั่ง', 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+                over: ['เกินใบสั่ง', 'bg-rose-50 text-rose-700 border-rose-200'],
+                extra: ['นอกใบสั่ง', 'bg-violet-50 text-violet-700 border-violet-200']
+            };
+            body.innerHTML = groups.map(g => {
+                const o = g.order;
+                const tPlan = g.rows.reduce((s, r) => s + r.requiredKg, 0), tGot = g.rows.reduce((s, r) => s + r.gotKg, 0);
+                const tRemain = g.rows.reduce((s, r) => s + r.remainKg, 0);
+                const noPlan = !g.rows.some(r => r.inPlan);
+                const head = `<div class="px-3 py-2 bg-sky-50/60 border-t border-sky-100 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-ext-plan-order="${escapeHtml(o.moSo)}">
+                    <span class="font-bold ${moSoTextColorClass(o)}">${escapeHtml(o.moSo)}</span>
+                    ${g.isExtMode ? '<span class="px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-800 border border-sky-200 text-[10px] font-semibold">ตั้งเป็นไหมสั่งย้อมนอกบริษัท</span>' : ''}
+                    ${o.customerName ? `<span class="text-slate-500">${escapeHtml(o.customerName)}</span>` : ''}
+                    ${o.dueDate ? `<span class="text-slate-400">กำหนดส่ง ${escapeHtml(String(o.dueDate))}</span>` : ''}
+                    <span class="ml-auto text-slate-600">ตามใบสั่ง <b>${f(tPlan)}</b> · รับแล้ว <b>${f(tGot)}</b> · คงเหลือ <b class="${tRemain > 0.01 ? 'text-amber-700' : 'text-emerald-700'}">${f(tRemain)}</b> กก.</span>
+                </div>`;
+                const rows = g.rows.length === 0
+                    ? `<tr><td colspan="8" class="px-3 py-2 text-xs text-slate-400">แผนกวางแผนยังไม่ได้ลงใบสั่งย้อม (code สี/น้ำหนัก) ของ M/O นี้</td></tr>`
+                    : g.rows.map(r => {
+                        const st = STATUS[r.status];
+                        const vend = [...r.vendors, ...r.slips.map(s => 'ใบ ' + s)].join(' · ');
+                        const addBtn = (r.inPlan && r.remainKg > 0.01)
+                            ? `<button type="button" onclick="addExternalDyeRowFromPlan(${g.orderIndex}, decodeURIComponent('${encodeURIComponent(r.code)}'))" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-sky-600 text-white hover:bg-sky-700 transition whitespace-nowrap" title="สร้างแถวจ้างย้อมในตารางด้านล่าง (นน.ในใบสั่งย้อม = ${f(r.remainKg)} กก.)"><i class="fa-solid fa-plus mr-1"></i>จ้าง</button>`
+                            : '';
+                        return `<tr class="hover:bg-slate-50/80" data-ext-plan-row="${escapeHtml(r.key)}">
+                            <td class="px-3 py-1.5 font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(r.code)}</td>
+                            <td class="px-3 py-1.5 text-right tabular-nums">${r.inPlan ? f(r.planKg) : '-'}</td>
+                            <td class="px-3 py-1.5 text-right tabular-nums text-slate-500">${r.surplusKg > 0.005 ? f(r.surplusKg) : '-'}</td>
+                            <td class="px-3 py-1.5 text-right tabular-nums font-medium">${r.inPlan ? f(r.requiredKg) : '-'}</td>
+                            <td class="px-3 py-1.5 text-right tabular-nums font-medium text-sky-700">${f(r.gotKg)}</td>
+                            <td class="px-3 py-1.5 text-right tabular-nums ${r.remainKg > 0.01 ? 'text-amber-700 font-medium' : 'text-slate-400'}">${r.inPlan ? f(r.remainKg) : '-'}</td>
+                            <td class="px-3 py-1.5"><span class="inline-flex px-2 py-0.5 rounded-full border text-[10px] font-semibold ${st[1]}">${st[0]}</span></td>
+                            <td class="px-3 py-1.5 text-[11px] text-slate-500">${escapeHtml(vend) || '<span class="text-slate-300">-</span>'}</td>
+                            <td class="px-3 py-1.5 text-right">${addBtn}</td>
+                        </tr>`;
+                    }).join('');
+                return head + `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500 text-[11px]"><tr>
+                    <th class="px-3 py-1.5 text-left">code สี</th><th class="px-3 py-1.5 text-right">นน.ในใบสั่งย้อม (Kg.)</th><th class="px-3 py-1.5 text-right">หัก Surplus (Kg.)</th><th class="px-3 py-1.5 text-right">ต้องย้อม (Kg.)</th>
+                    <th class="px-3 py-1.5 text-right">รับจากผู้รับจ้าง (Kg.)</th><th class="px-3 py-1.5 text-right">คงเหลือ (Kg.)</th><th class="px-3 py-1.5 text-left">สถานะ</th><th class="px-3 py-1.5 text-left">ผู้รับจ้าง / ใบส่ง</th><th class="px-3 py-1.5"></th>
+                    </tr></thead><tbody class="divide-y divide-slate-100">${rows}</tbody></table></div>`;
+            }).join('');
+        }
+
+        // ปุ่ม "+ จ้าง": สร้างแถวจ้างย้อมภายนอกล่วงหน้าจากใบสั่งย้อมของแผนกวางแผน (นน.ในใบสั่งย้อม = ส่วนที่ยังไม่ได้รับ, นน.โอนจริง = 0)
+        function addExternalDyeRowFromPlan(orderIndex, colorCode) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            const key = normalizeDyeColorCodeKey(colorCode);
+            const required = getDyeingRequiredKgByColor(order).get(key) || 0;
+            let got = 0;
+            ((order.dyeing || {}).dyeOrderLog || []).forEach(r => { if (isOutsourcedDyeRow(r) && normalizeDyeColorCodeKey(r.colorCode) === key) got += Number(r.actualTransferKg) || 0; });
+            if (!order.dyeing) order.dyeing = {};
+            if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
+            const d = new Date();
+            const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            order.dyeing.dyeOrderLog.push({
+                isExtra: false, orderDate: today, colorNo: '', colorCode, yarnType: '', lotNo: '', hang: '',
+                orderKg: Math.round(Math.max(0, required - got) * 100) / 100, dyeTubNo: '', requisitionKg: 0, actualTransferKg: 0,
+                plannedDate: '', actualDate: '', dueDate: order.dueDate || '', remark: 'สร้างจากใบสั่งย้อมแผนกวางแผน',
+                isDamaged: false, vendor: 'จ้างย้อมภายนอก'
+            });
+            persistOrderChange(order);
+            renderDyeOrderLogTable();
+            showToast(`เพิ่มรายการจ้างย้อม ${colorCode} ของ ${order.moSo} แล้ว — ใส่ผู้รับจ้าง/น้ำหนักที่รับในตารางด้านล่าง`);
         }
 
         function addDyeOrderLogFromSelect() {
