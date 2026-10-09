@@ -655,6 +655,8 @@
 
             <!-- NEW (2026-10-09): ประมาณการไหมที่ต้องใช้ แยกตามชนิดไหม (ตร.ม. ที่ยังไม่ย้อม × 3.5) — renderYarnEstimatePanel() -->
             <div id="overviewYarnPanel" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3"></div>
+            <!-- NEW (2026-10-09): รับไหมแต่ละชนิด + ตัดยอดเบิกไปย้อม = สต๊อกคงเหลือ — renderYarnStockPanel() -->
+            <div id="overviewYarnStockPanel" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3"></div>
 
             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3">
                 <div class="relative w-full sm:w-80">
@@ -4077,7 +4079,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-69';
+        const APP_BUILD = 'QCDashboard-70';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -4168,6 +4170,8 @@
             if (savedShippingInvoices) {
                 try { shippingInvoices = (JSON.parse(savedShippingInvoices) || []).map(normalizeShippingInvoice); } catch(e) {}
             }
+            // NEW (2026-10-09): รายการรับไหมแต่ละชนิด (สต๊อกไหม) — local-only, see loadYarnReceipts().
+            loadYarnReceipts();
             const printDateEl = document.getElementById('printDateNow');
             if (printDateEl) printDateEl.textContent = new Date().toLocaleString('th-TH');
             // NEW (2026-09-16): "รายงาน QC ทั้งหมด" defaults to showing only the current month on every
@@ -12359,9 +12363,229 @@
                 <p class="text-[10px] text-slate-400">${r.excludedDyed ? `ตัดที่ย้อมแล้ว ${r.excludedDyed} ใบ` : 'ไม่มีงานที่ย้อมครบแล้วในไลน์'}${r.noSqm ? ` · ไม่นับ ${r.noSqm} ใบที่ยังไม่ได้กรอกพื้นที่รวม (ตร.ม.)` : ''}</p>`;
         }
 
+        // =========================================================================================
+        // NEW (2026-10-09): "ทำช่องรายการรับไหมแต่ละชนิด เพื่อมาตัดยอดไหม จะได้ดูยอดคงเหลือ"
+        // บันทึกการรับไหมเข้าคลังแยกตามชนิดไหม (วันที่รับ + ชนิดไหม + กก.) เก็บใน localStorage (qc_yarn_receipts_v1, ไม่ซิงก์ข้ามเครื่อง
+        // — สำรอง/ย้ายเครื่องด้วย ส่งออก/นำเข้า Excel). ยอดตัดออก = ไหมที่เบิกไปย้อมจริง (requisitionKg ในบันทึกสั่งย้อมของแผนกย้อม,
+        // ไม่รวมแถวจ้างย้อมภายนอก) นับตั้งแต่ "วันที่เริ่มตัดยอด" (ค่าเริ่มต้น = วันรับไหมครั้งแรก).
+        //   คงเหลือ = รับสะสม − เบิกใช้ ;  คงเหลือสุทธิ = คงเหลือ − ประมาณการไหมที่ยังต้องใช้ (computeYarnEstimate)
+        // =========================================================================================
+        const YARN_RECEIPT_KEY = 'qc_yarn_receipts_v1';
+        const YARN_STOCK_START_KEY = 'qc_yarn_stock_start_v1';
+        let yarnReceipts = [];
+        function yarnTypeKey(v) { return String(v || '').trim().replace(/\s+/g, ' ').toUpperCase(); }
+        function newYarnReceiptId() { return 'yr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+        function yarnDateFromAny(raw) {
+            if (typeof raw === 'number' && raw > 20000 && raw < 80000) { // Excel serial
+                const d = new Date(Math.round((raw - 25569) * 86400000));
+                return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+            }
+            return normalizeDateString(raw);
+        }
+        function normalizeYarnReceipt(r) {
+            if (!r || typeof r !== 'object') return null;
+            const kg = Number(r.kg);
+            const type = String(r.yarnType || '').trim().replace(/\s+/g, ' ');
+            if (!type || !isFinite(kg) || kg === 0) return null;
+            return { id: r.id || newYarnReceiptId(), date: yarnDateFromAny(r.date) || '', yarnType: type, kg, createdAt: r.createdAt || Date.now() };
+        }
+        function loadYarnReceipts() {
+            try {
+                const a = JSON.parse(localStorage.getItem(YARN_RECEIPT_KEY) || '[]');
+                yarnReceipts = Array.isArray(a) ? a.map(normalizeYarnReceipt).filter(Boolean) : [];
+            } catch (e) { yarnReceipts = []; }
+        }
+        function saveYarnReceipts() { try { localStorage.setItem(YARN_RECEIPT_KEY, JSON.stringify(yarnReceipts)); } catch (e) { /* storage unavailable */ } }
+        function getYarnStockStartRaw() { try { return localStorage.getItem(YARN_STOCK_START_KEY) || ''; } catch (e) { return ''; } }
+        function getYarnStockStart() {
+            const raw = getYarnStockStartRaw();
+            if (raw) return raw;
+            const dates = yarnReceipts.map(r => r.date).filter(Boolean).sort();
+            return dates[0] || '';
+        }
+        function setYarnStockStart(value) {
+            const v = normalizeDateString(value);
+            try { if (v) localStorage.setItem(YARN_STOCK_START_KEY, v); else localStorage.removeItem(YARN_STOCK_START_KEY); } catch (e) { /* ignore */ }
+            renderYarnStockPanel();
+        }
+        function computeYarnStock() {
+            const start = getYarnStockStart();
+            const map = new Map();
+            const grp = (label) => {
+                const raw = String(label || '').trim().replace(/\s+/g, ' ');
+                const key = yarnTypeKey(raw);
+                let g = map.get(key);
+                if (!g) { g = { key, label: raw || '(ไม่ระบุชนิดไหม)', received: 0, used: 0, need: 0, receipts: [] }; map.set(key, g); }
+                return g;
+            };
+            yarnReceipts.forEach(r => { const g = grp(r.yarnType); g.received += r.kg; g.receipts.push(r); });
+            let undated = 0;
+            (productionOrders || []).forEach(o => {
+                const log = Array.isArray((o.dyeing || {}).dyeOrderLog) ? o.dyeing.dyeOrderLog : [];
+                log.forEach(item => {
+                    if (!item || isOutsourcedDyeRow(item)) return;
+                    const kg = Number(item.requisitionKg) || 0;
+                    if (!(kg > 0)) return;
+                    const d = normalizeDateString(item.orderDate || item.actualDate);
+                    if (!d) undated++;
+                    else if (start && d < start) return;
+                    grp(item.yarnType || o.yarnType).used += kg;
+                });
+            });
+            let est = null;
+            try { est = computeYarnEstimate(); } catch (e) { est = null; }
+            if (est) est.rows.forEach(r => { const g = grp(r.key ? r.label : ''); g.need += r.kg; });
+            const rows = [...map.values()].filter(g => g.received !== 0 || g.used > 0 || g.need > 0);
+            rows.forEach(g => { g.balance = g.received - g.used; g.net = g.balance - g.need; g.receipts.sort((a, b) => (b.date || '').localeCompare(a.date || '')); });
+            rows.sort((a, b) => (a.key === '') - (b.key === '') || a.net - b.net || a.label.localeCompare(b.label));
+            const sum = (k) => rows.reduce((s, g) => s + g[k], 0);
+            return { start, startIsAuto: !getYarnStockStartRaw(), rows, undated, received: sum('received'), used: sum('used'), need: sum('need'), balance: sum('balance'), net: sum('net') };
+        }
+        function addYarnReceiptFromForm() {
+            const date = (document.getElementById('yarnRcvDate') || {}).value || '';
+            const type = ((document.getElementById('yarnRcvType') || {}).value || '').trim();
+            const kg = parseFloat((document.getElementById('yarnRcvKg') || {}).value);
+            if (!date) { showToast('กรุณาเลือกวันที่รับ', 'fa-triangle-exclamation', 'text-amber-400'); return; }
+            if (!type) { showToast('กรุณากรอกชนิดไหม', 'fa-triangle-exclamation', 'text-amber-400'); return; }
+            if (!isFinite(kg) || kg === 0) { showToast('กรุณากรอกจำนวน (กก.)', 'fa-triangle-exclamation', 'text-amber-400'); return; }
+            // ใช้ชื่อชนิดไหมเดียวกับที่มีอยู่แล้ว (ไม่สนตัวพิมพ์/ช่องว่าง) เพื่อไม่ให้แยกกลุ่มซ้ำ
+            const existing = yarnReceipts.find(r => yarnTypeKey(r.yarnType) === yarnTypeKey(type));
+            const r = normalizeYarnReceipt({ date, yarnType: existing ? existing.yarnType : type, kg });
+            if (!r) return;
+            yarnReceipts.push(r);
+            saveYarnReceipts();
+            const kgEl = document.getElementById('yarnRcvKg'); if (kgEl) kgEl.value = '';
+            renderYarnStockPanel();
+            const t = document.getElementById('yarnRcvKg'); if (t) t.focus();
+            showToast(`บันทึกรับไหม ${r.yarnType} ${r.kg.toLocaleString('th-TH')} กก. แล้ว`);
+        }
+        function updateYarnReceipt(id, field, value) {
+            const r = yarnReceipts.find(x => x.id === id);
+            if (!r) return;
+            if (field === 'kg') { const n = parseFloat(value); if (!isFinite(n) || n === 0) { renderYarnStockPanel(); return; } r.kg = n; }
+            else if (field === 'date') r.date = normalizeDateString(value) || '';
+            else if (field === 'yarnType') { const t = String(value || '').trim().replace(/\s+/g, ' '); if (!t) { renderYarnStockPanel(); return; } r.yarnType = t; }
+            saveYarnReceipts();
+            renderYarnStockPanel();
+        }
+        function deleteYarnReceipt(id) {
+            const r = yarnReceipts.find(x => x.id === id);
+            if (!r) return;
+            if (!confirm(`ลบรายการรับไหม ${r.yarnType} ${r.kg.toLocaleString('th-TH')} กก. (${r.date || 'ไม่มีวันที่'}) ?`)) return;
+            yarnReceipts = yarnReceipts.filter(x => x.id !== id);
+            saveYarnReceipts();
+            renderYarnStockPanel();
+        }
+        const YARN_RECEIPT_COLUMNS = [
+            { key: 'id', label: 'รหัส' },
+            { key: 'date', label: 'วันที่รับ', type: 'date' },
+            { key: 'yarnType', label: 'ชนิดไหม' },
+            { key: 'kg', label: 'จำนวน (กก.)', type: 'number' }
+        ];
+        function exportYarnReceipts() {
+            const rows = yarnReceipts.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.yarnType.localeCompare(b.yarnType));
+            if (rows.length === 0) { showToast('ยังไม่มีรายการรับไหมให้ส่งออก', 'fa-triangle-exclamation', 'text-amber-400'); return; }
+            exportFlatRowsToExcel('รายการรับไหม.xlsx', 'รับไหม', YARN_RECEIPT_COLUMNS, rows);
+        }
+        // นำเข้า: หาคอลัมน์จากหัวตาราง (ยืดหยุ่น: วันที่/Date, ชนิดไหม/Yarn, กก./Kg/จำนวน) — ถ้ามี "รหัส" และมีอยู่แล้วจะข้าม (นำเข้าไฟล์เดิมซ้ำได้ ไม่ซ้ำซ้อน)
+        function parseYarnReceiptAoa(aoa) {
+            if (!aoa || aoa.length < 2) return [];
+            const head = aoa[0].map(h => String(h || '').trim().toLowerCase());
+            const find = (...needles) => head.findIndex(h => needles.some(n => h.includes(n)));
+            const iId = find('รหัส', 'id'), iDate = find('วันที่', 'date'), iType = find('ชนิด', 'yarn', 'ไหม'), iKg = find('กก', 'kg', 'จำนวน', 'น้ำหนัก');
+            if (iDate === -1 || iType === -1 || iKg === -1) return null;
+            const out = [];
+            for (let i = 1; i < aoa.length; i++) {
+                const row = aoa[i] || [];
+                const r = normalizeYarnReceipt({ id: iId !== -1 ? String(row[iId] || '').trim() : '', date: row[iDate], yarnType: row[iType], kg: parseFloat(String(row[iKg]).replace(/,/g, '')) });
+                if (r) out.push(r);
+            }
+            return out;
+        }
+        function importYarnReceipts(fileInput) {
+            const file = fileInput.files[0];
+            if (!file) return;
+            readExcelAoaFromFile(file, (err, aoa) => {
+                fileInput.value = '';
+                if (err) { showToast('อ่านไฟล์ไม่สำเร็จ: ' + err.message, 'fa-triangle-exclamation', 'text-rose-400'); return; }
+                const rows = parseYarnReceiptAoa(aoa);
+                if (rows === null) { showToast('ไม่พบหัวคอลัมน์ วันที่รับ / ชนิดไหม / จำนวน (กก.)', 'fa-triangle-exclamation', 'text-rose-400'); return; }
+                const have = new Set(yarnReceipts.map(r => r.id));
+                let added = 0, skipped = 0;
+                rows.forEach(r => { if (have.has(r.id)) { skipped++; return; } yarnReceipts.push(r); have.add(r.id); added++; });
+                saveYarnReceipts();
+                renderYarnStockPanel();
+                showToast(`นำเข้ารับไหม ${added} รายการ${skipped ? `, ข้ามที่มีอยู่แล้ว ${skipped}` : ''}`, 'fa-check', 'text-emerald-400');
+            });
+        }
+        function renderYarnStockPanel() {
+            const panel = document.getElementById('overviewYarnStockPanel');
+            if (!panel) return;
+            // เก็บสถานะที่ผู้ใช้กำลังกรอก/เปิดดูไว้ ก่อนวาดใหม่
+            const keep = {};
+            ['yarnRcvDate', 'yarnRcvType', 'yarnRcvKg'].forEach(id => { const el = document.getElementById(id); if (el) keep[id] = el.value; });
+            const openTypes = new Set([...panel.querySelectorAll('details[open]')].map(d => d.getAttribute('data-stock-type')));
+            const s = computeYarnStock();
+            const f = (n, d = 2) => (Number(n) || 0).toLocaleString('th-TH', { minimumFractionDigits: d, maximumFractionDigits: d });
+            const typeNames = new Map();
+            yarnReceipts.forEach(r => typeNames.set(yarnTypeKey(r.yarnType), r.yarnType));
+            (productionOrders || []).forEach(o => { const t = String(o.yarnType || '').trim().replace(/\s+/g, ' '); if (t) typeNames.set(yarnTypeKey(t), typeNames.get(yarnTypeKey(t)) || t); });
+            const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const cls = (n) => n < 0 ? 'text-rose-600' : 'text-emerald-700';
+            const rowsHtml = s.rows.map(g => `
+                <details class="border-t border-slate-100" data-stock-type="${escapeHtml(g.label)}" ${openTypes.has(g.label) ? 'open' : ''}>
+                    <summary class="grid grid-cols-12 gap-2 items-center px-3 py-2 text-xs cursor-pointer hover:bg-slate-50 list-none">
+                        <span class="col-span-3 font-semibold text-slate-800"><i class="fa-solid fa-chevron-right text-[9px] text-slate-400 mr-1.5"></i>${escapeHtml(g.label)}</span>
+                        <span class="col-span-2 text-right tabular-nums">${f(g.received)}</span>
+                        <span class="col-span-2 text-right tabular-nums text-slate-600">${f(g.used)}</span>
+                        <span class="col-span-2 text-right tabular-nums font-bold ${cls(g.balance)}" data-stock-balance>${f(g.balance)}</span>
+                        <span class="col-span-1 text-right tabular-nums text-slate-500">${f(g.need, 0)}</span>
+                        <span class="col-span-2 text-right tabular-nums font-bold ${cls(g.net)}" data-stock-net>${g.net < 0 ? 'ขาด ' + f(-g.net, 0) : f(g.net, 0)}</span>
+                    </summary>
+                    <div class="px-3 pb-2 overflow-x-auto">
+                        ${g.receipts.length === 0 ? '<p class="text-[11px] text-slate-400 py-1">ยังไม่มีรายการรับไหมชนิดนี้ — ยอดที่เบิกไปย้อมจึงยังไม่มีสต๊อกให้ตัด</p>' : `
+                        <table class="w-full text-[11px]"><thead class="text-slate-400"><tr><th class="text-left py-1">วันที่รับ</th><th class="text-left py-1">ชนิดไหม</th><th class="text-right py-1">จำนวน (กก.)</th><th class="w-8"></th></tr></thead>
+                        <tbody>${g.receipts.map(r => `<tr class="border-t border-slate-50" data-receipt-id="${escapeHtml(r.id)}">
+                            <td class="py-1"><input type="date" value="${escapeHtml(r.date)}" onchange="updateYarnReceipt('${r.id}','date',this.value)" class="px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px]"></td>
+                            <td class="py-1"><input type="text" value="${escapeHtml(r.yarnType)}" onchange="updateYarnReceipt('${r.id}','yarnType',this.value)" class="w-36 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px]"></td>
+                            <td class="py-1 text-right"><input type="number" step="0.01" value="${r.kg}" onchange="updateYarnReceipt('${r.id}','kg',this.value)" class="w-24 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] text-right"></td>
+                            <td class="py-1 text-right"><button type="button" onclick="deleteYarnReceipt('${r.id}')" class="text-slate-300 hover:text-rose-500" title="ลบรายการ"><i class="fa-solid fa-trash-can"></i></button></td></tr>`).join('')}</tbody></table>`}
+                    </div>
+                </details>`).join('');
+            panel.innerHTML = `
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-boxes-packing mr-2 text-teal-600"></i>รับไหม / สต๊อกไหมคงเหลือ (แยกตามชนิดไหม)</h3>
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button onclick="exportYarnReceipts()" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-2.5 py-1 rounded-lg shadow transition text-[11px] flex items-center gap-1.5"><i class="fa-solid fa-file-export"></i> ส่งออก Excel</button>
+                        <label class="bg-white border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-medium px-2.5 py-1 rounded-lg transition text-[11px] flex items-center gap-1.5 cursor-pointer"><i class="fa-solid fa-file-import"></i> นำเข้า Excel
+                            <input type="file" accept=".xlsx,.xls" class="hidden" onchange="importYarnReceipts(this)"></label>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-end gap-2 bg-teal-50/60 border border-teal-100 rounded-xl p-2.5">
+                    <label class="text-[11px] text-slate-500 flex flex-col gap-0.5">วันที่รับ
+                        <input id="yarnRcvDate" type="date" value="${escapeHtml(keep.yarnRcvDate || todayStr)}" class="px-2 py-1 bg-white border border-slate-200 rounded-md text-xs"></label>
+                    <label class="text-[11px] text-slate-500 flex flex-col gap-0.5">ชนิดไหม
+                        <input id="yarnRcvType" type="text" list="yarnRcvTypeList" value="${escapeHtml(keep.yarnRcvType || '')}" placeholder="เลือก/พิมพ์ชนิดไหม" class="w-44 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs">
+                        <datalist id="yarnRcvTypeList">${[...typeNames.values()].sort().map(t => `<option value="${escapeHtml(t)}"></option>`).join('')}</datalist></label>
+                    <label class="text-[11px] text-slate-500 flex flex-col gap-0.5">จำนวน (กก.)
+                        <input id="yarnRcvKg" type="number" step="0.01" value="${escapeHtml(keep.yarnRcvKg || '')}" onkeydown="if(event.key==='Enter'){addYarnReceiptFromForm();}" class="w-28 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs text-right"></label>
+                    <button type="button" onclick="addYarnReceiptFromForm()" id="yarnRcvAddBtn" class="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-3 py-1.5 rounded-lg shadow text-xs flex items-center gap-1.5"><i class="fa-solid fa-plus"></i> บันทึกรับไหม</button>
+                    <label class="text-[11px] text-slate-500 flex flex-col gap-0.5 ml-auto">ตัดยอดเบิกตั้งแต่วันที่
+                        <input id="yarnStockStartInput" type="date" value="${escapeHtml(getYarnStockStartRaw())}" ${s.start && s.startIsAuto ? `title="ว่าง = ใช้วันรับไหมครั้งแรก (${escapeHtml(s.start)})"` : ''} onchange="setYarnStockStart(this.value)" class="px-2 py-1 bg-white border border-slate-200 rounded-md text-xs"></label>
+                </div>
+                ${(s.rows.length === 0 || yarnReceipts.length === 0) ? '<div class="p-4 text-center text-xs text-slate-400">ยังไม่มีรายการรับไหม — กรอกวันที่รับ ชนิดไหม และจำนวน (กก.) ด้านบนเพื่อเริ่มตัดยอด</div>' : `
+                <div class="border border-slate-100 rounded-xl overflow-hidden">
+                    <div class="grid grid-cols-12 gap-2 px-3 py-1.5 bg-slate-50 text-[11px] font-semibold text-slate-500"><span class="col-span-3">ชนิดไหม</span><span class="col-span-2 text-right">รับสะสม (กก.)</span><span class="col-span-2 text-right">เบิกไปย้อม (กก.)</span><span class="col-span-2 text-right">คงเหลือ (กก.)</span><span class="col-span-1 text-right" title="ประมาณการไหมที่ยังต้องใช้ (จากกล่องด้านบน)">ต้องใช้อีก</span><span class="col-span-2 text-right" title="คงเหลือ − ต้องใช้อีก (ติดลบ = ต้องสั่งเพิ่ม)">คงเหลือสุทธิ</span></div>
+                    ${rowsHtml}
+                    <div class="grid grid-cols-12 gap-2 px-3 py-2 border-t border-slate-200 bg-teal-50/50 text-xs font-bold text-slate-800"><span class="col-span-3">รวมทุกชนิด</span><span class="col-span-2 text-right tabular-nums">${f(s.received)}</span><span class="col-span-2 text-right tabular-nums">${f(s.used)}</span><span class="col-span-2 text-right tabular-nums ${cls(s.balance)}" id="yarnStockTotalBalance">${f(s.balance)}</span><span class="col-span-1 text-right tabular-nums">${f(s.need, 0)}</span><span class="col-span-2 text-right tabular-nums ${cls(s.net)}" id="yarnStockTotalNet">${s.net < 0 ? 'ขาด ' + f(-s.net, 0) : f(s.net, 0)}</span></div>
+                </div>`}
+                <p class="text-[10px] text-slate-400">เบิกไปย้อม = ยอด "เบิก (กก.)" ในบันทึกสั่งย้อมของแผนกย้อม (ไม่รวมจ้างย้อมภายนอก) ${s.start ? `นับตั้งแต่ ${escapeHtml(s.start)}` : ''}${s.undated ? ` · มี ${s.undated} แถวที่ไม่มีวันที่ (นับรวม)` : ''} · คงเหลือสุทธิ = คงเหลือ − ประมาณการไหมที่ยังต้องใช้ (ติดลบ = ต้องสั่งเพิ่ม) · ข้อมูลรับไหมเก็บในเบราว์เซอร์เครื่องนี้ — สำรองด้วย "ส่งออก Excel"</p>`;
+        }
+
         function renderProductionOverview() {
             renderOverviewSummaryPanel();
             try { renderYarnEstimatePanel(); } catch (e) { console.error('renderYarnEstimatePanel failed:', e); }
+            try { renderYarnStockPanel(); } catch (e) { console.error('renderYarnStockPanel failed:', e); }
             const moTbody = document.getElementById('overviewMoTableBody');
             const soTbody = document.getElementById('overviewSoTableBody');
             if (!moTbody || !soTbody) return;
