@@ -4079,7 +4079,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-70';
+        const APP_BUILD = 'QCDashboard-72';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -7102,6 +7102,88 @@
             return map;
         }
 
+        // =========================================================================================
+        // NEW (2026-10-09): "M/O แต่ละสีมีย้อมทั้งในบริษัทและสั่งย้อมนอกบริษัท · M/O มีหลายชิ้น บางชิ้นทอในบริษัท บางชิ้นจ้างทอนอกบริษัท ·
+        // ไหมสั่งย้อมนอกบริษัทมีทั้งไหมของเราและซื้อจากบริษัทที่สั่งย้อม" — ตั้งค่าได้ต่อสี/ต่อชิ้น (ค่าว่าง = ตามโหมดของ M/O ทั้งใบเหมือนเดิม):
+        //   colorOrders[i].dyeWhere  '' | 'internal' | 'external'      — สีนี้ย้อมที่ไหน
+        //   colorOrders[i].extOwnKg  '' | number                        — (ย้อมนอก) ไหมของเราที่ส่งไปย้อมกี่ กก. ที่เหลือ = ซื้อจากผู้รับจ้างย้อม; ว่าง = ไหมของเราทั้งหมด
+        //   sizeItems[i].weaveWhere  '' | 'internal' | 'external'      — ชิ้น/ขนาดนี้ทอที่ไหน (ใช้เมื่อ M/O เป็นโหมดทอในบริษัท)
+        // % ย้อมของสีเดิมรวมแถวย้อมในและแถวจ้างย้อมนอกอยู่แล้ว (getDyeingActualKgByColor) — ที่เพิ่มคือแยกให้เห็นว่าในเท่าไร นอกเท่าไร.
+        // =========================================================================================
+        function getDyeRowWhere(order, row) {
+            if (row && row.dyeWhere === 'internal') return 'internal';
+            if (row && row.dyeWhere === 'external') return 'external';
+            return (((order || {}).dyeing || {}).mode === 'external') ? 'external' : 'internal';
+        }
+        // สัดส่วนไหมของเรา (0..1) ของสีที่ย้อมนอก — ไม่ได้ระบุ = ไหมของเราทั้งหมด
+        function getDyeRowOwnShare(row) {
+            const kg = Number(row && row.kg) || 0;
+            const o = row ? row.extOwnKg : '';
+            if (!(kg > 0) || o === '' || o === null || o === undefined || isNaN(Number(o))) return 1;
+            return Math.max(0, Math.min(1, Number(o) / kg));
+        }
+        function getDyeingColorStatus(order) {
+            const out = { rows: [], totalRequired: 0, totalInternal: 0, totalExternal: 0, totalOwn: 0, totalBuy: 0, externalColors: 0, internalColors: 0 };
+            try {
+                const dyeing = (order && order.dyeing) || {};
+                const map = new Map();
+                const ensure = (key, code) => {
+                    let g = map.get(key);
+                    if (!g) { g = { key, code, inPlan: false, wheres: new Set(), planKg: 0, requiredKg: 0, ownKg: 0, buyKg: 0, internalKg: 0, externalKg: 0 }; map.set(key, g); }
+                    return g;
+                };
+                (Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders : []).forEach(r => {
+                    if (!r || typeof r !== 'object') return;
+                    const key = normalizeDyeColorCodeKey(r.colorCode);
+                    if (!key) return;
+                    const g = ensure(key, String(r.colorCode).trim());
+                    const kg = Number(r.kg) || 0;
+                    const req = r.useSurplus ? Math.max(0, kg - (Number(r.surplusKg) || 0)) : kg;
+                    const w = getDyeRowWhere(order, r);
+                    g.inPlan = true; g.wheres.add(w); g.planKg += kg; g.requiredKg += req;
+                    if (w === 'external') { const own = req * getDyeRowOwnShare(r); g.ownKg += own; g.buyKg += req - own; }
+                });
+                (Array.isArray(dyeing.dyeOrderLog) ? dyeing.dyeOrderLog : []).forEach(r => {
+                    if (!r || typeof r !== 'object') return;
+                    const key = normalizeDyeColorCodeKey(r.colorCode);
+                    if (!key) return;
+                    const g = ensure(key, String(r.colorCode).trim());
+                    const kg = Number(r.actualTransferKg) || 0;
+                    if (isOutsourcedDyeRow(r)) g.externalKg += kg; else g.internalKg += kg;
+                });
+                map.forEach(g => {
+                    if (g.inPlan) g.where = g.wheres.size > 1 ? 'mixed' : (g.wheres.has('external') ? 'external' : 'internal');
+                    else g.where = (g.externalKg > 0 && g.internalKg === 0) ? 'external' : 'internal';
+                    g.doneKg = g.internalKg + g.externalKg;
+                    g.pct = g.requiredKg > 0 ? Math.max(0, Math.min(100, Math.round(g.doneKg / g.requiredKg * 100))) : 0;
+                    out.rows.push(g);
+                    out.totalRequired += g.requiredKg; out.totalInternal += g.internalKg; out.totalExternal += g.externalKg;
+                    out.totalOwn += g.ownKg; out.totalBuy += g.buyKg;
+                    if (g.where === 'external' || g.where === 'mixed') out.externalColors++;
+                    if (g.where === 'internal' || g.where === 'mixed') out.internalColors++;
+                });
+            } catch (e) { console.error('getDyeingColorStatus failed:', e); }
+            return out;
+        }
+        // ชิ้น/ขนาดของ M/O ที่ทอในบริษัท vs จ้างทอนอก (จาก sizeItems[].weaveWhere; ไม่มีรายการขนาด → ใช้โหมดทั้งใบ)
+        function getWeavingSplit(order) {
+            const modeExt = (((order || {}).weaving) || {}).mode === 'external';
+            const items = (Array.isArray(order && order.sizeItems) ? order.sizeItems : []).filter(it => it && ((Number(it.qty) || 0) > 0 || (Number(it.sqm) || 0) > 0));
+            let extPieces = 0, intPieces = 0, extSqm = 0, intSqm = 0;
+            items.forEach(it => {
+                const ext = it.weaveWhere === 'external' || (it.weaveWhere !== 'internal' && modeExt);
+                const q = Number(it.qty) || 0, sq = Number(it.sqm) || 0;
+                if (ext) { extPieces += q; extSqm += sq; } else { intPieces += q; intSqm += sq; }
+            });
+            const hasItems = items.length > 0;
+            if (!hasItems) {
+                const pcs = Number(order && order.totalPieces) || 0, sq = Number(order && order.totalSqm) || 0;
+                if (modeExt) { extPieces = pcs; extSqm = sq; } else { intPieces = pcs; intSqm = sq; }
+            }
+            const hasExternal = extPieces > 0 || extSqm > 0, hasInternal = intPieces > 0 || intSqm > 0;
+            return { hasItems, modeExt, extPieces, intPieces, extSqm, intSqm, hasExternal, hasInternal, mixed: hasExternal && hasInternal };
+        }
+
         // "ย้อมครบตามแผนหรือยัง" — true only when EVERY color Planning ordered (net of ไหม Surplus) has
         // at least that much actualTransferKg logged. No plan on file yet (colorOrders empty) is "not
         // decidable" — never auto-transfer an order nobody has planned colors for.
@@ -9208,6 +9290,8 @@
                 length: Number(it.length) || 0,
                 qty: Number(it.qty) || 0,
                 voidPercent: Number(it.voidPercent) || 0,
+                // NEW (2026-10-09): ชิ้นนี้ทอที่ไหน — '' = ตามโหมดของ M/O (weaving.mode), 'internal' = ทอในบริษัท, 'external' = จ้างทอนอกบริษัท
+                weaveWhere: (it.weaveWhere === 'internal' || it.weaveWhere === 'external') ? it.weaveWhere : '',
                 // A row saved before "sqm" existed gets it derived from width×length×qty×void% (void%
                 // defaults to 0 for those, i.e. no change from the old plain-area formula). A row that
                 // already has an sqm value keeps it as-is even if it was hand-typed and doesn't match
@@ -9484,7 +9568,12 @@
                 // keep working exactly as before.
                 const totalSqm = Number(order.totalSqm) || 0;
                 if (totalSqm > 0) {
-                    const sqmWoven = Number(s.sqmWoven) || 0;
+                    let sqmWoven = Number(s.sqmWoven) || 0;
+                    // NEW (2026-10-09): M/O ที่มีบางชิ้นจ้างทอนอก — ชิ้นที่จ้างนอกนับเป็นทอเสร็จเมื่อได้รับพรมคืนแล้ว (และ QC ไม่ตีกลับ)
+                    try {
+                        const sp = getWeavingSplit(order);
+                        if (sp.mixed && sp.extSqm > 0) { const ex = s.external || {}; if (ex.receivedDate && ex.qcResult !== 'fail') sqmWoven += sp.extSqm; }
+                    } catch (e) { /* keep plain sqmWoven */ }
                     s.percent = Math.max(0, Math.min(100, Math.round((sqmWoven / totalSqm) * 100)));
                 } else if (items.length > 0) {
                     const doneCount = items.filter(it => it.status === 'done').length;
@@ -12290,6 +12379,18 @@
         //  - ไม่นับงานที่ส่งแล้ว/รอส่ง และงานที่ผ่านแผนกย้อมไปแล้ว (ทอ/ตกแต่ง) = ย้อมแล้ว
         //  - งานที่อยู่แผนกวางแผน/ย้อม: ตร.ม. ที่ยังไม่ย้อม = พื้นที่รวม × (100 − % ย้อม) ÷ 100 (ย้อมครบ 100% หรือใช้ Surplus ครบ → ไม่นับ)
         // =========================================================================================
+        // NEW (2026-10-09): "ชนิดไหม WOOL 380 ที่ขึ้นต้นว่า 380 คือไหมชนิดเดียวกัน ไม่ต้องแยกในรายการชนิดไหม" — รวมกลุ่มชนิดไหมที่
+        // ขึ้นต้นด้วย "ชื่อ + เบอร์ 3 หลักขึ้นไป" เป็นชนิดเดียวกัน เช่น "WOOL 380", "wool 380/2", "WOOL 380 NATURAL" → "WOOL 380".
+        // ไม่มีเบอร์ 3 หลัก (เช่น "ACRYLIC", "Bamboo Silk", "ACRYLIC 2/28") ใช้ชื่อเต็มเหมือนเดิม (ไม่สนตัวพิมพ์/ช่องว่าง).
+        function yarnGroupParts(v) {
+            const raw = String(v || '').trim().replace(/\s+/g, ' ');
+            if (!raw) return { key: '', label: '' };
+            const m = raw.toUpperCase().match(/^([^\d]*?)\s*(\d{3,})/);
+            if (m && m[1].trim()) { const label = `${m[1].trim()} ${m[2]}`; return { key: label, label }; }
+            return { key: raw.toUpperCase(), label: raw };
+        }
+        function yarnGroupKey(v) { return yarnGroupParts(v).key; }
+        function yarnGroupLabel(v) { return yarnGroupParts(v).label || '(ไม่ระบุชนิดไหม)'; }
         const YARN_KG_PER_SQM_DEFAULT = 3.5;
         function getYarnKgPerSqm() {
             try { const v = parseFloat(localStorage.getItem('yarnKgPerSqm')); if (isFinite(v) && v > 0) return v; } catch (e) { /* storage unavailable */ }
@@ -12317,16 +12418,21 @@
                 if (dyedPct >= 100) { excludedDyed++; return; }
                 if (!(total > 0)) { noSqm++; return; }
                 const undyed = total * (100 - dyedPct) / 100;
+                // NEW (2026-10-09): สีที่ย้อมนอกและซื้อไหมจากผู้รับจ้างย้อม ไม่ใช้ไหมจากสต๊อกเรา → แยกเป็น buyKg ไม่รวมในไหมที่ต้องใช้
+                let buyShare = 0;
+                try { const cs = getDyeingColorStatus(o); buyShare = cs.totalRequired > 0 ? Math.min(1, cs.totalBuy / cs.totalRequired) : 0; } catch (e) { buyShare = 0; }
                 const raw = String(o.yarnType || '').trim().replace(/\s+/g, ' ');
-                const key = raw ? raw.toUpperCase() : '';
+                const parts = yarnGroupParts(raw);
+                const key = parts.key;
                 let g = groups.get(key);
-                if (!g) { g = { key, label: raw || '(ไม่ระบุชนิดไหม)', orders: [], sqm: 0, kg: 0 }; groups.set(key, g); }
-                g.orders.push({ moSo: o.moSo, customer: o.customerName || '', total, dyedPct, undyed, kg: undyed * factor });
-                g.sqm += undyed; g.kg += undyed * factor;
+                if (!g) { g = { key, label: parts.label || '(ไม่ระบุชนิดไหม)', orders: [], sqm: 0, kg: 0, buyKg: 0 }; groups.set(key, g); }
+                const allKg = undyed * factor, buyKg = allKg * buyShare, ownKg = allKg - buyKg;
+                g.orders.push({ moSo: o.moSo, customer: o.customerName || '', yarn: raw, total, dyedPct, undyed, kg: ownKg, buyKg });
+                g.sqm += undyed; g.kg += ownKg; g.buyKg += buyKg;
             });
             const rows = [...groups.values()].sort((a, b) => (a.key === '') - (b.key === '') || b.kg - a.kg);
             rows.forEach(g => g.orders.sort((a, b) => b.kg - a.kg));
-            return { factor, rows, totalSqm: rows.reduce((s, g) => s + g.sqm, 0), totalKg: rows.reduce((s, g) => s + g.kg, 0), orderCount: rows.reduce((s, g) => s + g.orders.length, 0), excludedDyed, noSqm };
+            return { factor, rows, totalSqm: rows.reduce((s, g) => s + g.sqm, 0), totalKg: rows.reduce((s, g) => s + g.kg, 0), totalBuyKg: rows.reduce((s, g) => s + g.buyKg, 0), orderCount: rows.reduce((s, g) => s + g.orders.length, 0), excludedDyed, noSqm };
         }
         function renderYarnEstimatePanel() {
             const panel = document.getElementById('overviewYarnPanel');
@@ -12339,11 +12445,11 @@
                         <span class="col-span-5 font-semibold text-slate-800"><i class="fa-solid fa-chevron-right text-[9px] text-slate-400 mr-1.5"></i>${escapeHtml(g.label)}</span>
                         <span class="col-span-2 text-right text-slate-500">${g.orders.length} ใบ</span>
                         <span class="col-span-2 text-right tabular-nums">${f(g.sqm)}</span>
-                        <span class="col-span-3 text-right tabular-nums font-bold text-indigo-700">${f(g.kg)}</span>
+                        <span class="col-span-3 text-right tabular-nums font-bold text-indigo-700">${f(g.kg)}${g.buyKg > 0.005 ? `<span class="block text-[10px] font-normal text-orange-700" data-yarn-buy>+ซื้อจากโรงย้อม ${f(g.buyKg)}</span>` : ''}</span>
                     </summary>
                     <div class="px-3 pb-2 overflow-x-auto">
-                        <table class="w-full text-[11px]"><thead class="text-slate-400"><tr><th class="text-left py-1">M/O, S/O</th><th class="text-left py-1">ลูกค้า</th><th class="text-right py-1">ตร.ม. ทั้งใบ</th><th class="text-right py-1">ย้อมแล้ว</th><th class="text-right py-1">ตร.ม. ที่ยังไม่ย้อม</th><th class="text-right py-1">ไหม (กก.)</th></tr></thead>
-                        <tbody>${g.orders.map(o => `<tr class="border-t border-slate-50"><td class="py-1 font-medium text-slate-700">${escapeHtml(o.moSo)}</td><td class="py-1 text-slate-500">${escapeHtml(o.customer)}</td><td class="py-1 text-right tabular-nums">${f(o.total)}</td><td class="py-1 text-right tabular-nums">${f(o.dyedPct, 0)}%</td><td class="py-1 text-right tabular-nums">${f(o.undyed)}</td><td class="py-1 text-right tabular-nums font-semibold">${f(o.kg)}</td></tr>`).join('')}</tbody></table>
+                        <table class="w-full text-[11px]"><thead class="text-slate-400"><tr><th class="text-left py-1">M/O, S/O</th><th class="text-left py-1">ลูกค้า</th><th class="text-left py-1">ชนิดไหมเต็ม</th><th class="text-right py-1">ตร.ม. ทั้งใบ</th><th class="text-right py-1">ย้อมแล้ว</th><th class="text-right py-1">ตร.ม. ที่ยังไม่ย้อม</th><th class="text-right py-1">ไหม (กก.)</th></tr></thead>
+                        <tbody>${g.orders.map(o => `<tr class="border-t border-slate-50"><td class="py-1 font-medium text-slate-700">${escapeHtml(o.moSo)}</td><td class="py-1 text-slate-500">${escapeHtml(o.customer)}</td><td class="py-1 text-slate-500" data-yarn-full>${escapeHtml(o.yarn || '-')}</td><td class="py-1 text-right tabular-nums">${f(o.total)}</td><td class="py-1 text-right tabular-nums">${f(o.dyedPct, 0)}%</td><td class="py-1 text-right tabular-nums">${f(o.undyed)}</td><td class="py-1 text-right tabular-nums font-semibold">${f(o.kg)}</td></tr>`).join('')}</tbody></table>
                     </div>
                 </details>`).join('');
             panel.innerHTML = `
@@ -12360,7 +12466,7 @@
                     ${typeRows}
                     <div class="grid grid-cols-12 gap-2 px-3 py-2 border-t border-slate-200 bg-indigo-50/50 text-xs font-bold text-slate-800"><span class="col-span-5">รวมทุกชนิด</span><span class="col-span-2 text-right">${r.orderCount} ใบ</span><span class="col-span-2 text-right tabular-nums" id="yarnTotalSqm">${f(r.totalSqm)}</span><span class="col-span-3 text-right tabular-nums text-indigo-700" id="yarnTotalKg">${f(r.totalKg)}</span></div>
                 </div>`}
-                <p class="text-[10px] text-slate-400">${r.excludedDyed ? `ตัดที่ย้อมแล้ว ${r.excludedDyed} ใบ` : 'ไม่มีงานที่ย้อมครบแล้วในไลน์'}${r.noSqm ? ` · ไม่นับ ${r.noSqm} ใบที่ยังไม่ได้กรอกพื้นที่รวม (ตร.ม.)` : ''}</p>`;
+                <p class="text-[10px] text-slate-400">${r.excludedDyed ? `ตัดที่ย้อมแล้ว ${r.excludedDyed} ใบ` : 'ไม่มีงานที่ย้อมครบแล้วในไลน์'}${r.noSqm ? ` · ไม่นับ ${r.noSqm} ใบที่ยังไม่ได้กรอกพื้นที่รวม (ตร.ม.)` : ''}${r.totalBuyKg > 0.005 ? ` · ไม่รวมไหมที่ซื้อจากโรงย้อม (สีที่ย้อมนอก) ${f(r.totalBuyKg)} กก. — ไม่ตัดสต๊อก` : ''}</p>`;
         }
 
         // =========================================================================================
@@ -12373,7 +12479,7 @@
         const YARN_RECEIPT_KEY = 'qc_yarn_receipts_v1';
         const YARN_STOCK_START_KEY = 'qc_yarn_stock_start_v1';
         let yarnReceipts = [];
-        function yarnTypeKey(v) { return String(v || '').trim().replace(/\s+/g, ' ').toUpperCase(); }
+        function yarnTypeKey(v) { return yarnGroupKey(v); }
         function newYarnReceiptId() { return 'yr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
         function yarnDateFromAny(raw) {
             if (typeof raw === 'number' && raw > 20000 && raw < 80000) { // Excel serial
@@ -12412,10 +12518,10 @@
             const start = getYarnStockStart();
             const map = new Map();
             const grp = (label) => {
-                const raw = String(label || '').trim().replace(/\s+/g, ' ');
-                const key = yarnTypeKey(raw);
+                const parts = yarnGroupParts(label);
+                const key = parts.key;
                 let g = map.get(key);
-                if (!g) { g = { key, label: raw || '(ไม่ระบุชนิดไหม)', received: 0, used: 0, need: 0, receipts: [] }; map.set(key, g); }
+                if (!g) { g = { key, label: parts.label || '(ไม่ระบุชนิดไหม)', received: 0, used: 0, need: 0, receipts: [] }; map.set(key, g); }
                 return g;
             };
             yarnReceipts.forEach(r => { const g = grp(r.yarnType); g.received += r.kg; g.receipts.push(r); });
@@ -12423,7 +12529,7 @@
             (productionOrders || []).forEach(o => {
                 const log = Array.isArray((o.dyeing || {}).dyeOrderLog) ? o.dyeing.dyeOrderLog : [];
                 log.forEach(item => {
-                    if (!item || isOutsourcedDyeRow(item)) return;
+                    if (!item) return; // รวมแถวจ้างย้อมนอก: นน.โอนจากใบเบิก = ไหมของเราที่ส่งไปย้อม (ไหมที่ซื้อจากโรงย้อมไม่ตัดสต๊อก)
                     const kg = Number(item.requisitionKg) || 0;
                     if (!(kg > 0)) return;
                     const d = normalizeDateString(item.orderDate || item.actualDate);
@@ -12448,9 +12554,8 @@
             if (!date) { showToast('กรุณาเลือกวันที่รับ', 'fa-triangle-exclamation', 'text-amber-400'); return; }
             if (!type) { showToast('กรุณากรอกชนิดไหม', 'fa-triangle-exclamation', 'text-amber-400'); return; }
             if (!isFinite(kg) || kg === 0) { showToast('กรุณากรอกจำนวน (กก.)', 'fa-triangle-exclamation', 'text-amber-400'); return; }
-            // ใช้ชื่อชนิดไหมเดียวกับที่มีอยู่แล้ว (ไม่สนตัวพิมพ์/ช่องว่าง) เพื่อไม่ให้แยกกลุ่มซ้ำ
-            const existing = yarnReceipts.find(r => yarnTypeKey(r.yarnType) === yarnTypeKey(type));
-            const r = normalizeYarnReceipt({ date, yarnType: existing ? existing.yarnType : type, kg });
+            // เก็บชื่อที่พิมพ์ไว้ตามจริง — การรวมกลุ่มชนิดไหมเดียวกัน (เช่น WOOL 380 …) ทำตอนคำนวณ (yarnGroupParts)
+            const r = normalizeYarnReceipt({ date, yarnType: type, kg });
             if (!r) return;
             yarnReceipts.push(r);
             saveYarnReceipts();
@@ -12528,8 +12633,10 @@
             const s = computeYarnStock();
             const f = (n, d = 2) => (Number(n) || 0).toLocaleString('th-TH', { minimumFractionDigits: d, maximumFractionDigits: d });
             const typeNames = new Map();
-            yarnReceipts.forEach(r => typeNames.set(yarnTypeKey(r.yarnType), r.yarnType));
-            (productionOrders || []).forEach(o => { const t = String(o.yarnType || '').trim().replace(/\s+/g, ' '); if (t) typeNames.set(yarnTypeKey(t), typeNames.get(yarnTypeKey(t)) || t); });
+            const rawKey = (x) => String(x || '').trim().replace(/\s+/g, ' ').toUpperCase();
+            // ตัวเลือกชนิดไหม: ชื่อกลุ่ม (เช่น WOOL 380) + ชื่อเต็มที่เคยใช้
+            yarnReceipts.forEach(r => { typeNames.set(rawKey(r.yarnType), r.yarnType); const gl = yarnGroupLabel(r.yarnType); typeNames.set(rawKey(gl), typeNames.get(rawKey(gl)) || gl); });
+            (productionOrders || []).forEach(o => { const t = String(o.yarnType || '').trim().replace(/\s+/g, ' '); if (t) { typeNames.set(rawKey(t), typeNames.get(rawKey(t)) || t); const gl = yarnGroupLabel(t); typeNames.set(rawKey(gl), typeNames.get(rawKey(gl)) || gl); } });
             const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
             const cls = (n) => n < 0 ? 'text-rose-600' : 'text-emerald-700';
             const rowsHtml = s.rows.map(g => `
@@ -12579,7 +12686,7 @@
                     ${rowsHtml}
                     <div class="grid grid-cols-12 gap-2 px-3 py-2 border-t border-slate-200 bg-teal-50/50 text-xs font-bold text-slate-800"><span class="col-span-3">รวมทุกชนิด</span><span class="col-span-2 text-right tabular-nums">${f(s.received)}</span><span class="col-span-2 text-right tabular-nums">${f(s.used)}</span><span class="col-span-2 text-right tabular-nums ${cls(s.balance)}" id="yarnStockTotalBalance">${f(s.balance)}</span><span class="col-span-1 text-right tabular-nums">${f(s.need, 0)}</span><span class="col-span-2 text-right tabular-nums ${cls(s.net)}" id="yarnStockTotalNet">${s.net < 0 ? 'ขาด ' + f(-s.net, 0) : f(s.net, 0)}</span></div>
                 </div>`}
-                <p class="text-[10px] text-slate-400">เบิกไปย้อม = ยอด "เบิก (กก.)" ในบันทึกสั่งย้อมของแผนกย้อม (ไม่รวมจ้างย้อมภายนอก) ${s.start ? `นับตั้งแต่ ${escapeHtml(s.start)}` : ''}${s.undated ? ` · มี ${s.undated} แถวที่ไม่มีวันที่ (นับรวม)` : ''} · คงเหลือสุทธิ = คงเหลือ − ประมาณการไหมที่ยังต้องใช้ (ติดลบ = ต้องสั่งเพิ่ม) · ข้อมูลรับไหมเก็บในเบราว์เซอร์เครื่องนี้ — สำรองด้วย "ส่งออก Excel"</p>`;
+                <p class="text-[10px] text-slate-400">เบิกไปย้อม = ยอด "นน.โอนจากใบเบิก (กก.)" ในบันทึกสั่งย้อม (รวมแถวจ้างย้อมนอก = ไหมของเราที่ส่งไปย้อม · ไหมที่ซื้อจากโรงย้อมไม่ตัดสต๊อก) ${s.start ? `นับตั้งแต่ ${escapeHtml(s.start)}` : ''}${s.undated ? ` · มี ${s.undated} แถวที่ไม่มีวันที่ (นับรวม)` : ''} · คงเหลือสุทธิ = คงเหลือ − ประมาณการไหมที่ยังต้องใช้ (ติดลบ = ต้องสั่งเพิ่ม) · ข้อมูลรับไหมเก็บในเบราว์เซอร์เครื่องนี้ — สำรองด้วย "ส่งออก Excel"</p>`;
         }
 
         function renderProductionOverview() {
@@ -16335,6 +16442,15 @@
                         <input type="text" placeholder="Code สี" value="${escapeHtml(row.colorCode || '')}" onchange="updateDyeingColorOrderField(${orderIndex}, '${row.id}', 'colorCode', this.value)" class="${codeCls}">
                         <input type="number" min="0" step="0.01" placeholder="กก." value="${row.kg || ''}" onchange="updateDyeingColorOrderField(${orderIndex}, '${row.id}', 'kg', Number(this.value)||0)" class="${inputCls}">
                         <span class="text-[10px] text-slate-400">กก.</span>
+                        <select data-dye-where onchange="updateDyeingColorOrderField(${orderIndex}, '${row.id}', 'dyeWhere', this.value)" class="${compact ? 'w-20' : 'w-28'} p-1 bg-white border ${getDyeRowWhere(order, row) === 'external' ? 'border-amber-300 text-amber-700' : 'border-slate-200'} rounded-md text-[11px]" title="ย้อมที่ไหน (ว่าง = ตามโหมดของ M/O)">
+                            <option value="" ${!row.dyeWhere ? 'selected' : ''}>ตาม M/O (${(order.dyeing || {}).mode === 'external' ? 'นอก' : 'ใน'})</option>
+                            <option value="internal" ${row.dyeWhere === 'internal' ? 'selected' : ''}>ย้อมใน</option>
+                            <option value="external" ${row.dyeWhere === 'external' ? 'selected' : ''}>ย้อมนอก</option>
+                        </select>
+                        ${getDyeRowWhere(order, row) === 'external' ? `
+                            <input data-ext-own type="number" min="0" step="0.01" placeholder="ไหมเรา กก." value="${row.extOwnKg === '' || row.extOwnKg === undefined || row.extOwnKg === null ? '' : row.extOwnKg}" onchange="updateDyeingColorOrderField(${orderIndex}, '${row.id}', 'extOwnKg', this.value === '' ? '' : Number(this.value))" class="${compact ? inputCls : 'w-28 p-1.5 bg-white border border-slate-200 rounded-lg text-xs'}" title="ไหมของเราที่ส่งไปย้อมกี่ กก. (ว่าง = ทั้งหมด) — ที่เหลือซื้อจากผู้รับจ้างย้อม">
+                            ${(Number(row.kg) || 0) > 0 && getDyeRowOwnShare(row) < 0.9999 ? `<span class="text-[10px] text-orange-700 whitespace-nowrap" data-ext-buy>ซื้อ ${((Number(row.kg) || 0) * (1 - getDyeRowOwnShare(row))).toFixed(2)} กก.</span>` : ''}
+                        ` : ''}
                         <label class="flex items-center gap-1 text-[10px] text-slate-600"><input type="checkbox" ${row.useSurplus ? 'checked' : ''} onchange="updateDyeingColorOrderSurplus(${orderIndex}, '${row.id}', 'useSurplus', this.checked)" class="rounded"> Surplus</label>
                         ${row.useSurplus ? `
                             <input type="number" min="0" step="0.01" placeholder="กก. Surplus" value="${row.surplusKg || ''}" onchange="updateDyeingColorOrderSurplus(${orderIndex}, '${row.id}', 'surplusKg', Number(this.value)||0)" class="${inputCls}">
@@ -16347,9 +16463,23 @@
                     </div>
                 `;
             }).join('');
+            // NEW (2026-10-09): สถานะย้อมต่อสี — แผน/ย้อมใน/ย้อมนอก/% (ตารางเต็มเท่านั้น ไม่แสดงในการ์ดบอร์ดแบบย่อ)
+            let statusHtml = '';
+            if (!compact && rows.length > 0) {
+                const st = getDyeingColorStatus(order).rows.filter(g => g.inPlan);
+                const fk = (n) => (Number(n) || 0).toFixed(2);
+                const WH = { internal: ['ใน', 'bg-indigo-50 text-indigo-700'], external: ['นอก', 'bg-amber-50 text-amber-700'], mixed: ['ใน+นอก', 'bg-violet-50 text-violet-700'] };
+                if (st.length > 0) statusHtml = `
+                    <div class="mt-1 border border-violet-100 rounded-lg overflow-hidden bg-white/70" data-dye-color-status>
+                        <p class="px-2 py-1 text-[10px] font-bold text-violet-700 bg-violet-50/70">สถานะย้อมต่อสี (ย้อมใน / ย้อมนอก รวมกันเทียบกับที่ต้องย้อม)</p>
+                        <table class="w-full text-[10px]"><thead class="text-slate-400"><tr><th class="px-2 py-0.5 text-left">สี</th><th class="px-2 py-0.5 text-left">ที่</th><th class="px-2 py-0.5 text-right">ต้องย้อม</th><th class="px-2 py-0.5 text-right">ย้อมใน</th><th class="px-2 py-0.5 text-right">ย้อมนอก</th><th class="px-2 py-0.5 text-right">%</th></tr></thead>
+                        <tbody>${st.map(g => `<tr class="border-t border-slate-50" data-dye-status-row="${escapeHtml(g.key)}"><td class="px-2 py-0.5 font-semibold text-slate-700">${escapeHtml(g.code)}</td><td class="px-2 py-0.5"><span class="px-1.5 rounded ${WH[g.where][1]}">${WH[g.where][0]}</span>${g.buyKg > 0.005 ? ` <span class="text-orange-700">ซื้อไหม ${fk(g.buyKg)}</span>` : ''}</td><td class="px-2 py-0.5 text-right tabular-nums">${fk(g.requiredKg)}</td><td class="px-2 py-0.5 text-right tabular-nums">${fk(g.internalKg)}</td><td class="px-2 py-0.5 text-right tabular-nums">${fk(g.externalKg)}</td><td class="px-2 py-0.5 text-right tabular-nums font-bold ${g.pct >= 100 ? 'text-emerald-700' : 'text-slate-700'}">${g.pct}%</td></tr>`).join('')}</tbody></table>
+                    </div>`;
+            }
             return `
                 <div class="space-y-1.5">
                     ${rowsHtml || `<p class="text-[11px] text-slate-400">ยังไม่มีรายการสี — กด "เพิ่มสี" เพื่อเริ่มบันทึกแผนสั่งย้อม</p>`}
+                    ${statusHtml}
                     <div class="flex items-center gap-2">
                         <button type="button" onclick="addDyeingColorOrderRow(${orderIndex})" class="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 border border-dashed border-indigo-200 rounded-lg px-2 py-1"><i class="fa-solid fa-plus"></i> เพิ่มสี</button>
                         ${rows.length > 0 ? `<span class="text-[11px] font-bold text-violet-700">${rows.length} สี • รวม ${totalKg.toFixed(2)} กก.</span>` : ''}
@@ -18486,7 +18616,7 @@
                                 <button type="button" onclick="openWeavingOrderPrintFromOrder(${orderIndex})" class="w-full mt-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium py-1.5 rounded-lg shadow transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-print"></i> พิมพ์ใบสั่งจ้างทอ (PDF)</button>
                             `;
                         }
-                        return `
+                        return renderWeavingPieceSplitHtml(order, orderIndex) + `
                             <div class="bg-white/70 border border-teal-100 rounded-lg p-2 text-[11px] text-slate-600 space-y-0.5">
                                 <p class="font-semibold text-teal-700"><i class="fa-solid fa-ruler-combined mr-1"></i>สเปคงานทอในบริษัท (จาก BOM ด้านบน)</p>
                                 <p>พื้นที่รวม: <span class="font-medium text-slate-700">${fmtBomNum(bomForWeaving.area, 2)} ตร.ม.</span></p>
@@ -18765,6 +18895,54 @@
             `;
         }
 
+
+        // NEW (2026-10-09): แผนกวางแผนเลือกรายชิ้น (รายการขนาด) ว่าทอในบริษัทหรือจ้างทอนอก — ใช้เมื่อ M/O เป็นโหมด "ทอในบริษัท"
+        // (ถ้าจ้างทอนอกทั้งใบให้ใช้ปุ่ม "จ้างภายนอกทอ" ด้านบน). ผลลัพธ์ไปแสดงที่ KPI วางแผน (สถานที่/ค้างทอ) และ % ทอ.
+        function setSizeItemWeaveWhere(orderIndex, itemIndex, value) {
+            const order = productionOrders[orderIndex];
+            if (!order || !Array.isArray(order.sizeItems) || !order.sizeItems[itemIndex]) return;
+            order.sizeItems[itemIndex].weaveWhere = (value === 'internal' || value === 'external') ? value : '';
+            if (order.weaving && order.weaving.mode !== 'external' && getWeavingSplit(order).hasExternal && (!order.weaving.external || typeof order.weaving.external !== 'object')) {
+                order.weaving.external = { sentDate: '', vendorDueDate: '', qcResult: 'pending', failResolution: '', receivedDate: '' };
+            }
+            recomputeStagePercent(order, 'weaving');
+            persistOrderChange(order);
+            rerenderOrderViews(orderIndex);
+        }
+        function renderWeavingPieceSplitHtml(order, orderIndex) {
+            const items = Array.isArray(order.sizeItems) ? order.sizeItems : [];
+            if (items.length === 0) {
+                return `<p class="text-[10px] text-slate-400" data-weave-split-hint><i class="fa-solid fa-circle-info mr-1"></i>ถ้า M/O มีหลายขนาด/หลายชิ้น เพิ่ม "รายการขนาด" ในข้อมูลหลักของ M/O แล้วเลือกได้ว่าแต่ละชิ้นทอในบริษัทหรือจ้างทอนอก</p>`;
+            }
+            const sp = getWeavingSplit(order);
+            const f = (n) => (Number(n) || 0).toFixed(2);
+            return `
+                <div class="bg-white/70 border border-teal-100 rounded-lg p-2 space-y-1" data-weave-split>
+                    <p class="text-[11px] font-semibold text-teal-700"><i class="fa-solid fa-shuffle mr-1"></i>ทอที่ไหนรายชิ้น <span class="font-normal text-slate-400">(ว่าง = ทอในบริษัท)</span></p>
+                    ${items.map((it, i) => `
+                        <div class="flex flex-wrap items-center gap-1.5 text-[11px]" data-weave-split-row="${i}">
+                            <span class="text-slate-500 w-4 text-right">${i + 1}</span>
+                            <span class="text-slate-700">${Number(it.width) || 0} × ${Number(it.length) || 0} ม. × ${Number(it.qty) || 0} ชิ้น · ${f(it.sqm)} ตร.ม.</span>
+                            <select onchange="setSizeItemWeaveWhere(${orderIndex}, ${i}, this.value)" class="ml-auto p-1 bg-white border ${it.weaveWhere === 'external' ? 'border-amber-300 text-amber-700' : 'border-slate-200'} rounded-md text-[11px]">
+                                <option value="" ${!it.weaveWhere ? 'selected' : ''}>ทอในบริษัท</option>
+                                <option value="internal" ${it.weaveWhere === 'internal' ? 'selected' : ''}>ทอในบริษัท (ระบุ)</option>
+                                <option value="external" ${it.weaveWhere === 'external' ? 'selected' : ''}>จ้างทอนอก</option>
+                            </select>
+                        </div>`).join('')}
+                    <p class="text-[10px] text-slate-500">ทอในบริษัท <b>${sp.intPieces}</b> ชิ้น (${f(sp.intSqm)} ตร.ม.) · จ้างทอนอก <b class="${sp.extPieces > 0 ? 'text-amber-700' : ''}">${sp.extPieces}</b> ชิ้น (${f(sp.extSqm)} ตร.ม.)</p>
+                </div>`;
+        }
+        // แผนกทอ: M/O ที่มีบางชิ้นจ้างทอนอก → แสดงสถานะงานจ้างทอ (ส่ง/กำหนดส่ง/QC/รับคืน) เพิ่มจากงานทอในบริษัท
+        function renderWeavingMixedExternalHtml(order, orderIndex) {
+            const sp = getWeavingSplit(order);
+            if (!sp.mixed) return '';
+            return `
+                <div class="mb-2" data-weave-mixed-external>
+                    <p class="text-[11px] font-bold text-amber-700 mb-1"><i class="fa-solid fa-truck-ramp-box mr-1"></i>ชิ้นที่จ้างทอนอก ${sp.extPieces} ชิ้น (${(Number(sp.extSqm) || 0).toFixed(2)} ตร.ม.) — ที่เหลือ ${sp.intPieces} ชิ้นทอในบริษัท</p>
+                    ${renderWeavingExternalJobHtml(order, orderIndex)}
+                </div>`;
+        }
+
         // จ้างภายนอกทอ: a single outsourced-job record (not itemized) — ส่งผ้าพร้อมไหมวันที่ / กำหนดส่ง /
         // ผล QC (ถ้าไม่ผ่านให้บันทึกวิธีแก้ปัญหา) / วันที่ได้รับพรมคืน. Editable regardless of currentStage,
         // same convention as every other department's fields.
@@ -18889,7 +19067,7 @@
                 const yarnColorsReceived = Number(order.weaving.yarnColorsReceived) || 0;
                 const yarnColorsRemaining = Math.max(0, totalYarnColors - yarnColorsReceived);
                 const totalSqm = Number(order.totalSqm) || 0;
-                weavingChecks = weavingSpecFieldsHtml + `
+                weavingChecks = weavingSpecFieldsHtml + renderWeavingMixedExternalHtml(order, orderIndex) + `
                     <div class="flex flex-wrap gap-4 mb-2">
                         <label class="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" ${order.weaving.receivedPrintedFabric ? 'checked' : ''} onchange="updateOrderField(${orderIndex}, 'weaving.receivedPrintedFabric', this.checked)" class="rounded"> ได้รับผ้าปั๊มลายแล้ว</label>
                         <label class="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" ${order.weaving.yarnComplete ? 'checked' : ''} onchange="updateOrderField(${orderIndex}, 'weaving.yarnComplete', this.checked)" class="rounded"> ไหมครบสำหรับทอ</label>
@@ -20207,6 +20385,20 @@
             return shippingInvoices.filter(inv => inv && Array.isArray(inv.items) && inv.items.some(it => normalizeMoSoKey(it && it.moSo) === key))
                 .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
         }
+        // ป้ายเล็กใต้เลข M/O: ย้อมในกี่สี/นอกกี่สี และทอนอกกี่ชิ้น (แสดงเฉพาะ M/O ที่มีงานนอกบริษัท)
+        function kpiInOutBadgeHtml(order) {
+            try {
+                const parts = [];
+                const cs = getDyeingColorStatus(order);
+                const extC = cs.rows.filter(g => g.inPlan && (g.where === 'external' || g.where === 'mixed')).length;
+                const intC = cs.rows.filter(g => g.inPlan && (g.where === 'internal' || g.where === 'mixed')).length;
+                if (extC > 0) parts.push(`ย้อมใน ${intC} / นอก ${extC} สี`);
+                const sp = getWeavingSplit(order);
+                if (sp.hasExternal && sp.hasItems) parts.push(sp.mixed ? `ทอนอก ${sp.extPieces}/${sp.extPieces + sp.intPieces} ชิ้น` : 'ทอนอกทั้งใบ');
+                else if (sp.modeExt) parts.push('ทอนอกทั้งใบ');
+                return parts.length ? `<span class="block text-[10px] font-normal text-amber-700" data-kpi-inout>${escapeHtml(parts.join(' · '))}</span>` : '';
+            } catch (e) { return ''; }
+        }
         function kpiDueAutoFill(order) {
             const out = {};
             try {
@@ -20216,7 +20408,12 @@
                     .map(l => Object.assign({}, l, { _d: normalizeDateString(l.date) })).filter(l => l._d).sort((a, b) => a._d.localeCompare(b._d));
                 const total = Number(order.totalSqm) || 0, woven = Number(w.sqmWoven) || 0;
                 const external = w.mode === 'external';
-                const weavingDone = ['finishing', 'ready_to_ship', 'shipped'].includes(stage) || (total > 0 && woven >= total - 0.005);
+                // NEW (2026-10-09): บางชิ้นจ้างทอนอก (sizeItems[].weaveWhere) — ในบริษัท vs นอกบริษัท
+                const split = getWeavingSplit(order);
+                const mixed = !external && split.mixed;
+                const extRecv = !!((w.external || {}).receivedDate) && (w.external || {}).qcResult !== 'fail';
+                const weavingDone = ['finishing', 'ready_to_ship', 'shipped'].includes(stage)
+                    || (mixed ? (split.intSqm > 0 ? woven >= split.intSqm - 0.005 : true) && extRecv : (total > 0 && woven >= total - 0.005));
                 // GRADE
                 const lastGrade = [...logs].reverse().find(l => l.grade);
                 if (lastGrade) out.grade = String(lastGrade.grade);
@@ -20231,7 +20428,11 @@
                 if (external) out.location = 'จ้างทอนอกบริษัท';
                 else {
                     const looms = [...new Set(logs.map(l => String(l.loom === undefined || l.loom === null ? '' : l.loom).trim()).filter(Boolean))];
-                    if (looms.length) out.location = 'เครื่อง ' + looms.join(', ');
+                    const locParts = [];
+                    if (looms.length) locParts.push('เครื่อง ' + looms.join(', '));
+                    else if (mixed) locParts.push('ในบริษัท');
+                    if (mixed) locParts.push('จ้างทอนอก ' + split.extPieces + ' ชิ้น');
+                    if (locParts.length) out.location = locParts.join(' + ');
                 }
                 // เริ่มทอ / ทอเสร็จ / วันที่โอน
                 if (logs.length) out.startDate = logs[0]._d;
@@ -20240,7 +20441,11 @@
                 if (wDone) out.transferDate = wDone;
                 // ค้างทอ (ชิ้น)
                 const pieces = Number(order.totalPieces) || 0;
-                if (!external && total > 0 && pieces > 0) out.pendingQty = weavingDone ? 0 : Math.max(0, Math.ceil(pieces * (1 - Math.min(1, woven / total)) - 1e-9));
+                if (mixed) {
+                    // ค้างทอ = ชิ้นทอในบริษัทที่ยังไม่ทอ (ตามสัดส่วน ตร.ม.) + ชิ้นจ้างทอนอกที่ยังไม่ได้รับคืน
+                    const intPending = split.intSqm > 0 ? Math.ceil(split.intPieces * (1 - Math.min(1, woven / split.intSqm)) - 1e-9) : 0;
+                    out.pendingQty = weavingDone ? 0 : Math.max(0, intPending) + (extRecv ? 0 : split.extPieces);
+                } else if (!external && total > 0 && pieces > 0) out.pendingQty = weavingDone ? 0 : Math.max(0, Math.ceil(pieces * (1 - Math.min(1, woven / total)) - 1e-9));
                 // เลขที่ INV / วันส่งพรม จากใบส่งสินค้า (Delivery)
                 const invs = kpiShippingInvoicesFor(order);
                 const invNos = [...new Set(invs.map(i => String(i.invNo || '').trim()).filter(Boolean))];
@@ -20297,7 +20502,7 @@
                 return `
                     <tr class="hover:bg-slate-50/80">
                         <td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(kpiShortDate(order.openDate) || '-')}</td>
-                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${orderTypeBadgeHtml(order.orderType)}${escapeHtml(order.moSo)}</td>
+                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${orderTypeBadgeHtml(order.orderType)}${escapeHtml(order.moSo)}${kpiInOutBadgeHtml(order)}</td>
                         <td class="px-2 py-1.5">${escapeHtml(order.customerName || '-')}</td>
                         <td class="px-2 py-1.5">${escapeHtml(order.customerPO || '-')}</td>
                         <td class="px-2 py-1.5">${escapeHtml(order.quality || '-')}</td>
@@ -20306,7 +20511,7 @@
                         <td class="px-2 py-1.5 text-right">${order.colorsCount || 0}</td>
                         <td class="px-2 py-1.5 text-right">${(Number(order.totalSqm) || 0).toFixed(2)}</td>
                         <td class="px-2 py-1.5"><input type="text" value="${escapeHtml(e.grade.v)}" data-kpi-field="grade" data-auto="${e.grade.auto ? 1 : 0}"${tip(e.grade, 'บันทึกทอ/ใบวางแผน')} onchange="${f(orderIndex, 'weaving.grade')}" class="w-16 px-1.5 py-1 border ${cls(e.grade)} rounded text-xs"></td>
-                        <td class="px-2 py-1.5"><input type="text" value="${escapeHtml(e.location.v)}" data-kpi-field="location" data-auto="${e.location.auto ? 1 : 0}"${tip(e.location, 'บันทึกทอ')} onchange="${f(orderIndex, 'weaving.location')}" class="w-24 px-1.5 py-1 border ${cls(e.location)} rounded text-xs"></td>
+                        <td class="px-2 py-1.5"><input type="text" value="${escapeHtml(e.location.v)}" data-kpi-field="location" data-auto="${e.location.auto ? 1 : 0}"${tip(e.location, 'บันทึกทอ')} onchange="${f(orderIndex, 'weaving.location')}" class="w-36 px-1.5 py-1 border ${cls(e.location)} rounded text-xs"></td>
                         <td class="px-2 py-1.5"><input type="date" value="${e.startDate.v}" data-kpi-field="startDate" data-auto="${e.startDate.auto ? 1 : 0}"${tip(e.startDate, 'บันทึกทอ (วันแรกที่ทอ)')} onchange="${f(orderIndex, 'weaving.startDate')}" class="px-1.5 py-1 border ${cls(e.startDate)} rounded text-xs"></td>
                         <td class="px-2 py-1.5"><input type="date" value="${e.finishDate.v}" data-kpi-field="finishDate" data-auto="${e.finishDate.auto ? 1 : 0}"${tip(e.finishDate, 'การทอครบ/โอนออกจากแผนกทอ')} onchange="${f(orderIndex, 'weaving.finishDate')}" class="px-1.5 py-1 border ${cls(e.finishDate)} rounded text-xs"></td>
                         <td class="px-2 py-1.5"><input type="number" step="1" value="${e.pendingQty.v}" data-kpi-field="pendingQty" data-auto="${e.pendingQty.auto ? 1 : 0}"${tip(e.pendingQty, 'จำนวนชิ้น × สัดส่วน ตร.ม. ที่ยังไม่ได้ทอ')} onchange="updateOrderField(${orderIndex}, 'weaving.pendingQty', Number(this.value))" class="w-14 px-1.5 py-1 border ${cls(e.pendingQty)} rounded text-xs text-right"></td>
@@ -21120,7 +21325,7 @@
             filtered.forEach(({ item }) => {
                 const monthKey = bucketKeyForDate(item.actualDate, 'month');
                 if (!monthKey) return;
-                const yarnType = String(item.yarnType || '').trim() || '(ไม่ระบุชนิดไหม)';
+                const yarnType = yarnGroupLabel(item.yarnType); // รวมชนิดไหมที่ขึ้นต้นเหมือนกัน (เช่น WOOL 380 …)
                 const gKey = `${monthKey}|${yarnType}`;
                 if (!groups[gKey]) groups[gKey] = { monthKey, yarnType, count: 0, requisitionKg: 0, actualTransferKg: 0 };
                 groups[gKey].count += 1;
@@ -21291,7 +21496,11 @@
                 const log = Array.isArray(dyeing.dyeOrderLog) ? dyeing.dyeOrderLog : [];
                 const extRows = log.filter(isOutsourcedDyeRow);
                 const isExtMode = dyeing.mode === 'external';
-                if (!isExtMode && extRows.length === 0) return;
+                // NEW (2026-10-09): สีที่ตั้ง "ย้อมที่ = นอกบริษัท" รายสี (แม้ M/O เป็นโหมดย้อมในบริษัท) ก็ถือว่าอยู่ในรายการนี้
+                const colorStatus = getDyeingColorStatus(order);
+                const statusByKey = new Map(colorStatus.rows.map(x => [x.key, x]));
+                const hasExtColor = colorStatus.rows.some(x => x.inPlan && (x.where === 'external' || x.where === 'mixed'));
+                if (!isExtMode && !hasExtColor && extRows.length === 0) return;
                 // เดือน: ตามเดือนที่เลือกของหน้ารายงาน — M/O เปิดในเดือนนั้น หรือมีแถวจ้างภายนอกวันที่ในเดือนนั้น
                 if (!(reportMonthMatchOrder(order) || extRows.some(r => reportMonthMatchDate(r.orderDate || r.actualDate, order)))) return;
 
@@ -21318,10 +21527,14 @@
 
                 const rows = [];
                 plan.forEach((p, key) => {
-                    if (!isExtMode && !got.has(key)) return; // M/O ย้อมในบริษัท: โชว์เฉพาะสีที่จ้างภายนอกจริง
+                    const st = statusByKey.get(key);
+                    const colorExt = !!st && (st.where === 'external' || st.where === 'mixed');
+                    const colorInt = !!st && st.where === 'internal' && (((dyeing.colorOrders || []).find(r => r && normalizeDyeColorCodeKey(r.colorCode) === key) || {}).dyeWhere === 'internal');
+                    if (!got.has(key) && !colorExt && !(isExtMode && !colorInt)) return; // โชว์เฉพาะสีที่ย้อมนอก (ตั้งไว้/จ้างจริง)
                     const req = required.has(key) ? required.get(key) : p.kg;
                     const g = got.get(key);
                     rows.push({ key, code: p.code, planKg: p.kg, surplusKg: Math.max(0, p.kg - req), requiredKg: req, gotKg: g ? g.kg : 0, inPlan: true,
+                        ownKg: st ? st.ownKg : 0, buyKg: st ? st.buyKg : 0, isExtColor: colorExt,
                         vendors: g ? [...g.vendors] : [], slips: g ? [...g.slips] : [] });
                 });
                 got.forEach((g, key) => {
@@ -21330,6 +21543,7 @@
                 });
                 if (rows.length === 0 && !isExtMode) return;
                 rows.forEach(r => {
+                    if (r.ownKg === undefined) { r.ownKg = 0; r.buyKg = 0; }
                     const remain = r.requiredKg - r.gotKg;
                     r.remainKg = r.inPlan ? Math.max(0, remain) : 0;
                     if (!r.inPlan) r.status = 'extra';
@@ -21379,7 +21593,7 @@
                     <span class="ml-auto text-slate-600">ตามใบสั่ง <b>${f(tPlan)}</b> · รับแล้ว <b>${f(tGot)}</b> · คงเหลือ <b class="${tRemain > 0.01 ? 'text-amber-700' : 'text-emerald-700'}">${f(tRemain)}</b> กก.</span>
                 </div>`;
                 const rows = g.rows.length === 0
-                    ? `<tr><td colspan="8" class="px-3 py-2 text-xs text-slate-400">แผนกวางแผนยังไม่ได้ลงใบสั่งย้อม (code สี/น้ำหนัก) ของ M/O นี้</td></tr>`
+                    ? `<tr><td colspan="9" class="px-3 py-2 text-xs text-slate-400">แผนกวางแผนยังไม่ได้ลงใบสั่งย้อม (code สี/น้ำหนัก) ของ M/O นี้</td></tr>`
                     : g.rows.map(r => {
                         const st = STATUS[r.status];
                         const vend = [...r.vendors, ...r.slips.map(s => 'ใบ ' + s)].join(' · ');
@@ -21393,6 +21607,7 @@
                             <td class="px-3 py-1.5 text-right tabular-nums font-medium">${r.inPlan ? f(r.requiredKg) : '-'}</td>
                             <td class="px-3 py-1.5 text-right tabular-nums font-medium text-sky-700">${f(r.gotKg)}</td>
                             <td class="px-3 py-1.5 text-right tabular-nums ${r.remainKg > 0.01 ? 'text-amber-700 font-medium' : 'text-slate-400'}">${r.inPlan ? f(r.remainKg) : '-'}</td>
+                            <td class="px-3 py-1.5 text-[11px] whitespace-nowrap" data-ext-yarn-src>${r.inPlan && (r.ownKg > 0.005 || r.buyKg > 0.005) ? `<span class="text-slate-600">เรา <b>${f(r.ownKg)}</b></span>${r.buyKg > 0.005 ? ` · <span class="text-orange-700">ซื้อจากโรงย้อม <b>${f(r.buyKg)}</b></span>` : ''}` : '<span class="text-slate-300">-</span>'}</td>
                             <td class="px-3 py-1.5"><span class="inline-flex px-2 py-0.5 rounded-full border text-[10px] font-semibold ${st[1]}">${st[0]}</span></td>
                             <td class="px-3 py-1.5 text-[11px] text-slate-500">${escapeHtml(vend) || '<span class="text-slate-300">-</span>'}</td>
                             <td class="px-3 py-1.5 text-right">${addBtn}</td>
@@ -21400,7 +21615,7 @@
                     }).join('');
                 return head + `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500 text-[11px]"><tr>
                     <th class="px-3 py-1.5 text-left">code สี</th><th class="px-3 py-1.5 text-right">นน.ในใบสั่งย้อม (Kg.)</th><th class="px-3 py-1.5 text-right">หัก Surplus (Kg.)</th><th class="px-3 py-1.5 text-right">ต้องย้อม (Kg.)</th>
-                    <th class="px-3 py-1.5 text-right">รับจากผู้รับจ้าง (Kg.)</th><th class="px-3 py-1.5 text-right">คงเหลือ (Kg.)</th><th class="px-3 py-1.5 text-left">สถานะ</th><th class="px-3 py-1.5 text-left">ผู้รับจ้าง / ใบส่ง</th><th class="px-3 py-1.5"></th>
+                    <th class="px-3 py-1.5 text-right">รับจากผู้รับจ้าง (Kg.)</th><th class="px-3 py-1.5 text-right">คงเหลือ (Kg.)</th><th class="px-3 py-1.5 text-left" title="ไหมของเราที่ส่งไปย้อม / ไหมที่ซื้อจากผู้รับจ้างย้อม (ตั้งที่แผนกวางแผน)">ไหมที่ใช้ (Kg.)</th><th class="px-3 py-1.5 text-left">สถานะ</th><th class="px-3 py-1.5 text-left">ผู้รับจ้าง / ใบส่ง</th><th class="px-3 py-1.5"></th>
                     </tr></thead><tbody class="divide-y divide-slate-100">${rows}</tbody></table></div>`;
             }).join('');
         }
@@ -21413,13 +21628,16 @@
             const required = getDyeingRequiredKgByColor(order).get(key) || 0;
             let got = 0;
             ((order.dyeing || {}).dyeOrderLog || []).forEach(r => { if (isOutsourcedDyeRow(r) && normalizeDyeColorCodeKey(r.colorCode) === key) got += Number(r.actualTransferKg) || 0; });
+            // สัดส่วนไหมของเราที่ส่งไปย้อม (ตั้งที่แผนกวางแผน; ไม่ระบุ = ทั้งหมด) → ใส่ในช่อง "นน.โอนจากใบเบิก" ของแถวจ้างย้อม = ไหมของเราที่ส่งออก (ใช้ตัดสต๊อกไหม)
+            const colorRow = ((order.dyeing || {}).colorOrders || []).find(r => r && normalizeDyeColorCodeKey(r.colorCode) === key);
+            const ownShare = colorRow ? getDyeRowOwnShare(colorRow) : 1;
             if (!order.dyeing) order.dyeing = {};
             if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
             const d = new Date();
             const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             order.dyeing.dyeOrderLog.push({
                 isExtra: false, orderDate: today, colorNo: '', colorCode, yarnType: '', lotNo: '', hang: '',
-                orderKg: Math.round(Math.max(0, required - got) * 100) / 100, dyeTubNo: '', requisitionKg: 0, actualTransferKg: 0,
+                orderKg: Math.round(Math.max(0, required - got) * 100) / 100, dyeTubNo: '', requisitionKg: Math.round(Math.max(0, required - got) * ownShare * 100) / 100, actualTransferKg: 0,
                 plannedDate: '', actualDate: '', dueDate: order.dueDate || '', remark: 'สร้างจากใบสั่งย้อมแผนกวางแผน',
                 isDamaged: false, vendor: 'จ้างย้อมภายนอก'
             });
