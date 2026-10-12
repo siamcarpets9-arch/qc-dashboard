@@ -1532,7 +1532,7 @@
                     </div>
                     <div id="kpiDuePeriodSummary" class="px-3 pb-3"></div>
                 </div>
-                <p class="px-1 text-[11px] text-slate-400"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-teal-50 border border-teal-300 align-middle mr-1"></span>ช่องสีเขียวอมฟ้า = เติมอัตโนมัติจากข้อมูลที่มีในระบบ (บันทึกทอ, การโอนงาน, ใบส่งสินค้าใน "รายการรอส่ง") — พิมพ์ทับได้ และเลขที่ INV ดึงจากใบส่งสินค้า (INVOICE)</p>
+                <p class="px-1 text-[11px] text-slate-400"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-teal-50 border border-teal-300 align-middle mr-1"></span>ช่องสีเขียวอมฟ้า = เติมอัตโนมัติจากข้อมูลที่มีในระบบ (บันทึกทอ, การโอนงาน, ใบส่งสินค้าใน "รายการรอส่ง") — พิมพ์ทับได้ และเลขที่ INV / เลขที่ใบส่ง ดึงจากใบส่งสินค้า (INVOICE) เลขเดียวกัน</p>
                 <div id="kpiDueSplitContainer"></div>
             </div>
 
@@ -4079,7 +4079,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-72';
+        const APP_BUILD = 'QCDashboard-73';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -20466,6 +20466,8 @@
                 grade: pick(w.grade, a.grade), location: pick(w.location, a.location), startDate: pick(w.startDate, a.startDate),
                 finishDate: pick(w.finishDate, a.finishDate), pendingQty: pick(w.pendingQty && Number(w.pendingQty) !== 0 ? w.pendingQty : '', a.pendingQty),
                 transferDate: pick(w.transferDate, a.transferDate), invNo: pick(fin.invNo, a.invNo),
+                // NEW (2026-10-12): เลขที่ใบส่ง = เลขเดียวกับ INV ของใบส่งสินค้า (DELIVERY NOTE) ในหน้า Delivery
+                deliveryNoteNo: pick(fin.deliveryNoteNo, a.invNo),
                 shippedDate: { v: shipped, auto: !order.shippedDate && !!a.shipDateFromInvoice }
             };
         }
@@ -20516,7 +20518,7 @@
                         <td class="px-2 py-1.5"><input type="date" value="${e.finishDate.v}" data-kpi-field="finishDate" data-auto="${e.finishDate.auto ? 1 : 0}"${tip(e.finishDate, 'การทอครบ/โอนออกจากแผนกทอ')} onchange="${f(orderIndex, 'weaving.finishDate')}" class="px-1.5 py-1 border ${cls(e.finishDate)} rounded text-xs"></td>
                         <td class="px-2 py-1.5"><input type="number" step="1" value="${e.pendingQty.v}" data-kpi-field="pendingQty" data-auto="${e.pendingQty.auto ? 1 : 0}"${tip(e.pendingQty, 'จำนวนชิ้น × สัดส่วน ตร.ม. ที่ยังไม่ได้ทอ')} onchange="updateOrderField(${orderIndex}, 'weaving.pendingQty', Number(this.value))" class="w-14 px-1.5 py-1 border ${cls(e.pendingQty)} rounded text-xs text-right"></td>
                         <td class="px-2 py-1.5"><input type="date" value="${e.transferDate.v}" data-kpi-field="transferDate" data-auto="${e.transferDate.auto ? 1 : 0}"${tip(e.transferDate, 'วันที่โอนออกจากแผนกทอ')} onchange="${f(orderIndex, 'weaving.transferDate')}" class="px-1.5 py-1 border ${cls(e.transferDate)} rounded text-xs"></td>
-                        <td class="px-2 py-1.5"><input type="text" value="${escapeHtml(fin.deliveryNoteNo || '')}" onchange="${f(orderIndex, 'finishing.deliveryNoteNo')}" class="w-20 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs"></td>
+                        <td class="px-2 py-1.5"><input type="text" value="${escapeHtml(e.deliveryNoteNo.v)}" data-kpi-field="deliveryNoteNo" data-auto="${e.deliveryNoteNo.auto ? 1 : 0}"${tip(e.deliveryNoteNo, 'ใบส่งสินค้า (เลขเดียวกับ INV) ในแท็บ รายการรอส่ง')} onchange="${f(orderIndex, 'finishing.deliveryNoteNo')}" class="w-28 px-1.5 py-1 border ${cls(e.deliveryNoteNo)} rounded text-xs"></td>
                         <td class="px-2 py-1.5 whitespace-nowrap${e.shippedDate.auto ? ' text-teal-700' : ''}" data-kpi-field="shippedDate"${tip(e.shippedDate, 'วันที่ส่งตามใบส่งสินค้า')}>${escapeHtml(kpiShortDate(e.shippedDate.v) || '-')}</td>
                         <td class="px-2 py-1.5"><input type="text" value="${escapeHtml(e.invNo.v)}" data-kpi-field="invNo" data-auto="${e.invNo.auto ? 1 : 0}"${tip(e.invNo, 'ใบส่งสินค้า (INVOICE) ในแท็บ รายการรอส่ง')} onchange="${f(orderIndex, 'finishing.invNo')}" placeholder="เลขที่ INV" class="w-28 px-1.5 py-1 border ${cls(e.invNo)} rounded text-xs"></td>
                     </tr>
@@ -23490,7 +23492,7 @@
                     quality: order.quality, dueDate: order.dueDate, totalPieces: order.totalPieces,
                     colorsCount: order.colorsCount, totalSqm: order.totalSqm,
                     grade: e.grade.v, location: e.location.v, startDate: e.startDate.v, finishDate: e.finishDate.v,
-                    pendingQty: e.pendingQty.v, transferDate: e.transferDate.v, deliveryNoteNo: fin.deliveryNoteNo,
+                    pendingQty: e.pendingQty.v, transferDate: e.transferDate.v, deliveryNoteNo: e.deliveryNoteNo.v,
                     shippedDate: kpiShortDate(e.shippedDate.v), invNo: e.invNo.v
                 };
             });
