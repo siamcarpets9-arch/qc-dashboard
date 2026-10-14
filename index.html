@@ -4079,7 +4079,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-73';
+        const APP_BUILD = 'QCDashboard-74';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6881,15 +6881,23 @@
         // =========================================================================================
         function buildDyeingOrderPrintHTML(data) {
             const isExternal = data.mode === 'external';
-            const title = isExternal ? 'ใบสั่งจ้างย้อมนอกบริษัท' : 'ใบสั่งย้อมภายใน';
+            // NEW (2026-10-14): ถ้ามีสีที่ย้อมนอกบริษัท เพิ่มคอลัมน์ ย้อมที่ / ไหมเรา / ซื้อจากผู้รับจ้าง
+            const showWhere = (data.colors || []).some(c => c && c.where === 'external');
+            const title = isExternal ? 'ใบสั่งจ้างย้อมนอกบริษัท' : (showWhere ? 'ใบสั่งย้อม (ในบริษัท + จ้างย้อมนอก)' : 'ใบสั่งย้อมภายใน');
+            const fmt2 = (v) => (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const colSpanAll = showWhere ? 7 : 4;
             const colorsRows = (data.colors || []).map((c, idx) => `
                 <tr>
                     <td>${idx + 1}</td>
                     <td>${escapeHtml(c.colorCode || '-')}</td>
                     <td>${escapeHtml(c.quality || '-')}</td>
-                    <td style="text-align:right;">${(Number(c.dyeKg) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    ${showWhere ? `<td>${c.where === 'external' ? 'ย้อมนอก' : 'ย้อมใน'}</td>` : ''}
+                    <td style="text-align:right;">${fmt2(c.dyeKg)}</td>
+                    ${showWhere ? `<td style="text-align:right;">${c.where === 'external' ? fmt2(c.ownKg) : '-'}</td><td style="text-align:right;">${c.where === 'external' ? fmt2(c.buyKg) : '-'}</td>` : ''}
                 </tr>
             `).join('');
+            const sumOwn = (data.colors || []).reduce((a, c) => a + (c && c.where === 'external' ? (Number(c.ownKg) || 0) : 0), 0);
+            const sumBuy = (data.colors || []).reduce((a, c) => a + (c && c.where === 'external' ? (Number(c.buyKg) || 0) : 0), 0);
             const grandTotal = data.grandTotalDyeKg !== undefined && data.grandTotalDyeKg !== null
                 ? Number(data.grandTotalDyeKg)
                 : (data.colors || []).reduce((sum, c) => sum + (Number(c.dyeKg) || 0), 0);
@@ -6904,19 +6912,19 @@
                         <tr><th>M/O, S/O</th><td>${escapeHtml(data.moSo || '-')}${data.refSo ? ` / ${escapeHtml(data.refSo)}` : ''}</td></tr>
                         ${data.customerName ? `<tr><th>ลูกค้า</th><td>${escapeHtml(data.customerName)}</td></tr>` : ''}
                         ${data.dueDate ? `<tr><th>กำหนดส่ง</th><td>${escapeHtml(data.dueDate)}</td></tr>` : ''}
-                        <tr><th>ประเภท</th><td>${isExternal ? 'สั่งย้อมนอกบริษัทฯ (Outsourced)' : 'ย้อมในบริษัทฯ (Internal)'}</td></tr>
-                        ${isExternal ? `<tr><th>ผู้รับจ้างย้อม</th><td>&nbsp;</td></tr>` : ''}
+                        <tr><th>ประเภท</th><td>${isExternal ? 'สั่งย้อมนอกบริษัทฯ (Outsourced)' : (showWhere ? 'ย้อมในบริษัทฯ + จ้างย้อมนอกบริษัทบางสี' : 'ย้อมในบริษัทฯ (Internal)')}</td></tr>
+                        ${(isExternal || showWhere) ? `<tr><th>ผู้รับจ้างย้อม</th><td>&nbsp;</td></tr>` : ''}
                     </table>
                     <p class="print-section-title">รายการสีที่สั่งย้อม</p>
                     <table class="print-detail-table">
                         <thead>
-                            <tr><th style="width:32px;">#</th><th>Code สี</th><th>คุณภาพ (Quality)</th><th style="text-align:right;">น้ำหนักสั่งย้อม (กก.)</th></tr>
+                            <tr><th style="width:32px;">#</th><th>Code สี</th><th>คุณภาพ (Quality)</th>${showWhere ? '<th>ย้อมที่</th>' : ''}<th style="text-align:right;">น้ำหนักสั่งย้อม (กก.)</th>${showWhere ? '<th style="text-align:right;">ไหมของเรา (กก.)</th><th style="text-align:right;">ซื้อจากผู้รับจ้าง (กก.)</th>' : ''}</tr>
                         </thead>
                         <tbody>
-                            ${colorsRows || '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">ไม่มีรายการสี</td></tr>'}
+                            ${colorsRows || `<tr><td colspan="${colSpanAll}" style="text-align:center; color:#94a3b8;">ไม่มีรายการสี</td></tr>`}
                         </tbody>
                         <tfoot>
-                            <tr><th colspan="3" style="text-align:right;">รวมทั้งหมด</th><th style="text-align:right;">${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.</th></tr>
+                            <tr><th colspan="${showWhere ? 4 : 3}" style="text-align:right;">รวมทั้งหมด</th><th style="text-align:right;">${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.</th>${showWhere ? `<th style="text-align:right;">${fmt2(sumOwn)}</th><th style="text-align:right;">${fmt2(sumBuy)}</th>` : ''}</tr>
                         </tfoot>
                     </table>
                     <div class="print-signature-row">
@@ -6955,10 +6963,36 @@
                 quality: order.quality || '',
                 dyeKg: Number(isExternal ? it.weightKgOrdered : it.weightKg) || 0
             })).filter(c => c.dyeKg > 0);
+            // NEW (2026-10-14): ย้อมที่ไหน + ไหมของเรา/ซื้อจากผู้รับจ้าง ต่อสี (จากใบสั่งย้อมของแผนกวางแผน; ไม่มีแถวแผนของสีนั้น = ตามโหมด M/O ไหมเราทั้งหมด)
+            const planRows = Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders.filter(r => r && typeof r === 'object') : [];
+            const decorate = (c) => {
+                const key = normalizeDyeColorCodeKey(c.colorCode);
+                const pr = planRows.filter(r => normalizeDyeColorCodeKey(r.colorCode) === key);
+                const where = pr.length > 0 ? (pr.some(r => getDyeRowWhere(order, r) === 'external') ? 'external' : 'internal') : (isExternal ? 'external' : 'internal');
+                c.where = where;
+                if (where === 'external') {
+                    let own = 0, buy = 0;
+                    if (pr.length > 0) {
+                        pr.forEach(r => {
+                            if (getDyeRowWhere(order, r) !== 'external') return;
+                            const kg = Number(r.kg) || 0;
+                            const req = r.useSurplus ? Math.max(0, kg - (Number(r.surplusKg) || 0)) : kg;
+                            const o = req * getDyeRowOwnShare(r);
+                            own += o; buy += req - o;
+                        });
+                        const tot = own + buy;
+                        if (tot > 0 && c.dyeKg > 0) { const ratio = own / tot; own = c.dyeKg * ratio; buy = c.dyeKg - own; }
+                        else { own = c.dyeKg; buy = 0; }
+                    } else { own = c.dyeKg; buy = 0; }
+                    c.ownKg = Math.round(own * 100) / 100; c.buyKg = Math.round(buy * 100) / 100;
+                }
+                return c;
+            };
+            colors = colors.map(decorate);
             if (colors.length === 0) {
                 // No per-color execution line items entered yet — fall back to Planning's per-color dye-order plan.
                 const rows = Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders : [];
-                colors = rows.filter(r => (Number(r.kg) || 0) > 0).map(r => ({
+                colors = rows.filter(r => r && (Number(r.kg) || 0) > 0).map(r => decorate({
                     colorCode: r.colorCode || '-', quality: order.quality || '', dyeKg: Number(r.kg) || 0
                 }));
             }
@@ -7370,8 +7404,11 @@
         // groups its data rows by normalized M/O, S/O key. Ditto marks (a cell that is exactly '"')
         // carry forward the last non-ditto value in that column — the dyeing department's own
         // convention for "same as the row above". A combined-order row (one dye batch shared by
-        // several M/O, S/O) credits its FULL kg to every M/O, S/O in the group, per the user's explicit
-        // choice — one physical hang really was dyed for all of them together, not split between them.
+        // several M/O, S/O) used to credit its FULL kg to every M/O, S/O in the group. CHANGED
+        // (2026-10-14): "ในใบสั่งย้อม ถ้า M/O หลาย M/O รวมกัน ให้ดูที่ใบสั่งแล้วหักตามยอดสั่ง หรือหารกันตามจำนวนที่สั่ง"
+        // → the row's kg (and นน.ในใบสั่งย้อม / นน.โอนจากใบเบิก, and Col.No "3,1,3") is now SPLIT between
+        // the M/Os by each M/O's own planned dye-order kg for that color (see dyeShareWeightsForOrders);
+        // no plan on file for any of them → divided equally.
         //
         // UPDATED (2026-10-01): "ต่อไปจะทำตารางแบบนี้ ให้เอาของวันที่ 29/9 เข้าอย่างเดียวก่อน" — the
         // dyeing department introduced a second, simpler sheet layout they intend to use going forward
@@ -7419,10 +7456,47 @@
             return map;
         }
 
+        // NEW (2026-10-14): สัดส่วนที่ใช้แบ่งยอดย้อมรวมหลาย M/O — น้ำหนักสีนั้นในใบสั่งย้อมของแต่ละ M/O (net ไหมเหลือ);
+        // M/O ที่ไม่พบในระบบ/ไม่มีแผน: ถ้ามีแผนของ M/O อื่นและยอดรวมมากกว่าผลรวมแผน ส่วนต่างแบ่งให้ M/O ที่ไม่มีแผนเท่าๆ กัน;
+        // ถ้าไม่มีแผนเลย → หารเท่ากัน
+        function dyeShareWeightsForOrders(keys, colorCode, refTotal) {
+            const colorKey = normalizeDyeColorCodeKey(colorCode);
+            const planned = keys.map(k => {
+                const idx = productionOrders.findIndex(p => normalizeDyeingMoSoMatchKey(p.moSo) === k);
+                if (idx === -1) return null;
+                return getDyeingRequiredKgByColor(productionOrders[idx]).get(colorKey) || 0;
+            });
+            const planSum = planned.reduce((a, b) => a + (b || 0), 0);
+            let shares;
+            if (planSum > 0) {
+                const unknownN = planned.filter(w => !(w > 0)).length;
+                if (unknownN > 0 && refTotal > planSum) {
+                    const rest = (refTotal - planSum) / unknownN;
+                    shares = planned.map(w => (w > 0 ? w : rest));
+                } else {
+                    shares = planned.map(w => w || 0);
+                }
+            } else {
+                shares = keys.map(() => 1);
+            }
+            return { shares, planned, planSum };
+        }
+        // แบ่ง total ตาม shares ปัดทศนิยม decimals ตำแหน่ง — เศษที่เหลือใส่ก้อนที่ใหญ่สุด เพื่อให้ผลรวมเท่ายอดเดิมเสมอ
+        function splitKgByShares(total, shares, decimals) {
+            const f = Math.pow(10, decimals);
+            const sum = shares.reduce((a, b) => a + b, 0);
+            const t = Number(total) || 0;
+            const parts = shares.map(x => sum > 0 ? Math.round(t * x / sum * f) / f : 0);
+            const diff = Math.round((t - parts.reduce((a, b) => a + b, 0)) * f) / f;
+            if (diff !== 0) { let mx = 0; parts.forEach((x, i) => { if (x > parts[mx]) mx = i; }); parts[mx] = Math.round((parts[mx] + diff) * f) / f; }
+            return parts;
+        }
+
         function aggregateDyeingImport(workbook) {
             const dateSheetNames = workbook.SheetNames.filter(n => /^\d{1,2}-\d{1,2}-\d{2,4}$/.test(n.trim()));
             const byMoSo = {};
             let sheetsRead = 0;
+            let splitRows = 0;
             dateSheetNames.forEach(sheetName => {
                 const ws = workbook.Sheets[sheetName];
                 const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
@@ -7454,7 +7528,10 @@
                 const hasDateCol = firstHeader.toUpperCase() === 'DATE';
                 // NEW (2026-10-07): ไฟล์รายงานย้อมวันที่ 5-6/10 ตัดคอลัมน์ DATE/Item/ลำดับ ออก — แถวหัวตารางเริ่มที่ "Order NO." ตั้งแต่คอลัมน์ A
                 // และวันที่อยู่ที่หัวชีต (M1). เดิมถูกมองเป็นรูปแบบเก่า (ต้องมีเลขลำดับคอลัมน์ A) → ทุกแถวถูกข้ามเงียบๆ
-                const noDateCol = !hasDateCol && /order/i.test(firstHeader);
+                // NEW (2026-10-14): ชีตวันที่ 7–12/10 มีคอลัมน์ "No." (ลำดับ) นำหน้าแล้วตามด้วย "Order NO." — เดิมถูกอ่านเป็นรูปแบบเก่า
+                // (คอลัมน์เลื่อนกัน: Hang ไปอยู่ช่องนน.โอนจริง, นน.โอนจากใบเบิกไปอยู่หมายเหตุ) → อ่านตามชื่อหัวตารางจริงเหมือนรูปแบบไม่มีวันที่
+                const hasSeqNoHeader = !hasDateCol && /^no\.?$/i.test(firstHeader) && /order/i.test(String((aoa[1] || [])[1] || ''));
+                const noDateCol = !hasDateCol && (/order/i.test(firstHeader) || hasSeqNoHeader);
                 const isNewLayout = hasDateCol || noDateCol;
                 const colMap = isNewLayout ? mapNewDyeingLayoutColumns(aoa[1]) : {};
 
@@ -7525,15 +7602,46 @@
                         remark = (row[9] !== null && row[9] !== undefined) ? String(row[9]).trim() : '';
                     }
 
-                    splitDyeingOrderNoCell(orderNoRaw).forEach(disp => {
-                        const key = normalizeDyeingMoSoMatchKey(disp);
-                        if (!key) return;
-                        if (!byMoSo[key]) byMoSo[key] = { moSoDisplay: disp, rows: [], typeHint: /^\s*(S\/O|SO)\b/i.test(String(orderNoRaw || '')) ? 'SO' : 'MO' };
-                        byMoSo[key].rows.push({ dateKey, sheetName, colorNo, colorCode, yarnType, lotNo, hang, batchNo, kg, remark, requisitionKg, orderKg, dyeTubNo });
-                    });
+                    const dispList = splitDyeingOrderNoCell(orderNoRaw);
+                    const keyList = dispList.map(d => normalizeDyeingMoSoMatchKey(d));
+                    const typeHintRow = /^\s*(S\/O|SO)\b/i.test(String(orderNoRaw || '')) ? 'SO' : 'MO';
+                    const pushRow = (disp, key, extra) => {
+                        if (!byMoSo[key]) byMoSo[key] = { moSoDisplay: disp, rows: [], typeHint: typeHintRow };
+                        byMoSo[key].rows.push(Object.assign({ dateKey, sheetName, colorNo, colorCode, yarnType, lotNo, hang, batchNo, kg, remark, requisitionKg, orderKg, dyeTubNo }, extra || {}));
+                    };
+                    if (dispList.length > 1 && keyList.every(k => !!k)) {
+                        // NEW (2026-10-14): แถวย้อมรวมหลาย M/O → แบ่งยอดตามยอดสั่งย้อมของแต่ละ M/O (ไม่มียอดสั่ง → หารเท่ากัน)
+                        const refTotal = [orderKg, requisitionKg, kg].map(Number).find(v => v > 0) || 0;
+                        const { shares } = dyeShareWeightsForOrders(keyList, colorCode, refTotal);
+                        const hasOrderKg = orderKg !== null && orderKg !== undefined && !isNaN(Number(orderKg));
+                        const hasReqKg = requisitionKg !== null && requisitionKg !== undefined && !isNaN(Number(requisitionKg));
+                        const orderParts = hasOrderKg ? splitKgByShares(orderKg, shares, 2) : null;
+                        const reqParts = hasReqKg ? splitKgByShares(requisitionKg, shares, 3) : null;
+                        const kgParts = splitKgByShares(kg, shares, 3);
+                        const colorNoSegs = String(colorNo || '').split(/[,，]/).map(x => x.trim());
+                        const colorNoPerOrder = colorNoSegs.length === dispList.length && colorNoSegs.every(x => x !== '');
+                        const note = `ย้อมรวม ${dispList.join(' + ')}`;
+                        splitRows++;
+                        dispList.forEach((disp, n) => {
+                            pushRow(disp, keyList[n], {
+                                kg: kgParts[n],
+                                orderKg: hasOrderKg ? orderParts[n] : orderKg,
+                                requisitionKg: hasReqKg ? reqParts[n] : requisitionKg,
+                                colorNo: colorNoPerOrder ? colorNoSegs[n] : colorNo,
+                                remark: remark ? `${note} · ${remark}` : note,
+                                sharedWith: dispList.length
+                            });
+                        });
+                    } else {
+                        dispList.forEach((disp, n) => {
+                            const key = keyList[n];
+                            if (!key) return;
+                            pushRow(disp, key);
+                        });
+                    }
                 }
             });
-            return { byMoSo, sheetsRead };
+            return { byMoSo, sheetsRead, splitRows };
         }
 
         // =========================================================================================
@@ -7800,7 +7908,7 @@
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                     // NEW (2026-10-08): ใบ Packing Slip ไหมจ้างย้อม (Siam Dyemaster) ใช้ตัวเลือกไฟล์เดียวกัน
                     if (isSiamDyeSlipWorkbook(workbook)) { renderSiamDyeSlipPreview(workbook); return; }
-                    const { byMoSo, sheetsRead } = aggregateDyeingImport(workbook);
+                    const { byMoSo, sheetsRead, splitRows } = aggregateDyeingImport(workbook);
                     const moSoKeys = Object.keys(byMoSo);
                     if (sheetsRead === 0) {
                         status.textContent = 'ไม่พบ sheet ที่ชื่อเป็นวันที่ (เช่น 1-9-2026) ในไฟล์นี้ — ตรวจสอบว่าเป็นไฟล์รายงานการผลิตแผนกย้อมที่ถูกต้อง';
@@ -7823,7 +7931,7 @@
                     const matchedCount = rows.filter(r => r.orderIndex !== -1).length;
                     const unmatchedRows = rows.filter(r => r.orderIndex === -1);
 
-                    status.textContent = `อ่านข้อมูลจาก ${sheetsRead} วัน พบ ${rows.length} M/O, S/O — ตรงกับระบบ ${matchedCount} รายการ${unmatchedRows.length > 0 ? `, ไม่พบในระบบ ${unmatchedRows.length} รายการ (เลือกผูกกับรายการใกล้เคียง หรือสร้างเป็นรายการ "นอกระบบ" ให้ข้อมูลขึ้นในรายงาน)` : ''}`;
+                    status.textContent = `อ่านข้อมูลจาก ${sheetsRead} วัน พบ ${rows.length} M/O, S/O — ตรงกับระบบ ${matchedCount} รายการ${unmatchedRows.length > 0 ? `, ไม่พบในระบบ ${unmatchedRows.length} รายการ (เลือกผูกกับรายการใกล้เคียง หรือสร้างเป็นรายการ "นอกระบบ" ให้ข้อมูลขึ้นในรายงาน)` : ''}${splitRows > 0 ? ` · มี ${splitRows} แถวที่ย้อมรวมหลาย M/O — แบ่งยอดให้แต่ละ M/O ตามยอดสั่งย้อมในใบสั่งของ M/O นั้น (ไม่มียอดสั่งหารเท่ากัน)` : ''}`;
 
                     preview.classList.remove('hidden');
                     preview.innerHTML = rows.map(r => {
@@ -7990,7 +8098,9 @@
                         if (hasOrderKg) row.orderKg = g.orderKg;
                         if (!row.orderDate) row.orderDate = orderDate;
                         row.actualDate = actualDate;
-                        row.remark = mergedRemark || row.remark || '';
+                        // FIX (2026-10-14): แถวที่เคยนำเข้าผิดคอลัมน์ (หมายเหตุกลายเป็นตัวเลข เช่น 7.523 ซึ่งจริงๆ คือ นน.โอนจากใบเบิก) → ล้างทิ้งเมื่อนำเข้าใหม่
+                        const staleNumericRemark = row._importKey && /^\d+(\.\d+)?$/.test(String(row.remark || '').trim());
+                        row.remark = mergedRemark || (staleNumericRemark ? '' : (row.remark || ''));
                         if (g.ext) { row.vendor = g.ext.vendor; row.slipNo = g.ext.slipNo; }
                         row._importKey = importKey;
                         usedThisRound.add(idx);
