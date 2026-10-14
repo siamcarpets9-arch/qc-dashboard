@@ -4079,7 +4079,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-74';
+        const APP_BUILD = 'QCDashboard-75';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -9402,6 +9402,8 @@
                 voidPercent: Number(it.voidPercent) || 0,
                 // NEW (2026-10-09): ชิ้นนี้ทอที่ไหน — '' = ตามโหมดของ M/O (weaving.mode), 'internal' = ทอในบริษัท, 'external' = จ้างทอนอกบริษัท
                 weaveWhere: (it.weaveWhere === 'internal' || it.weaveWhere === 'external') ? it.weaveWhere : '',
+                // NEW (2026-10-14): แนววางพรมบนผ้าใบ — '' = อัตโนมัติ (ใช้ผ้าน้อยสุด), 'w' = ด้านกว้างขวางหน้าผ้า, 'l' = ด้านยาวขวางหน้าผ้า
+                canvasDir: (it.canvasDir === 'w' || it.canvasDir === 'l') ? it.canvasDir : '',
                 // A row saved before "sqm" existed gets it derived from width×length×qty×void% (void%
                 // defaults to 0 for those, i.e. no change from the old plain-area formula). A row that
                 // already has an sqm value keeps it as-is even if it was hand-typed and doesn't match
@@ -11509,6 +11511,118 @@
         // see recomputeOrderSizeTotals(). Orders with no rows keep totalSqm/totalPieces as plain,
         // manually-entered numbers (legacy behavior, and still fine for a simple single-size order).
         // =========================================================================================
+
+        // =========================================================================================
+        // NEW (2026-10-14): คำนวณการใช้ผ้าใบ (Canvas) ต่อ M/O จากรายการขนาด (sizeItems) อัตโนมัติ
+        // "ผ้าใบมีหน้ากว้าง 3 ม. / 5 ม. / 6 ม. เผื่อไว้ด้านละ 10 ซม." — แต่ละชิ้น: ด้านที่ขวางหน้าผ้า + 0.20 ม. ต้องไม่เกินหน้าผ้า
+        // (เลือกหน้าผ้าแคบสุดที่ใส่ได้), ความยาวผ้าที่ตัด = ด้านที่ไปตามม้วน + 0.20 ม., ตร.ม.ผ้าใบ = หน้าผ้า × ความยาวที่ตัด × จำนวนชิ้น
+        // แนววางพรม (ด้านไหนขวางหน้าผ้า): อัตโนมัติ = เลือกแนวที่ใช้ตร.ม.ผ้าน้อยสุด (ผู้ใช้เลือก), แก้ต่อชิ้นได้ (sizeItems[i].canvasDir 'w' | 'l')
+        // กาวทาหลังพรม (มาตรฐาน) = ตร.ม.ผ้าใบ × ตัวคูณ (Production Settings, ค่าเริ่มต้น 2) → ไปที่ KPI ทากาวตกแต่ง (เบิกกาวตามมาตรฐาน)
+        // =========================================================================================
+        const CANVAS_ROLL_WIDTHS_M = [3, 5, 6];
+        const CANVAS_MARGIN_PER_SIDE_M = 0.10;
+
+        function computeCanvasForPiece(item) {
+            const w = Number(item && item.width) || 0;
+            const l = Number(item && item.length) || 0;
+            if (!(w > 0) || !(l > 0)) return null;
+            const qty = Number(item.qty) > 0 ? Number(item.qty) : 1;
+            const m2 = CANVAS_MARGIN_PER_SIDE_M * 2;
+            const r4 = (v) => Math.round(v * 10000) / 10000;
+            const option = (dir) => {
+                const across = dir === 'w' ? w : l;
+                const along = dir === 'w' ? l : w;
+                const needAcross = r4(across + m2);
+                const roll = CANVAS_ROLL_WIDTHS_M.find(rw => rw + 1e-9 >= needAcross) || null;
+                const cutLength = r4(along + m2);
+                const areaEach = r4((roll || needAcross) * cutLength);
+                return { dir, across, along, needAcross, roll, fits: !!roll, cutLength, areaEach };
+            };
+            const a = option('w'), b = option('l');
+            let chosen, alt;
+            if (item.canvasDir === 'w') { chosen = a; alt = b; }
+            else if (item.canvasDir === 'l') { chosen = b; alt = a; }
+            else if (a.fits && !b.fits) { chosen = a; alt = b; }
+            else if (!a.fits && b.fits) { chosen = b; alt = a; }
+            else if (!a.fits && !b.fits) { if (b.needAcross < a.needAcross) { chosen = b; alt = a; } else { chosen = a; alt = b; } }
+            else if (b.areaEach < a.areaEach - 1e-9) { chosen = b; alt = a; }
+            else { chosen = a; alt = b; }
+            return Object.assign({}, chosen, {
+                width: w, length: l, qty, manual: item.canvasDir === 'w' || item.canvasDir === 'l',
+                totalLength: r4(chosen.cutLength * qty), totalArea: r4(chosen.areaEach * qty), alt
+            });
+        }
+
+        function computeCanvasForOrder(order) {
+            const items = Array.isArray(order && order.sizeItems) ? order.sizeItems : [];
+            const pieces = [];
+            items.forEach((it, idx) => { const c = computeCanvasForPiece(it); if (c) { c.itemIndex = idx; pieces.push(c); } });
+            const byRoll = {};
+            let total = 0;
+            pieces.forEach(c => {
+                total += c.totalArea;
+                const key = c.roll || 0;
+                if (!byRoll[key]) byRoll[key] = { roll: c.roll, length: 0, area: 0 };
+                byRoll[key].length += c.totalLength;
+                byRoll[key].area += c.totalArea;
+            });
+            const totalSqm = Math.round(total * 100) / 100;
+            return {
+                pieces, byRoll: Object.values(byRoll).sort((x, y) => (x.roll || 99) - (y.roll || 99)), totalSqm,
+                glueKg: computeGlueStandardKg(totalSqm), hasAny: pieces.length > 0, allFit: pieces.every(c => c.fits)
+            };
+        }
+
+        function setSizeItemCanvasDir(orderIndex, itemIndex, value) {
+            const order = productionOrders[orderIndex];
+            if (!order || !Array.isArray(order.sizeItems) || !order.sizeItems[itemIndex]) return;
+            order.sizeItems[itemIndex].canvasDir = (value === 'w' || value === 'l') ? value : '';
+            persistOrderChange(order);
+            rerenderOrderViews(orderIndex);
+        }
+
+        function renderCanvasCardHtml(order, orderIndex) {
+            const c = computeCanvasForOrder(order);
+            const f2 = (v) => (Number(v) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const header = `<div class="flex items-center justify-between flex-wrap gap-1">
+                    <span class="text-xs font-bold text-teal-700"><i class="fa-solid fa-scroll mr-1"></i> คำนวณผ้าใบ + กาวทาหลังพรม</span>
+                    <span class="text-[10px] text-slate-400">หน้าผ้า ${CANVAS_ROLL_WIDTHS_M.join(' / ')} ม. · เผื่อด้านละ ${Math.round(CANVAS_MARGIN_PER_SIDE_M * 100)} ซม. · อัตโนมัติจากรายการขนาด</span>
+                </div>`;
+            if (!c.hasAny) {
+                return `<div id="canvasCalcCard" class="bg-teal-50/50 border border-teal-100 rounded-xl p-3.5 space-y-1.5">${header}<p class="text-[11px] text-slate-400">ใส่ กว้าง × ยาว (ม.) ในรายการขนาดด้านบน ระบบจะคำนวณผ้าใบให้อัตโนมัติ</p></div>`;
+            }
+            const rows = c.pieces.map((p, i) => {
+                const altTxt = p.alt ? `${p.alt.fits ? `แนวสลับ: หน้า ${p.alt.roll} ม. = ${f2(p.alt.areaEach)} ตร.ม./ชิ้น` : `แนวสลับ: ไม่พอดีหน้าผ้า (ต้องการ ${f2(p.alt.needAcross)} ม.)`}` : '';
+                return `<div class="bg-white border ${p.fits ? 'border-teal-100' : 'border-rose-300'} rounded-lg p-2 space-y-1" data-canvas-row="${p.itemIndex}">
+                    <div class="flex items-center gap-2 flex-wrap text-[11px]">
+                        <span class="font-semibold text-slate-700">ชิ้นที่ ${p.itemIndex + 1}: ${p.width} × ${p.length} ม. × ${p.qty} ชิ้น</span>
+                        <select data-canvas-dir onchange="setSizeItemCanvasDir(${orderIndex}, ${p.itemIndex}, this.value)" class="ml-auto p-1 bg-white border ${p.manual ? 'border-amber-300 text-amber-700' : 'border-slate-200'} rounded-md text-[11px]" title="ด้านไหนของพรมขวางหน้าผ้า">
+                            <option value="" ${!p.manual ? 'selected' : ''}>แนววาง: อัตโนมัติ (ใช้ผ้าน้อยสุด)</option>
+                            <option value="w" ${p.manual && p.dir === 'w' ? 'selected' : ''}>ด้านกว้างขวางหน้าผ้า</option>
+                            <option value="l" ${p.manual && p.dir === 'l' ? 'selected' : ''}>ด้านยาวขวางหน้าผ้า</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-[11px] text-slate-600">
+                        ${p.fits ? `<span>ใช้ผ้าหน้า <b class="text-teal-700">${p.roll} ม.</b></span>` : `<span class="text-rose-600 font-semibold">ด้านขวางหน้าผ้า ${f2(p.needAcross)} ม. เกินหน้าผ้า ${CANVAS_ROLL_WIDTHS_M[CANVAS_ROLL_WIDTHS_M.length - 1]} ม. — ต้องต่อผ้า</span>`}
+                        <span>ตัดยาว <b>${f2(p.cutLength)} ม.</b>/ชิ้น (รวม ${f2(p.totalLength)} ม.)</span>
+                        <span class="font-semibold text-slate-800">= ${f2(p.totalArea)} ตร.ม.</span>
+                    </div>
+                    ${altTxt ? `<p class="text-[10px] text-slate-400">${altTxt}</p>` : ''}
+                </div>`;
+            }).join('');
+            const rollSummary = c.byRoll.map(r => r.roll
+                ? `ผ้าหน้า ${r.roll} ม. ยาวรวม ${f2(r.length)} ม. (${f2(r.area)} ตร.ม.)`
+                : `เกินหน้าผ้า ${f2(r.area)} ตร.ม. (ต้องต่อผ้า)`).join(' · ');
+            return `<div id="canvasCalcCard" class="bg-teal-50/50 border border-teal-100 rounded-xl p-3.5 space-y-2">
+                ${header}
+                ${rows}
+                <p class="text-[11px] text-slate-500" data-canvas-roll-summary>${rollSummary}</p>
+                <div class="flex items-center justify-end gap-2 flex-wrap">
+                    <span class="text-xs font-bold text-teal-700 bg-white border border-teal-200 rounded-lg px-3 py-1" data-canvas-total>ผ้าใบรวม ${f2(c.totalSqm)} ตร.ม.</span>
+                    <span class="text-xs font-bold text-indigo-700 bg-white border border-indigo-200 rounded-lg px-3 py-1" data-canvas-glue title="ตร.ม.ผ้าใบ × ${Number(productionSettings.finishing.glueStandardMultiplier) || 2} (ตั้งค่าตัวคูณที่ Production Settings)">กาวทาหลังพรม ${f2(c.glueKg)} กก.</span>
+                </div>
+            </div>`;
+        }
 
         function recomputeOrderSizeTotals(order) {
             if (!Array.isArray(order.sizeItems) || order.sizeItems.length === 0) return;
@@ -18434,7 +18548,11 @@
             const prices = resolveBomPrices(order);
 
             const yarnKg = area * BOM_YARN_KG_PER_SQM * BOM_WASTE_FACTOR;
-            const canvasSqm = area * BOM_WASTE_FACTOR;
+            // CHANGED (2026-10-14): ผ้าใบใช้ตร.ม.จริงจากการคำนวณหน้าผ้า/ความยาว/เผื่อขอบ (computeCanvasForOrder) เมื่อ M/O มีรายการขนาด
+            // ไม่มีรายการขนาด → ใช้สูตรเดิม พื้นที่ × waste factor
+            const canvasCalc = computeCanvasForOrder(order);
+            const canvasFromSizes = canvasCalc.hasAny && canvasCalc.totalSqm > 0;
+            const canvasSqm = canvasFromSizes ? canvasCalc.totalSqm : area * BOM_WASTE_FACTOR;
             const latexKg = area * BOM_LATEX_KG_PER_SQM * BOM_WASTE_FACTOR;
             const backingSqm = area * BOM_WASTE_FACTOR;
             const laborSqm = area; // labor billed on net area — no waste factor, per the source sheet
@@ -18450,6 +18568,7 @@
             return {
                 area, spec, prices,
                 yarnSkuCode: bom.yarnSkuCode || '',
+                canvasFromSizes,
                 quantities: { yarnKg, canvasSqm, latexKg, backingSqm, laborSqm },
                 costs: { yarnCost, canvasCost, latexCost, backingCost, laborCost, materialCost, netTotal }
             };
@@ -18524,7 +18643,7 @@
 
             const qtyRows = [
                 ['ไหมพรม (Yarn)', bom.quantities.yarnKg, 'กก.', bom.costs.yarnCost],
-                ['ผ้าใบ (Canvas)', bom.quantities.canvasSqm, 'ตร.ม.', bom.costs.canvasCost],
+                [bom.canvasFromSizes ? 'ผ้าใบ (Canvas) <span class="text-[9px] text-teal-600 font-semibold">•ตามหน้าผ้าจริง</span>' : 'ผ้าใบ (Canvas)', bom.quantities.canvasSqm, 'ตร.ม.', bom.costs.canvasCost],
                 ['น้ำยางลาเท็กซ์ (Latex)', bom.quantities.latexKg, 'กก.', bom.costs.latexCost],
                 ['ผ้ารองหลัง (Backing)', bom.quantities.backingSqm, 'ตร.ม.', bom.costs.backingCost],
                 ['ค่าแรงช่างทอ (Labor)', bom.quantities.laborSqm, 'ตร.ม.', bom.costs.laborCost]
@@ -19360,7 +19479,7 @@
             totalSqmEl.classList.add('bg-white');
             const detailWarningHtml = renderDeadlineWarningBadge(order);
             document.getElementById('orderDetailStepper').innerHTML = renderStageStepper(getEffectiveStage(order)) + (detailWarningHtml ? `<div class="mt-1.5">${detailWarningHtml}</div>` : '');
-            const orderSizeItemsHtml = renderOrderSizeItemsBlock(order, orderIndex);
+            const orderSizeItemsHtml = renderOrderSizeItemsBlock(order, orderIndex) + renderCanvasCardHtml(order, orderIndex);
             const orderDesignImageHtml = renderDesignImageBlock(order, orderIndex, 'order', null, 'รูปดีไซน์ของ M/O นี้ (ถ้ามี)');
             // MERGED (2026-09-16): renderOrderExtraInfoBlock() now includes what used to be the separate
             // renderProductionRequirementsBlock() card as an inner subsection — see its own comment.
@@ -22139,13 +22258,21 @@
             return `
                 <th class="px-2 py-2 text-left">ว.ด.ป.</th>
                 <th class="px-2 py-2 text-left">M/O</th>
-                <th class="px-2 py-2 text-right">พื้นที่ (ตร.ม.)</th>
+                <th class="px-2 py-2 text-right" title="แถวใหม่เติมจากตร.ม.ผ้าใบของ M/O (แก้ไขได้)">พื้นที่ (ตร.ม.)</th>
                 <th class="px-2 py-2 text-right">เบิกตามมาตรฐาน (Kg.)</th>
                 ${glueTypeThs}
                 <th class="px-2 py-2 text-right">รวมเบิกกาว (Kg.)</th>
                 <th class="px-2 py-2 text-right">% การเบิกกาวจริง</th>
                 <th class="px-2 py-2 text-center">ลบ</th>
             `;
+        }
+
+        // ข้อความใต้เลข M/O ในตารางเบิกกาว: ผ้าใบรวมของ M/O นี้ และกาวมาตรฐานทั้งใบ (ตร.ม.ผ้าใบ × ตัวคูณ)
+        function glueCanvasHintHtml(order) {
+            const c = computeCanvasForOrder(order);
+            if (!c.hasAny || !(c.totalSqm > 0)) return '';
+            const f2 = (v) => (Number(v) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return `<div class="text-[10px] font-normal text-teal-600" data-glue-canvas-hint>ผ้าใบ ${f2(c.totalSqm)} ตร.ม. → กาวมาตรฐาน ${f2(c.glueKg)} กก.</div>`;
         }
 
         function renderGlueUsageTable() {
@@ -22189,9 +22316,9 @@
                 return `
                     <tr class="hover:bg-slate-50/80">
                         <td class="px-2 py-1.5">${dt(orderIndex, itemIndex, 'date', item.date)}</td>
-                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}</td>
+                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}${glueCanvasHintHtml(order)}</td>
                         <td class="px-2 py-1.5">${n(orderIndex, itemIndex, 'areaSqm', item.areaSqm)}</td>
-                        <td class="px-2 py-1.5 text-right font-semibold text-slate-600" title="คำนวณอัตโนมัติ = พื้นที่ x ตัวคูณมาตรฐาน (ตั้งค่าได้ที่ Production Settings)">${standard.toLocaleString('th-TH')}</td>
+                        <td class="px-2 py-1.5 text-right font-semibold text-slate-600" title="คำนวณอัตโนมัติ = พื้นที่ (ตร.ม.ผ้าใบ) x ตัวคูณมาตรฐาน (ตั้งค่าได้ที่ Production Settings)">${standard.toLocaleString('th-TH')}</td>
                         ${glueTypeCellsHtml}
                         <td class="px-2 py-1.5 text-right font-semibold">${totalKg.toFixed(2)}</td>
                         <td class="px-2 py-1.5 text-right ${percentCls}">${percent}</td>
@@ -22216,7 +22343,12 @@
             if (!Array.isArray(order.finishing.glueUsageLog)) order.finishing.glueUsageLog = [];
             // NEW (2026-09-16): standardKg starts at computeGlueStandardKg(0) = 0 and every currently-
             // configured glue type gets its own 0 field — dynamic instead of the old hardcoded 3 keys.
-            const newItem = { date: '', areaSqm: 0, standardKg: 0 };
+            // NEW (2026-10-14): "กาวทาหลังพรม คำนวณอัตโนมัติ เอาตร.ม.ผ้าใบ × 2" — แถวใหม่เริ่มที่ตร.ม.ผ้าใบที่ยังไม่ได้เบิกกาว
+            // (ผ้าใบรวมของ M/O − พื้นที่ในแถวเดิมของ M/O นี้) → เบิกตามมาตรฐาน = พื้นที่ × ตัวคูณ อัตโนมัติ; ไม่มีรายการขนาด = 0 เหมือนเดิม
+            const canvasTotal = computeCanvasForOrder(order).totalSqm;
+            const usedArea = order.finishing.glueUsageLog.reduce((a, r) => a + (Number(r && r.areaSqm) || 0), 0);
+            const startArea = canvasTotal > 0 ? Math.max(0, Math.round((canvasTotal - usedArea) * 100) / 100) : 0;
+            const newItem = { date: '', areaSqm: startArea, standardKg: computeGlueStandardKg(startArea) };
             (productionSettings.finishing.glueTypes || []).forEach(t => { newItem[t.key] = 0; });
             order.finishing.glueUsageLog.push(newItem);
             persistOrderChange(order);
