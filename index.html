@@ -4079,7 +4079,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-78';
+        const APP_BUILD = 'QCDashboard-80';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -7097,8 +7097,10 @@
         // → คำลงท้าย CUT/LOOP ในแผน (เช่น "B38 LOOP", "CC211-22A CUT") กับรูปสั้น -C/-L ในใบ Packing Slip/รายงานย้อม ("B38-L", "CC211-22A-C")
         // ถือเป็นสีเดียวกัน: key เป็นรูปมาตรฐาน "<รหัส>-C" / "<รหัส>-L". CUT กับ LOOP ของรหัสเดียวกัน = คนละรายการ (ยังแยกกัน).
         // ตัวอักษร C/L เดี่ยวต้องมีขีด/เว้นวรรคนำหน้า (เช่น "ARS C041", "TERACOTTA" ไม่ถูกตัด).
+        // NEW (2026-10-15): "5002 (SO 247)" = "5002" — วงเล็บที่เป็นหมายเหตุต่อท้ายชื่อสี (เช่น เลข S/O) ไม่ใช่ส่วนของรหัสสี → ตัดทิ้ง
+        // (ยกเว้น (CUT)/(LOOP)/(C)/(L) ซึ่งยังใช้แยกชนิด)
         function normalizeDyeColorCodeKey(v) {
-            const raw = String(v || '').replace(/[()]/g, ' ').trim().toUpperCase();
+            const raw = String(v || '').replace(/\(([^)]*)\)/g, (m, inner) => /^\s*(CUT|LOOP|C|L)\s*$/i.test(inner) ? ' ' + inner + ' ' : ' ').trim().toUpperCase();
             let m = raw.match(/^(.*?[^\s-])(?:[\s-]+|(?<=\d))(CUT|LOOP)$/);
             if (m) return m[1].replace(/\s+/g, '') + '-' + (m[2] === 'CUT' ? 'C' : 'L');
             m = raw.match(/^(.*?[^\s-])[\s-]+(C|L)$/);
@@ -7167,7 +7169,7 @@
             return Math.max(0, Math.min(1, Number(o) / kg));
         }
         function getDyeingColorStatus(order) {
-            const out = { rows: [], totalRequired: 0, totalInternal: 0, totalExternal: 0, totalOwn: 0, totalBuy: 0, externalColors: 0, internalColors: 0 };
+            const out = { rows: [], totalOver: 0, totalRequired: 0, totalInternal: 0, totalExternal: 0, totalOwn: 0, totalBuy: 0, externalColors: 0, internalColors: 0 };
             try {
                 const dyeing = (order && order.dyeing) || {};
                 const map = new Map();
@@ -7200,7 +7202,10 @@
                     else g.where = (g.externalKg > 0 && g.internalKg === 0) ? 'external' : 'internal';
                     g.doneKg = g.internalKg + g.externalKg;
                     g.pct = g.requiredKg > 0 ? Math.max(0, Math.min(100, Math.round(g.doneKg / g.requiredKg * 100))) : 0;
+                    // NEW (2026-10-15): ย้อมได้/รับมาเกินใบสั่งย้อม กี่ กก. (เฉพาะสีที่อยู่ในใบสั่งย้อมและมียอดต้องย้อม)
+                    g.overKg = (g.inPlan && g.requiredKg > 0) ? Math.max(0, Math.round((g.doneKg - g.requiredKg) * 100) / 100) : 0;
                     out.rows.push(g);
+                    out.totalOver += g.overKg;
                     out.totalRequired += g.requiredKg; out.totalInternal += g.internalKg; out.totalExternal += g.externalKg;
                     out.totalOwn += g.ownKg; out.totalBuy += g.buyKg;
                     if (g.where === 'external' || g.where === 'mixed') out.externalColors++;
@@ -7630,7 +7635,10 @@
                         const kgParts = splitKgByShares(kg, shares, 3);
                         const colorNoSegs = String(colorNo || '').split(/[,，]/).map(x => x.trim());
                         const colorNoPerOrder = colorNoSegs.length === dispList.length && colorNoSegs.every(x => x !== '');
-                        const note = `ย้อมรวม ${dispList.join(' + ')}`;
+                        const planSumKnown = shares.reduce((a, b) => a + b, 0);
+                        const actualForOver = Number(kg) > 0 ? Number(kg) : (Number(requisitionKg) > 0 ? Number(requisitionKg) : 0); // เทียบยอดที่ย้อมจริงกับผลรวมใบสั่งย้อมของทุก M/O (ไม่ใช่ นน.ในใบสั่งของแถวนี้)
+                        const overTotal = (actualForOver > 0 && planSumKnown > 0 && dyeShareWeightsForOrders(keyList, colorCode, refTotal).planned.every(w => w > 0)) ? Math.round((actualForOver - planSumKnown) * 100) / 100 : 0;
+                        const note = `ย้อมรวม ${dispList.join(' + ')}${overTotal > 0.01 ? ` · เกินใบสั่งย้อมรวม ${overTotal.toFixed(2)} กก.` : ''}`;
                         splitRows++;
                         dispList.forEach((disp, n) => {
                             pushRow(disp, keyList[n], {
@@ -7732,13 +7740,19 @@
                 // FIX (2026-10-15): ช่อง MATERIAL มีเครื่องหมายซ้ำ (") และบรรทัดต่อ "(SCM YARN)…" → สืบทอดค่าจากบรรทัดบน ไม่นับเป็นชนิดไหมใหม่
                 // (เดิมทำให้ถุงของสีเดียวกันแตกเป็นหลายกลุ่ม แล้วน้ำหนักแบ่งไม่ตรงแผน)
                 let lastMaterialRaw = '';
+                // NEW (2026-10-15): ช่อง COLOR / REMARK ที่เป็นเครื่องหมายซ้ำ (") = เหมือนบรรทัดบน — สืบทอดค่า (เดิมถูกนับเป็น "สี \"" แยกต่างหาก)
+                const isDittoCell = (v) => /^[\"“”″〃＂'`]+$/.test(String(v === null || v === undefined ? '' : v).trim());
+                let lastColor = '', lastRemark = '';
                 for (let i = headerIdx + 1; i < aoa.length; i++) {
                     const row = aoa[i] || [];
-                    const colorRaw = row[col.color];
+                    let colorRaw = row[col.color];
+                    if (isDittoCell(colorRaw)) colorRaw = lastColor;
+                    else if (colorRaw !== null && colorRaw !== undefined && String(colorRaw).trim() !== '') lastColor = String(colorRaw).trim();
                     const color = (colorRaw === null || colorRaw === undefined) ? '' : String(colorRaw).trim();
                     const nett = Number(row[col.nett]);
                     if (!color || color.toUpperCase() === 'COLOR' || !isFinite(nett) || nett <= 0) continue; // หัวตารางซ้ำข้ามหน้า / แถวรวม
-                    const remark = col.remark !== -1 ? String(row[col.remark] || '').trim() : '';
+                    let remark = col.remark !== -1 ? String(row[col.remark] || '').trim() : '';
+                    if (isDittoCell(remark)) remark = lastRemark; else if (remark) lastRemark = remark;
                     if (col.material !== -1) {
                         const mr = String(row[col.material] === null || row[col.material] === undefined ? '' : row[col.material]).trim();
                         if (mr && mr !== '"' && !mr.startsWith('(') && !/^[“”″'`]+$/.test(mr)) lastMaterialRaw = mr;
@@ -7830,13 +7844,13 @@
                 const { alloc, planned } = siamDefaultAllocation(g);
                 const shared = g.orders.length > 1;
                 const inputs = g.orders.map((o, n) => `<label class="flex items-center gap-1 text-[11px] text-slate-600">${escapeHtml(o.disp)}
-                    <input type="number" step="0.01" min="0" value="${alloc[n]}" data-sdm-alloc="${g.id}|${escapeHtml(o.key)}" oninput="siamRecalcGroup('${g.id}', ${g.nett})" class="w-20 px-1.5 py-0.5 border border-slate-300 rounded text-right text-xs">
-                    <span class="text-slate-400">กก.${planned[n] > 0 ? ` (แผน ${planned[n].toFixed(2)})` : ''}</span></label>`).join('');
+                    <input type="number" step="0.01" min="0" value="${alloc[n]}" data-sdm-alloc="${g.id}|${escapeHtml(o.key)}" data-sdm-plan="${planned[n] > 0 ? planned[n] : ''}" data-sdm-got="${siamExistingKgOtherSlips(o.key, g.colorCode, g.slipNo)}" oninput="siamRecalcGroup('${g.id}', ${g.nett})" class="w-20 px-1.5 py-0.5 border border-slate-300 rounded text-right text-xs">
+                    <span class="text-slate-400">กก.${planned[n] > 0 ? ` (ใบสั่งย้อม ${planned[n].toFixed(2)})` : ''}</span><span class="text-rose-600 font-semibold" data-sdm-over="${g.id}|${escapeHtml(o.key)}"></span></label>`).join('');
                 return `<div class="text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 space-y-1">
                     <div class="flex items-center justify-between gap-2 flex-wrap"><div><span class="font-semibold text-slate-700">${escapeHtml(g.colorCode)}</span>
                         <span class="text-slate-400 ml-1">${escapeHtml(g.material)} · ${g.packs} ถุง · NETT ${g.nett.toFixed(2)} กก.${shared ? ' · ย้อมรวมหลาย M/O' : ''}</span></div>
-                        <span id="sdmWarn-${g.id}" class="text-[11px] text-rose-600"></span></div>
-                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1">${shared ? inputs : `<span class="text-[11px] text-slate-600">${escapeHtml(g.orders[0].disp)} → ${alloc[0].toFixed(2)} กก.</span><input type="hidden" value="${alloc[0]}" data-sdm-alloc="${g.id}|${escapeHtml(g.orders[0].key)}">`}</div>
+                        <span class="text-[11px] text-rose-600 font-semibold" id="sdmOver-${g.id}"></span><span id="sdmWarn-${g.id}" class="text-[11px] text-rose-600"></span></div>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1">${shared ? inputs : `<span class="text-[11px] text-slate-600">${escapeHtml(g.orders[0].disp)} → ${alloc[0].toFixed(2)} กก.${planned[0] > 0 ? ` (ใบสั่งย้อม ${planned[0].toFixed(2)})` : ''}</span><input type="hidden" value="${alloc[0]}" data-sdm-alloc="${g.id}|${escapeHtml(g.orders[0].key)}" data-sdm-plan="${planned[0] > 0 ? planned[0] : ''}" data-sdm-got="${siamExistingKgOtherSlips(g.orders[0].key, g.colorCode, g.slipNo)}">`}</div>
                 </div>`;
             }).join('');
             const unparsedHtml = parsed.unparsed.length ? `<div class="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>ข้าม ${parsed.unparsed.length} ถุงที่อ่านเลข M/O จากช่อง REMARK ไม่ได้ (${parsed.unparsed.slice(0, 5).map(u => escapeHtml(u.color) + ' "' + escapeHtml(u.remark) + '"').join(', ')}${parsed.unparsed.length > 5 ? '…' : ''})</div>` : '';
@@ -7853,6 +7867,32 @@
             const sum = Math.round(inputs.reduce((s, el) => s + (Number(el.value) || 0), 0) * 100) / 100;
             const warn = document.getElementById('sdmWarn-' + gid);
             if (warn) warn.textContent = Math.abs(sum - nett) > 0.01 ? `รวม ${sum.toFixed(2)} ≠ NETT ${Number(nett).toFixed(2)} กก.` : '';
+            // NEW (2026-10-15): แจ้งยอดที่เกินใบสั่งย้อม (เทียบทีละ M/O กับใบสั่งย้อมของ M/O นั้น รวมที่รับมาจากใบอื่นแล้ว) + ยอดรวมเกินของสีนี้
+            let totalOver = 0, anyPlan = false;
+            inputs.forEach(el => {
+                const plan = Number(el.getAttribute('data-sdm-plan')) || 0;
+                const key = el.getAttribute('data-sdm-alloc');
+                const tag = [...document.querySelectorAll('[data-sdm-over]')].find(x => x.getAttribute('data-sdm-over') === key);
+                let over = 0;
+                if (plan > 0) { anyPlan = true; over = Math.round(((Number(el.value) || 0) + (Number(el.getAttribute('data-sdm-got')) || 0) - plan) * 100) / 100; }
+                if (over > 0.01) totalOver += over;
+                if (tag) tag.textContent = over > 0.01 ? `เกิน ${over.toFixed(2)} กก.` : '';
+            });
+            const ov = document.getElementById('sdmOver-' + gid);
+            if (ov) ov.textContent = (anyPlan && totalOver > 0.01) ? `เกินใบสั่งย้อมรวม ${totalOver.toFixed(2)} กก.` : '';
+        }
+        // กก. ที่ M/O นี้รับของสีนี้แล้วจากใบอื่น (ไม่นับใบเดียวกับที่กำลังนำเข้า เพราะนำเข้าซ้ำจะทับของเดิม)
+        function siamExistingKgOtherSlips(orderKey, colorCode, slipNo) {
+            const ord = productionOrders.find(p => normalizeDyeingMoSoMatchKey(p.moSo) === orderKey);
+            if (!ord) return 0;
+            const ck = normalizeDyeColorCodeKey(colorCode);
+            let sum = 0;
+            (((ord.dyeing || {}).dyeOrderLog) || []).forEach(r => {
+                if (!r || typeof r !== 'object' || normalizeDyeColorCodeKey(r.colorCode) !== ck) return;
+                if (String(r.slipNo || '') === String(slipNo || '') && r.slipNo) return;
+                sum += Number(r.actualTransferKg) || 0;
+            });
+            return Math.round(sum * 100) / 100;
         }
 
         // แปลงใบ packing slip ที่ผู้ใช้ตรวจ/แก้น้ำหนักแล้ว → โครง byMoSo ของ confirmDyeingImport()
@@ -8037,6 +8077,15 @@
                 if (!order.dyeing) order.dyeing = {};
                 if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
                 const log = order.dyeing.dyeOrderLog;
+                // FIX (2026-10-15): แถวไหมจ้างย้อมที่เคยนำเข้าผิดเป็น code สี '"' (เครื่องหมายซ้ำของใบ Packing Slip) → ลบทิ้งเมื่อนำเข้าใบเดิมใหม่
+                // (ตอนนี้สืบทอดสีจากบรรทัดบน และรวมเข้ากับสีเดียวกัน)
+                const importSlips = new Set(group.rows.filter(r => r.ext && r.ext.slipNo).map(r => String(r.ext.slipNo)));
+                if (importSlips.size > 0) {
+                    for (let li = log.length - 1; li >= 0; li--) {
+                        const lr = log[li];
+                        if (lr && importSlips.has(String(lr.slipNo || '')) && /^[\"“”″〃＂'`]+$/.test(String(lr.colorCode || '').trim())) log.splice(li, 1);
+                    }
+                }
                 const usedThisRound = new Set();
                 const detail = { moSo: order.moSo, regular: 0, extra: 0, stage: '', offSystem: createdOffSystem.includes(order.moSo) };
 
@@ -16727,7 +16776,7 @@
                     <div class="mt-1 border border-violet-100 rounded-lg overflow-hidden bg-white/70" data-dye-color-status>
                         <p class="px-2 py-1 text-[10px] font-bold text-violet-700 bg-violet-50/70">สถานะย้อมต่อสี (ย้อมใน / ย้อมนอก รวมกันเทียบกับที่ต้องย้อม)</p>
                         <table class="w-full text-[10px]"><thead class="text-slate-400"><tr><th class="px-2 py-0.5 text-left">สี</th><th class="px-2 py-0.5 text-left">ที่</th><th class="px-2 py-0.5 text-right">ต้องย้อม</th><th class="px-2 py-0.5 text-right">ย้อมใน</th><th class="px-2 py-0.5 text-right">ย้อมนอก</th><th class="px-2 py-0.5 text-right">%</th></tr></thead>
-                        <tbody>${st.map(g => `<tr class="border-t border-slate-50" data-dye-status-row="${escapeHtml(g.key)}"><td class="px-2 py-0.5 font-semibold text-slate-700">${escapeHtml(g.code)}</td><td class="px-2 py-0.5"><span class="px-1.5 rounded ${WH[g.where][1]}">${WH[g.where][0]}</span>${g.buyKg > 0.005 ? ` <span class="text-orange-700">ซื้อไหม ${fk(g.buyKg)}</span>` : ''}</td><td class="px-2 py-0.5 text-right tabular-nums">${fk(g.requiredKg)}</td><td class="px-2 py-0.5 text-right tabular-nums">${fk(g.internalKg)}</td><td class="px-2 py-0.5 text-right tabular-nums">${fk(g.externalKg)}</td><td class="px-2 py-0.5 text-right tabular-nums font-bold ${g.pct >= 100 ? 'text-emerald-700' : 'text-slate-700'}">${g.pct}%</td></tr>`).join('')}</tbody></table>
+                        <tbody>${st.map(g => `<tr class="border-t border-slate-50" data-dye-status-row="${escapeHtml(g.key)}"><td class="px-2 py-0.5 font-semibold text-slate-700">${escapeHtml(g.code)}</td><td class="px-2 py-0.5"><span class="px-1.5 rounded ${WH[g.where][1]}">${WH[g.where][0]}</span>${g.buyKg > 0.005 ? ` <span class="text-orange-700">ซื้อไหม ${fk(g.buyKg)}</span>` : ''}</td><td class="px-2 py-0.5 text-right tabular-nums">${fk(g.requiredKg)}</td><td class="px-2 py-0.5 text-right tabular-nums">${fk(g.internalKg)}</td><td class="px-2 py-0.5 text-right tabular-nums">${fk(g.externalKg)}</td><td class="px-2 py-0.5 text-right tabular-nums font-bold ${g.pct >= 100 ? 'text-emerald-700' : 'text-slate-700'}">${g.pct}%${g.overKg > 0.005 ? ` <span class="text-rose-600 font-semibold" data-dye-over>เกิน ${fk(g.overKg)} กก.</span>` : ''}</td></tr>`).join('')}</tbody></table>
                     </div>`;
             }
             return `
@@ -21643,8 +21692,7 @@
         const DYEING_ORDER_THEAD_HTML = `
             <th class="px-2 py-2 text-left">วันที่รับ order สั่งย้อม</th>
             <th class="px-2 py-2 text-left">M/O</th>
-            <th class="px-2 py-2 text-right">เบอร์สี</th>
-            <th class="px-2 py-2 text-left">code สี</th>
+            <th class="px-2 py-2 text-left">code สี</th><!-- 2026-10-15: ตัดคอลัมน์ "เบอร์สี" ออก — เบอร์สีกับ code สีคือตัวเดียวกัน -->
             <th class="px-2 py-2 text-left">ชนิดไหม</th>
             <th class="px-2 py-2 text-left">LOT ไหม</th>
             <!-- NEW (2026-09-16): Hang + Remark — matching the "Hang"/"Remark" columns of the attached
@@ -21672,15 +21720,14 @@
 
         // NEW (2026-10-14): "ในรายการไหมจ้างย้อม ช่วยปรับตารางให้ตรง" — แท็บ "ไหมจ้างย้อม" ใช้ชุดคอลัมน์เฉพาะงานจ้างภายนอก
         // (ตัด Hang / ตู้ย้อม / นน.โอนจากใบเบิก / ส่วนต่างติดลบ ซึ่งเป็นของย้อมในบริษัทออก):
-        // วันที่ · M/O · ผู้รับจ้าง · เลขที่ใบส่งไหม · เบอร์สี · code สี · ชนิดไหม · LOT · นน.สั่งย้อม (ใบสั่งแผนกวางแผน, หักไหม Surplus) ·
+        // วันที่ · M/O · ผู้รับจ้าง · เลขที่ใบส่งไหม · code สี · ชนิดไหม · LOT · นน.สั่งย้อม (ใบสั่งแผนกวางแผน, หักไหม Surplus) ·
         // ไหมของเรา · ซื้อจากผู้รับจ้าง · นน.รับกลับ · คงเหลือตามใบสั่ง · วันที่รับกลับจริง · กำหนดส่ง · หมายเหตุ
         const DYEING_EXTERNAL_THEAD_HTML = `
             <th class="px-2 py-2 text-left">วันที่ใบส่งไหม</th>
             <th class="px-2 py-2 text-left">M/O</th>
             <th class="px-2 py-2 text-left">ผู้รับจ้างย้อม</th>
             <th class="px-2 py-2 text-left">เลขที่ใบส่งไหม</th>
-            <th class="px-2 py-2 text-right">เบอร์สี</th>
-            <th class="px-2 py-2 text-left">code สี</th>
+            <th class="px-2 py-2 text-left">code สี</th><!-- 2026-10-15: ตัดคอลัมน์ "เบอร์สี" ออก — เบอร์สีกับ code สีคือตัวเดียวกัน -->
             <th class="px-2 py-2 text-left">ชนิดไหม</th>
             <th class="px-2 py-2 text-left">LOT ไหม</th>
             <th class="px-2 py-2 whitespace-nowrap text-right" title="ดึงจากใบสั่งย้อมของแผนกวางแผน (หักไหม Surplus แล้ว)">นน.สั่งย้อม (Kg.)</th>
@@ -21762,7 +21809,6 @@
                         <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}${isDyeOffSystemOrder(order) ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-300 text-[10px] font-semibold align-middle">นอกระบบ</span>' : ''}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'vendor', item.vendor, 'w-28')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'slipNo', item.slipNo, 'w-20')}</td>
-                        <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'colorNo', item.colorNo, 'w-10')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'colorCode', item.colorCode, 'w-20')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'yarnType', item.yarnType, 'w-20')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'lotNo', item.lotNo, 'w-16')}</td>
@@ -21787,7 +21833,6 @@
                     <tr class="hover:bg-slate-50/80">
                         <td class="px-2 py-1.5">${dt(orderIndex, itemIndex, 'orderDate', item.orderDate)}</td>
                         <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}${isDyeOffSystemOrder(order) ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-300 text-[10px] font-semibold align-middle" title="สร้างจากรายงานย้อม — ยังไม่ได้เปิด M/O, S/O นี้ในระบบ"><i class="fa-solid fa-keyboard mr-1"></i>นอกระบบ</span>' : ''}${order.currentStage === 'dyeing' ? `<div class="mt-0.5 font-normal">${renderQcBadge(order.moSo, 'dyeing')}</div>` : ''}</td>
-                        <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'colorNo', item.colorNo, 'w-10')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'colorCode', item.colorCode, 'w-16')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'yarnType', item.yarnType, 'w-20')}</td>
                         <td class="px-2 py-1.5">${t(orderIndex, itemIndex, 'lotNo', item.lotNo, 'w-16')}</td>
@@ -21888,7 +21933,7 @@
                     if (!r.inPlan) r.status = 'extra';
                     else if (r.gotKg <= 0.005) r.status = 'none';
                     else if (r.gotKg < r.requiredKg - 0.01) r.status = 'partial';
-                    else if (r.gotKg > r.requiredKg + 0.01 && r.requiredKg > 0) r.status = 'over';
+                    else if (r.gotKg > r.requiredKg + 0.01 && r.requiredKg > 0) { r.status = 'over'; r.overKg = Math.round((r.gotKg - r.requiredKg) * 100) / 100; }
                     else r.status = 'done';
                 });
                 groups.push({ order, orderIndex, isExtMode, rows });
@@ -21923,13 +21968,14 @@
                 const o = g.order;
                 const tPlan = g.rows.reduce((s, r) => s + r.requiredKg, 0), tGot = g.rows.reduce((s, r) => s + r.gotKg, 0);
                 const tRemain = g.rows.reduce((s, r) => s + r.remainKg, 0);
+                const tOver = g.rows.reduce((s, r) => s + (r.overKg || 0), 0);
                 const noPlan = !g.rows.some(r => r.inPlan);
                 const head = `<div class="px-3 py-2 bg-sky-50/60 border-t border-sky-100 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-ext-plan-order="${escapeHtml(o.moSo)}">
                     <span class="font-bold ${moSoTextColorClass(o)}">${escapeHtml(o.moSo)}</span>
                     ${g.isExtMode ? '<span class="px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-800 border border-sky-200 text-[10px] font-semibold">ตั้งเป็นไหมสั่งย้อมนอกบริษัท</span>' : ''}
                     ${o.customerName ? `<span class="text-slate-500">${escapeHtml(o.customerName)}</span>` : ''}
                     ${o.dueDate ? `<span class="text-slate-400">กำหนดส่ง ${escapeHtml(String(o.dueDate))}</span>` : ''}
-                    <span class="ml-auto text-slate-600">ตามใบสั่ง <b>${f(tPlan)}</b> · รับแล้ว <b>${f(tGot)}</b> · คงเหลือ <b class="${tRemain > 0.01 ? 'text-amber-700' : 'text-emerald-700'}">${f(tRemain)}</b> กก.</span>
+                    <span class="ml-auto text-slate-600">ตามใบสั่ง <b>${f(tPlan)}</b> · รับแล้ว <b>${f(tGot)}</b> · คงเหลือ <b class="${tRemain > 0.01 ? 'text-amber-700' : 'text-emerald-700'}">${f(tRemain)}</b> กก.${tOver > 0.01 ? ` · <b class="text-rose-600" data-ext-plan-over>เกินใบสั่ง ${f(tOver)} กก.</b>` : ''}</span>
                 </div>`;
                 const rows = g.rows.length === 0
                     ? `<tr><td colspan="9" class="px-3 py-2 text-xs text-slate-400">แผนกวางแผนยังไม่ได้ลงใบสั่งย้อม (code สี/น้ำหนัก) ของ M/O นี้</td></tr>`
@@ -21947,7 +21993,7 @@
                             <td class="px-3 py-1.5 text-right tabular-nums font-medium text-sky-700">${f(r.gotKg)}</td>
                             <td class="px-3 py-1.5 text-right tabular-nums ${r.remainKg > 0.01 ? 'text-amber-700 font-medium' : 'text-slate-400'}">${r.inPlan ? f(r.remainKg) : '-'}</td>
                             <td class="px-3 py-1.5 text-[11px] whitespace-nowrap" data-ext-yarn-src>${r.inPlan && (r.ownKg > 0.005 || r.buyKg > 0.005) ? `<span class="text-slate-600">เรา <b>${f(r.ownKg)}</b></span>${r.buyKg > 0.005 ? ` · <span class="text-orange-700">ซื้อจากโรงย้อม <b>${f(r.buyKg)}</b></span>` : ''}` : '<span class="text-slate-300">-</span>'}</td>
-                            <td class="px-3 py-1.5"><span class="inline-flex px-2 py-0.5 rounded-full border text-[10px] font-semibold ${st[1]}">${st[0]}</span></td>
+                            <td class="px-3 py-1.5 whitespace-nowrap"><span class="inline-flex px-2 py-0.5 rounded-full border text-[10px] font-semibold ${st[1]}">${st[0]}${r.overKg > 0.005 ? ' ' + f(r.overKg) + ' กก.' : ''}</span></td>
                             <td class="px-3 py-1.5 text-[11px] text-slate-500">${escapeHtml(vend) || '<span class="text-slate-300">-</span>'}</td>
                             <td class="px-3 py-1.5 text-right">${addBtn}</td>
                         </tr>`;
@@ -24112,7 +24158,6 @@
             { key: 'moSo', label: 'M/O' },
             { key: 'isExtra', label: 'ย้อมเพิ่ม (TRUE/FALSE)', type: 'bool' },
             { key: 'orderDate', label: 'วันที่รับ order สั่งย้อม', type: 'date' },
-            { key: 'colorNo', label: 'เบอร์สี' },
             { key: 'colorCode', label: 'code สี' },
             { key: 'yarnType', label: 'ชนิดไหม' },
             { key: 'lotNo', label: 'LOT ไหม' },
