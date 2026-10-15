@@ -4079,7 +4079,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-76';
+        const APP_BUILD = 'QCDashboard-78';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -7092,8 +7092,18 @@
         // Normalizes a colour-code string for matching between Planning's plan (order.dyeing.
         // colorOrders) and Dyeing's execution log (order.dyeing.dyeOrderLog) — same
         // trim/uppercase/strip-whitespace approach as normalizeMoSoKey(), just for color codes instead.
+        //
+        // NEW (2026-10-15): "CC211-22A-C = CC211-22A CUT, B38 LOOP = B38-L — ถ้าลงท้าย C หรือ L คือ CUT หรือ LOOP เป็น code สีเดียวกัน"
+        // → คำลงท้าย CUT/LOOP ในแผน (เช่น "B38 LOOP", "CC211-22A CUT") กับรูปสั้น -C/-L ในใบ Packing Slip/รายงานย้อม ("B38-L", "CC211-22A-C")
+        // ถือเป็นสีเดียวกัน: key เป็นรูปมาตรฐาน "<รหัส>-C" / "<รหัส>-L". CUT กับ LOOP ของรหัสเดียวกัน = คนละรายการ (ยังแยกกัน).
+        // ตัวอักษร C/L เดี่ยวต้องมีขีด/เว้นวรรคนำหน้า (เช่น "ARS C041", "TERACOTTA" ไม่ถูกตัด).
         function normalizeDyeColorCodeKey(v) {
-            return String(v || '').trim().toUpperCase().replace(/\s+/g, '');
+            const raw = String(v || '').replace(/[()]/g, ' ').trim().toUpperCase();
+            let m = raw.match(/^(.*?[^\s-])(?:[\s-]+|(?<=\d))(CUT|LOOP)$/);
+            if (m) return m[1].replace(/\s+/g, '') + '-' + (m[2] === 'CUT' ? 'C' : 'L');
+            m = raw.match(/^(.*?[^\s-])[\s-]+(C|L)$/);
+            if (m) return m[1].replace(/\s+/g, '') + '-' + m[2];
+            return raw.replace(/\s+/g, '');
         }
 
         // Planning's per-color dye-order plan, reduced to "how many kg does Dyeing still need to
@@ -7674,12 +7684,16 @@
             s = s.replace(/(^|[^A-Za-z])(M\/O|S\/O|MO|SO)(?![A-Za-z])\s*:?/gi, '$1 ');
             const out = [];
             const seen = new Set();
-            for (const m of s.matchAll(/([A-Za-z]{0,3})\s*(\d{1,6})\s*\/\s*(\d{2})(?!\d)/g)) {
-                const disp = `${(m[1] || '').toUpperCase()}${m[2]}/${m[3]}`;
-                const key = normalizeDyeingMoSoMatchKey(disp);
-                if (!key || seen.has(key)) continue;
-                seen.add(key);
-                out.push({ key, disp });
+            // FIX (2026-10-15): "MO 160+161+162+163/26" / "MO 132+133+180/26" / "M/O TH171+172/26" — หลายเลขใช้ปี/คำนำหน้าร่วมกัน
+            // (เดิมอ่านได้แค่เลขสุดท้าย → M/O ที่เหลือหายไป)
+            for (const m of s.matchAll(/([A-Za-z]{0,3})\s*(\d{1,6}(?:\s*\+\s*\d{1,6})*)\s*\/\s*(\d{2})(?!\d)/g)) {
+                m[2].split('+').forEach(num => {
+                    const disp = `${(m[1] || '').toUpperCase()}${String(num).trim()}/${m[3]}`;
+                    const key = normalizeDyeingMoSoMatchKey(disp);
+                    if (!key || seen.has(key)) return;
+                    seen.add(key);
+                    out.push({ key, disp });
+                });
             }
             return { orders: out, typeHint: isSO ? 'SO' : 'MO' };
         }
@@ -7715,6 +7729,9 @@
                 const head = (aoa[headerIdx] || []).map(c => String(c === null || c === undefined ? '' : c).trim().toUpperCase());
                 const col = { material: head.indexOf('MATERIAL'), color: head.indexOf('COLOR'), nett: head.indexOf('NETT'), remark: head.indexOf('REMARK'), pack: head.indexOf('PACK') };
                 const slip = { sheetName, slipNo: slipNo || sheetName, dateKey, packs: 0, totalNett: 0, grandTotal };
+                // FIX (2026-10-15): ช่อง MATERIAL มีเครื่องหมายซ้ำ (") และบรรทัดต่อ "(SCM YARN)…" → สืบทอดค่าจากบรรทัดบน ไม่นับเป็นชนิดไหมใหม่
+                // (เดิมทำให้ถุงของสีเดียวกันแตกเป็นหลายกลุ่ม แล้วน้ำหนักแบ่งไม่ตรงแผน)
+                let lastMaterialRaw = '';
                 for (let i = headerIdx + 1; i < aoa.length; i++) {
                     const row = aoa[i] || [];
                     const colorRaw = row[col.color];
@@ -7722,7 +7739,11 @@
                     const nett = Number(row[col.nett]);
                     if (!color || color.toUpperCase() === 'COLOR' || !isFinite(nett) || nett <= 0) continue; // หัวตารางซ้ำข้ามหน้า / แถวรวม
                     const remark = col.remark !== -1 ? String(row[col.remark] || '').trim() : '';
-                    const material = col.material !== -1 ? siamMaterialLabel(row[col.material]) : '';
+                    if (col.material !== -1) {
+                        const mr = String(row[col.material] === null || row[col.material] === undefined ? '' : row[col.material]).trim();
+                        if (mr && mr !== '"' && !mr.startsWith('(') && !/^[“”″'`]+$/.test(mr)) lastMaterialRaw = mr;
+                    }
+                    const material = col.material !== -1 ? siamMaterialLabel(lastMaterialRaw) : '';
                     slip.packs++; slip.totalNett += nett;
                     const parsed = parseSiamSlipOrders(remark);
                     if (parsed.orders.length === 0) { unparsed.push({ slipNo: slip.slipNo, color, nett, remark }); continue; }
@@ -7845,8 +7866,11 @@
                     if (!(kg > 0)) return;
                     if (!byMoSo[o.key]) byMoSo[o.key] = { moSoDisplay: o.disp, rows: [], typeHint: g.typeHint };
                     const others = g.orders.filter(x => x.key !== o.key).map(x => x.disp).join(', ');
+                    // ใช้ชื่อสีตามใบสั่งย้อมของ M/O นั้น (เช่น "B38 LOOP") เมื่อเป็นสีเดียวกัน (CUT/LOOP = -C/-L) — ไม่เจอในแผนใช้ตามใบ
+                    const ordIdx = productionOrders.findIndex(p => normalizeDyeingMoSoMatchKey(p.moSo) === o.key);
+                    const planRow = ordIdx === -1 ? null : (((productionOrders[ordIdx].dyeing || {}).colorOrders) || []).find(r => r && typeof r === 'object' && normalizeDyeColorCodeKey(r.colorCode) === normalizeDyeColorCodeKey(g.colorCode));
                     byMoSo[o.key].rows.push({
-                        dateKey: g.dateKey, sheetName: g.slipNo, colorNo: '', colorCode: g.colorCode, yarnType: g.material, lotNo: '', hang: '', batchNo: '',
+                        dateKey: g.dateKey, sheetName: g.slipNo, colorNo: '', colorCode: planRow && String(planRow.colorCode || '').trim() ? String(planRow.colorCode).trim() : g.colorCode, yarnType: g.material, lotNo: '', hang: '', batchNo: '',
                         kg, remark: `จ้างย้อม ${SIAM_DYE_VENDOR} · ใบ ${g.slipNo} · ${g.packs} ถุง${shared ? ` · ย้อมรวมกับ ${others} (NETT รวม ${g.nett.toFixed(2)} กก.)` : ''}`,
                         requisitionKg: null, orderKg: null, dyeTubNo: '', ext: { vendor: SIAM_DYE_VENDOR, slipNo: g.slipNo }
                     });
@@ -11979,10 +12003,18 @@
         // Sums every dyeing item's "ย้อมได้/วัน" across M/O, S/O currently AT the dyeing stage — i.e.
         // the dyeing department's current total daily throughput, straight from the per-color capacity
         // numbers already entered on each item (see renderDyeingItemsHtml).
+        // CHANGED (2026-10-15): "ย้อมได้/วัน เอาจำนวนสีว่าได้กี่สี เฉพาะที่ย้อมภายใน" — นับเฉพาะสีที่ย้อมในบริษัท:
+        // ข้าม M/O ที่ตั้งสั่งย้อมนอกบริษัททั้งใบ และสีที่ใบสั่งย้อมระบุ "ย้อมนอก" รายสี (getDyeRowWhere)
+        function isDyeingItemInternal(order, item) {
+            const key = normalizeDyeColorCodeKey(item && item.colorCode);
+            const rows = (((order || {}).dyeing || {}).colorOrders || []).filter(r => r && typeof r === 'object' && key && normalizeDyeColorCodeKey(r.colorCode) === key);
+            if (rows.length > 0) return rows.some(r => getDyeRowWhere(order, r) === 'internal');
+            return (((order || {}).dyeing || {}).mode) !== 'external';
+        }
         function getDyeingColorsPerDayTotal() {
             return productionOrders
                 .filter(o => getEffectiveStage(o) === 'dyeing')
-                .reduce((sum, o) => sum + (o.dyeing.items || []).reduce((s, it) => s + (Number(it.colorsPerDay) || 0), 0), 0);
+                .reduce((sum, o) => sum + (((o.dyeing || {}).items) || []).reduce((s, it) => s + (isDyeingItemInternal(o, it) ? (Number(it.colorsPerDay) || 0) : 0), 0), 0);
         }
 
         // Sums "ทอได้กี่ตร.เมตร/วัน" (weaving.sqmPerDay, entered per M/O next to "ทอได้กี่ตารางเมตรแล้ว")
@@ -12570,7 +12602,7 @@
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-7 gap-2">
                     ${overviewStatTileHtml('fa-ruler-combined', 'text-indigo-500', 'ตร.ม. คงเหลือในไลน์ผลิต (ไม่รวมรอส่ง)', `${s.totalSqmRemainingInLine.toLocaleString('th-TH')} ตร.ม.`)}
-                    ${overviewStatTileHtml('fa-droplet', 'text-violet-500', 'ย้อมได้/วัน (จำนวนสี)', `${s.dyeingColorsPerDay.toLocaleString('th-TH')} สี/วัน`)}
+                    ${overviewStatTileHtml('fa-droplet', 'text-violet-500', 'ย้อมได้/วัน (จำนวนสี · ย้อมภายใน)', `${s.dyeingColorsPerDay.toLocaleString('th-TH')} สี/วัน`)}
                     ${overviewStatTileHtml('fa-hand-holding-heart', 'text-teal-500', 'ทอได้/วัน (ตร.ม.)', `${s.weavingSqmPerDay.toLocaleString('th-TH')} ตร.ม./วัน`)}
                     ${overviewStatTileHtml('fa-box-archive', 'text-fuchsia-500', 'แต่งได้/วัน (จำนวน M/O ที่แต่งเสร็จ)', `
                         <span class="inline-flex items-center gap-1">
@@ -23717,7 +23749,7 @@
             // แถวเปล่าที่ระบบสร้างให้เป็นค่าเริ่มต้น (ไม่มี Code/กก./Surplus) ถูกแทนที่ด้วยรายการจริงจากไฟล์
             order.dyeing.colorOrders = order.dyeing.colorOrders.filter(r => r.colorCode || Number(r.kg) > 0 || r.useSurplus);
             newColorRows.forEach(nr => {
-                const match = order.dyeing.colorOrders.find(r => String(r.colorCode || '').trim().toUpperCase().replace(/\s+/g, ' ') === nr.colorCode.trim().toUpperCase().replace(/\s+/g, ' '));
+                const match = order.dyeing.colorOrders.find(r => normalizeDyeColorCodeKey(r.colorCode) === normalizeDyeColorCodeKey(nr.colorCode)); // CUT/LOOP = -C/-L
                 if (match) match.kg = nr.kg; // คง useSurplus/surplusKg/surplusLedgerId เดิมไว้
                 else order.dyeing.colorOrders.push(nr);
             });
