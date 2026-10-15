@@ -4079,7 +4079,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-80';
+        const APP_BUILD = 'QCDashboard-82';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -5412,7 +5412,7 @@
                     <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">${item.date ? escapeHtml(item.date) : '<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-300 text-[10px] font-semibold" title="Google Sheet ส่งวันที่มาเป็นค่าว่าง — คลิกเพื่อใส่วันที่ (หรืออัปเดตสคริปต์ Apps Script)" data-nodate-badge onclick="editItem(' + originalIndex + ')" style="cursor:pointer">ไม่มีวันที่ · คลิกแก้</span>'}</td>
                     <td class="py-3.5 px-4 font-semibold text-indigo-600 text-xs">${escapeHtml(item.id)}</td>
                     <td class="py-3.5 px-4 font-medium text-xs">${escapeHtml(item.department)}</td>
-                    <td class="py-3.5 px-4 text-xs font-mono text-slate-600">${moSoWarningHtml || `${orderTypeBadgeHtml(getOrderTypeByMoSo(item.moSo))}${marketBadgeHtml(getMarketByMoSo(item.moSo))}${escapeHtml(item.moSo)}${(item.moSo && !isMoSoInSystem(item.moSo)) ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-300 text-[10px] font-semibold align-middle whitespace-nowrap" title="เลขที่นี้ไม่มีใน productionOrders — ตรวจงานนอกระบบ"><i class="fa-solid fa-keyboard mr-1"></i>นอกระบบ</span>' : ''}`}</td>
+                    <td class="py-3.5 px-4 text-xs font-mono text-slate-600">${(() => { const th = designThumbHtml(item.moSo, 'w-10 h-10'); const inner = moSoWarningHtml || `${orderTypeBadgeHtml(getOrderTypeByMoSo(item.moSo))}${marketBadgeHtml(getMarketByMoSo(item.moSo))}${escapeHtml(item.moSo)}${(item.moSo && !isMoSoInSystem(item.moSo)) ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-300 text-[10px] font-semibold align-middle whitespace-nowrap" title="เลขที่นี้ไม่มีใน productionOrders — ตรวจงานนอกระบบ"><i class="fa-solid fa-keyboard mr-1"></i>นอกระบบ</span>' : ''}`; return th ? `<div class="flex items-center gap-2">${th}<div>${inner}</div></div>` : inner; })()}</td>
                     <td class="py-3.5 px-4 text-xs text-slate-600 max-w-xs truncate" title="${escapeHtml(summaryText)}">${escapeHtml(summaryText)}</td>
                     <td class="py-3.5 px-4 text-center"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${badgeClass}">${escapeHtml(item.status)}</span></td>
                     <td class="py-3.5 px-4 text-xs text-slate-600">${escapeHtml(item.inspector)}</td>
@@ -5709,8 +5709,13 @@
                 tr.className = 'hover:bg-slate-50/80 transition border-b border-slate-100';
                 tr.innerHTML = `
                     <td class="py-3.5 px-4">
-                        <p class="font-bold ${orderTypeTextClass(getOrderTypeByMoSo(row.moSo))} text-xs font-mono">${orderTypeBadgeHtml(getOrderTypeByMoSo(row.moSo))}${marketBadgeHtml(getMarketByMoSo(row.moSo))}${escapeHtml(row.moSo)}</p>
-                        ${customerLineHtml}
+                        <div class="flex items-center gap-2.5">
+                            ${designThumbHtml(row.moSo, 'w-12 h-12')}
+                            <div class="min-w-0">
+                                <p class="font-bold ${orderTypeTextClass(getOrderTypeByMoSo(row.moSo))} text-xs font-mono">${orderTypeBadgeHtml(getOrderTypeByMoSo(row.moSo))}${marketBadgeHtml(getMarketByMoSo(row.moSo))}${escapeHtml(row.moSo)}</p>
+                                ${customerLineHtml}
+                            </div>
+                        </div>
                     </td>
                     <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">${escapeHtml(row.date || '-')}</td>
                     <td class="py-3.5 px-4 text-xs text-slate-600 max-w-sm truncate" title="${escapeHtml(detailText)}">${escapeHtml(detailText)}</td>
@@ -7168,6 +7173,20 @@
             if (!(kg > 0) || o === '' || o === null || o === undefined || isNaN(Number(o))) return 1;
             return Math.max(0, Math.min(1, Number(o) / kg));
         }
+        // NEW (2026-10-15): "ไหมที่สั่งย้อมจากภายนอก ตัดอัตโนมัติตามใบส่งของเลย (ไหมที่ซื้อจากโรงย้อม = ไหมภายนอก ไม่ตัดสต๊อก)" —
+        // ไหมของเราที่ส่งไปย้อม (กก.) = นน.ที่รับตามใบส่งของ × สัดส่วนไหมของเราของสีนั้นในใบสั่งย้อม (extOwnKg ÷ kg; ไม่ระบุ/ไม่พบสี = ของเราทั้งหมด)
+        // ค่านี้ใส่ใน "นน.โอนจากใบเบิก" (requisitionKg) ของแถวจ้างย้อม ซึ่งเป็นยอดที่ตัดสต๊อกไหมอยู่แล้ว (renderYarnStockPanel). ส่วนที่เหลือ = ไหมภายนอก
+        function externalOwnYarnKg(order, colorCode, kg) {
+            const key = normalizeDyeColorCodeKey(colorCode);
+            const plan = ((((order || {}).dyeing || {}).colorOrders) || []).find(r => r && typeof r === 'object' && normalizeDyeColorCodeKey(r.colorCode) === key);
+            const share = plan ? getDyeRowOwnShare(plan) : 1;
+            return Math.round((Number(kg) || 0) * share * 1000) / 1000;
+        }
+        function getDyeRowYarnSource(item) {
+            const actual = Number(item && item.actualTransferKg) || 0;
+            const own = Math.min(actual, Number(item && item.requisitionKg) || 0);
+            return { own, external: Math.round(Math.max(0, actual - own) * 1000) / 1000 };
+        }
         function getDyeingColorStatus(order) {
             const out = { rows: [], totalOver: 0, totalRequired: 0, totalInternal: 0, totalExternal: 0, totalOwn: 0, totalBuy: 0, externalColors: 0, internalColors: 0 };
             try {
@@ -8149,8 +8168,10 @@
                     const mergedRemark = remarkParts.join(' · ');
                     const importKey = `${g.colorKey}|${g.isExtra ? 1 : 0}|${g.monthKey}${g.extTag || ''}`;
                     if (g.isExtra) detail.extra++; else detail.regular++;
-                    const hasRequisitionKg = g.requisitionKg !== null;
+                    let hasRequisitionKg = g.requisitionKg !== null;
                     const hasOrderKg = g.orderKg !== null;
+                    // NEW (2026-10-15): แถวไหมจ้างย้อมจากใบส่งของ (ไม่มี นน.โอนจากใบเบิก) → ตัดสต๊อกไหมอัตโนมัติ = นน.ที่รับ × สัดส่วนไหมของเรา (ที่เหลือ = ไหมภายนอก)
+                    const autoReq = (g.ext && !hasRequisitionKg) ? externalOwnYarnKg(order, g.colorCode, g.kg) : null;
 
                     let idx = log.findIndex((row, i) => row && row._importKey === importKey && !usedThisRound.has(i));
                     if (idx === -1 && !g.ext) {
@@ -8167,7 +8188,8 @@
                         row.dyeTubNo = g.dyeTubNo || row.dyeTubNo || '';
                         row.isExtra = g.isExtra;
                         row.actualTransferKg = g.kg;
-                        if (hasRequisitionKg) row.requisitionKg = g.requisitionKg;
+                        if (hasRequisitionKg) { row.requisitionKg = g.requisitionKg; delete row.reqAuto; }
+                        else if (autoReq !== null && (row.reqAuto || !(Number(row.requisitionKg) > 0))) { row.requisitionKg = autoReq; row.reqAuto = true; }
                         if (hasOrderKg) row.orderKg = g.orderKg;
                         if (!row.orderDate) row.orderDate = orderDate;
                         row.actualDate = actualDate;
@@ -8182,7 +8204,8 @@
                             isExtra: g.isExtra, orderDate, colorNo: g.colorNo, colorCode: g.colorCode,
                             yarnType: g.yarnType, lotNo: g.lotNo,
                             orderKg: hasOrderKg ? g.orderKg : 0, dyeTubNo: g.dyeTubNo || '',
-                            requisitionKg: hasRequisitionKg ? g.requisitionKg : 0, actualTransferKg: g.kg,
+                            requisitionKg: hasRequisitionKg ? g.requisitionKg : (autoReq !== null ? autoReq : 0), actualTransferKg: g.kg,
+                            ...(autoReq !== null && !hasRequisitionKg ? { reqAuto: true } : {}),
                             plannedDate: '', actualDate, dueDate: order.dueDate || '',
                             hang: g.hang || '', remark: mergedRemark, _importKey: importKey,
                             ...(g.ext ? { vendor: g.ext.vendor, slipNo: g.ext.slipNo } : {}),
@@ -9093,6 +9116,28 @@
         // Looks up the production order behind a given "M/O, S/O" text key — used so views that only
         // have the moSo string on hand (the QC records table, the shipping list) can still show the
         // same M/O=indigo / S/O=amber color coding as the Overview and Board views.
+        // NEW (2026-10-15): "รูปภาพดีไซน์ ถ้ามี ให้ขึ้นโชว์ที่รายงาน QC และที่รายการรอส่งด้วย" — ภาพย่อรูปดีไซน์ของ M/O, S/O
+        // (order.designImageUrl เดียวกับที่แผนกออกแบบอัปโหลด) ไว้ข้างเลข M/O ในตารางที่มีแต่ข้อความเลข M/O; ไม่มีรูป → ไม่แสดงอะไร. คลิกเพื่อดูภาพใหญ่
+        function designThumbHtml(moSo, sizeCls) {
+            const order = findOrderByMoSo(moSo);
+            const url = order && order.designImageUrl;
+            if (!url) return '';
+            return `<img src="${escapeHtml(url)}" alt="รูปดีไซน์" title="รูปดีไซน์ — คลิกเพื่อดูภาพใหญ่" data-design-thumb loading="lazy" onclick="openDesignImageZoom(this.getAttribute('src'))" class="${sizeCls || 'w-10 h-10'} object-cover rounded-lg border border-slate-200 shrink-0 cursor-zoom-in bg-white">`;
+        }
+        function openDesignImageZoom(url) {
+            if (!url) return;
+            const old = document.getElementById('designImageZoomOverlay');
+            if (old) old.remove();
+            const ov = document.createElement('div');
+            ov.id = 'designImageZoomOverlay';
+            ov.className = 'fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4 cursor-zoom-out';
+            ov.onclick = () => ov.remove();
+            const img = document.createElement('img');
+            img.src = url; img.alt = 'รูปดีไซน์';
+            img.className = 'max-w-full max-h-full rounded-lg shadow-2xl bg-white';
+            ov.appendChild(img);
+            document.body.appendChild(ov);
+        }
         function findOrderByMoSo(moSo) {
             const key = String(moSo || '').trim();
             return productionOrders.find(o => (o.moSo || '').trim() === key) || null;
@@ -12844,11 +12889,18 @@
             let est = null;
             try { est = computeYarnEstimate(); } catch (e) { est = null; }
             if (est) est.rows.forEach(r => { const g = grp(r.key ? r.label : ''); g.need += r.kg; });
+            // NEW (2026-10-15): ไหมภายนอก = ไหมที่ซื้อจากโรงย้อม (นน.รับกลับ − ไหมของเราที่ส่งไป) ในแถวจ้างย้อม — ไม่ตัดสต๊อก
+            let externalBought = 0;
+            (productionOrders || []).forEach(o => {
+                const log = Array.isArray((o.dyeing || {}).dyeOrderLog) ? o.dyeing.dyeOrderLog : [];
+                log.forEach(item => { if (item && isOutsourcedDyeRow(item)) externalBought += getDyeRowYarnSource(item).external; });
+            });
+            externalBought = Math.round(externalBought * 100) / 100;
             const rows = [...map.values()].filter(g => g.received !== 0 || g.used > 0 || g.need > 0);
             rows.forEach(g => { g.balance = g.received - g.used; g.net = g.balance - g.need; g.receipts.sort((a, b) => (b.date || '').localeCompare(a.date || '')); });
             rows.sort((a, b) => (a.key === '') - (b.key === '') || a.net - b.net || a.label.localeCompare(b.label));
             const sum = (k) => rows.reduce((s, g) => s + g[k], 0);
-            return { start, startIsAuto: !getYarnStockStartRaw(), rows, undated, received: sum('received'), used: sum('used'), need: sum('need'), balance: sum('balance'), net: sum('net') };
+            return { start, startIsAuto: !getYarnStockStartRaw(), rows, undated, externalBought, received: sum('received'), used: sum('used'), need: sum('need'), balance: sum('balance'), net: sum('net') };
         }
         function addYarnReceiptFromForm() {
             const date = (document.getElementById('yarnRcvDate') || {}).value || '';
@@ -12989,7 +13041,7 @@
                     ${rowsHtml}
                     <div class="grid grid-cols-12 gap-2 px-3 py-2 border-t border-slate-200 bg-teal-50/50 text-xs font-bold text-slate-800"><span class="col-span-3">รวมทุกชนิด</span><span class="col-span-2 text-right tabular-nums">${f(s.received)}</span><span class="col-span-2 text-right tabular-nums">${f(s.used)}</span><span class="col-span-2 text-right tabular-nums ${cls(s.balance)}" id="yarnStockTotalBalance">${f(s.balance)}</span><span class="col-span-1 text-right tabular-nums">${f(s.need, 0)}</span><span class="col-span-2 text-right tabular-nums ${cls(s.net)}" id="yarnStockTotalNet">${s.net < 0 ? 'ขาด ' + f(-s.net, 0) : f(s.net, 0)}</span></div>
                 </div>`}
-                <p class="text-[10px] text-slate-400">เบิกไปย้อม = ยอด "นน.โอนจากใบเบิก (กก.)" ในบันทึกสั่งย้อม (รวมแถวจ้างย้อมนอก = ไหมของเราที่ส่งไปย้อม · ไหมที่ซื้อจากโรงย้อมไม่ตัดสต๊อก) ${s.start ? `นับตั้งแต่ ${escapeHtml(s.start)}` : ''}${s.undated ? ` · มี ${s.undated} แถวที่ไม่มีวันที่ (นับรวม)` : ''} · คงเหลือสุทธิ = คงเหลือ − ประมาณการไหมที่ยังต้องใช้ (ติดลบ = ต้องสั่งเพิ่ม) · ข้อมูลรับไหมเก็บในเบราว์เซอร์เครื่องนี้ — สำรองด้วย "ส่งออก Excel"</p>`;
+                <p class="text-[10px] text-slate-400">เบิกไปย้อม = ยอด "นน.โอนจากใบเบิก (กก.)" ในบันทึกสั่งย้อม (รวมแถวจ้างย้อมนอก = ไหมของเราที่ส่งไปย้อม · ไหมที่ซื้อจากโรงย้อมไม่ตัดสต๊อก — ระบบตัดให้อัตโนมัติตามใบส่งของที่นำเข้า)${s.externalBought > 0.005 ? ` · <span class="text-orange-700 font-semibold" data-yarn-external-bought>ไหมภายนอก (ซื้อจากโรงย้อม ไม่ตัดสต๊อก) ${s.externalBought.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.</span>` : ''} ${s.start ? `นับตั้งแต่ ${escapeHtml(s.start)}` : ''}${s.undated ? ` · มี ${s.undated} แถวที่ไม่มีวันที่ (นับรวม)` : ''} · คงเหลือสุทธิ = คงเหลือ − ประมาณการไหมที่ยังต้องใช้ (ติดลบ = ต้องสั่งเพิ่ม) · ข้อมูลรับไหมเก็บในเบราว์เซอร์เครื่องนี้ — สำรองด้วย "ส่งออก Excel"</p>`;
         }
 
         function renderProductionOverview() {
@@ -18720,8 +18772,10 @@
                 </div>`;
             }).join('');
 
+            let bomExtYarnKg = 0;
+            try { (((order.dyeing || {}).dyeOrderLog) || []).forEach(it => { if (it && isOutsourcedDyeRow(it)) bomExtYarnKg += getDyeRowYarnSource(it).external; }); } catch (e) { bomExtYarnKg = 0; }
             const qtyRows = [
-                ['ไหมพรม (Yarn)', bom.quantities.yarnKg, 'กก.', bom.costs.yarnCost],
+                [bomExtYarnKg > 0.005 ? `ไหมพรม (Yarn) <span class="text-[9px] text-orange-700 font-semibold" title="ไหมที่ซื้อจากโรงย้อมที่รับกลับมาแล้ว — เป็นไหมภายนอก ไม่ใช่ไหมของเรา">•ไหมภายนอก ${fmtBomNum(bomExtYarnKg, 2)} กก.</span>` : 'ไหมพรม (Yarn)', bom.quantities.yarnKg, 'กก.', bom.costs.yarnCost],
                 [bom.canvasFromSizes ? 'ผ้าใบ (Canvas) <span class="text-[9px] text-teal-600 font-semibold">•ตามหน้าผ้าจริง</span>' : 'ผ้าใบ (Canvas)', bom.quantities.canvasSqm, 'ตร.ม.', bom.costs.canvasCost],
                 ['น้ำยางลาเท็กซ์ (Latex)', bom.quantities.latexKg, 'กก.', bom.costs.latexCost],
                 ['ผ้ารองหลัง (Backing)', bom.quantities.backingSqm, 'ตร.ม.', bom.costs.backingCost],
@@ -21783,6 +21837,12 @@
             const statusOf = (order) => { if (!statusCache.has(order)) statusCache.set(order, getDyeingColorStatus(order)); return statusCache.get(order); };
             const seenColor = new Set();
             const f2n = (v) => (Number(v) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            // NEW (2026-10-15): ใต้ นน.รับกลับ: ไหมของเรา (ตัดสต๊อกอัตโนมัติ) / ไหมภายนอก (ซื้อจากโรงย้อม ไม่ตัดสต๊อก)
+            const yarnSrcCell = (item) => {
+                const ys = getDyeRowYarnSource(item);
+                if (!((Number(item.actualTransferKg) || 0) > 0)) return '';
+                return `<div class="mt-0.5 text-[10px] leading-tight whitespace-nowrap" data-ext-yarn-source>${ys.own > 0.005 ? `<span class="text-slate-500" title="ไหมของเราที่ส่งไปย้อม — ตัดสต๊อกไหมแล้ว">ตัดสต๊อก ${f2n(ys.own)}</span>` : ''}${ys.own > 0.005 && ys.external > 0.005 ? ' · ' : ''}${ys.external > 0.005 ? `<span class="text-orange-700 font-semibold" title="ไหมที่ซื้อจากโรงย้อม — ไม่ตัดสต๊อกไหมของเรา">ไหมภายนอก ${f2n(ys.external)}</span>` : ''}</div>`;
+            };
             const externalRowHtml = ({ order, orderIndex, item, itemIndex }) => {
                 const key = normalizeDyeColorCodeKey(item.colorCode);
                 const st = key ? statusOf(order).rows.find(x => x.key === key) : null;
@@ -21815,7 +21875,7 @@
                         <td class="px-2 py-1.5 text-right">${planCell}</td>
                         <td class="px-2 py-1.5 text-right">${ownCell}</td>
                         <td class="px-2 py-1.5 text-right">${buyCell}</td>
-                        <td class="px-2 py-1.5">${n(orderIndex, itemIndex, 'actualTransferKg', item.actualTransferKg, 'w-16')}</td>
+                        <td class="px-2 py-1.5">${n(orderIndex, itemIndex, 'actualTransferKg', item.actualTransferKg, 'w-16')}${yarnSrcCell(item)}</td>
                         <td class="px-2 py-1.5 text-right whitespace-nowrap">${remainCell}</td>
                         <td class="px-2 py-1.5">${dt(orderIndex, itemIndex, 'actualDate', item.actualDate)}</td>
                         <td class="px-2 py-1.5">${dt(orderIndex, itemIndex, 'dueDate', item.dueDate)}</td>
@@ -22066,6 +22126,15 @@
             const order = productionOrders[orderIndex];
             if (!order || !order.dyeing || !Array.isArray(order.dyeing.dyeOrderLog) || !order.dyeing.dyeOrderLog[itemIndex]) return;
             order.dyeing.dyeOrderLog[itemIndex][field] = value;
+            // NEW (2026-10-15): แถวจ้างย้อมที่กรอก นน.รับกลับเอง → ตัดสต๊อกไหมของเราให้อัตโนมัติ (นน.รับกลับ × สัดส่วนไหมของเรา) ถ้ายังไม่เคยกรอก นน.โอนจากใบเบิกเอง
+            // กรอก นน.โอนจากใบเบิกเอง → ใช้ค่าที่กรอก (เลิกคำนวณอัตโนมัติ)
+            {
+                const it = order.dyeing.dyeOrderLog[itemIndex];
+                if (field === 'requisitionKg') delete it.reqAuto;
+                else if ((field === 'actualTransferKg' || field === 'colorCode') && isOutsourcedDyeRow(it) && (it.reqAuto || !(Number(it.requisitionKg) > 0)) && (Number(it.actualTransferKg) || 0) > 0) {
+                    it.requisitionKg = externalOwnYarnKg(order, it.colorCode, it.actualTransferKg); it.reqAuto = true;
+                }
+            }
             // แถวไหมจ้างย้อมต้องมีผู้รับจ้างหรือเลขที่ใบเสมอ — ถ้าลบทั้งสองช่อง แถวจะกลายเป็นย้อมในบริษัทและหายจากแท็บนี้
             if ((field === 'vendor' || field === 'slipNo') && currentDyeingKpiTab === 'external' && !isOutsourcedDyeRow(order.dyeing.dyeOrderLog[itemIndex])) {
                 order.dyeing.dyeOrderLog[itemIndex].vendor = 'จ้างย้อมภายนอก';
