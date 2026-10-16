@@ -1123,6 +1123,10 @@
                                 <div><label class="block text-xs font-semibold text-slate-600 mb-1">Tuft bind</label><input type="text" id="newOrderTuftBind" placeholder="ระบุข้อกำหนด" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
                                 <div><label class="block text-xs font-semibold text-slate-600 mb-1">Sprouting / Label</label><input type="text" id="newOrderSproutingLabel" placeholder="การเก็บปลายไหม / ป้าย" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
                             </div>
+                            <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                                <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer"><input type="checkbox" id="newOrderAntiSlip" class="w-4 h-4" onchange="updateNewOrderAntiSlipCalc()"> ปะยางกันลื่น (Anti-slip rubber)</label>
+                                <p id="newOrderAntiSlipCalc" class="hidden text-[11px] text-emerald-700 mt-1" data-antislip-calc></p>
+                            </div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">คำสั่งพิเศษถึงฝ่ายผลิต / QC</label><textarea id="newOrderProductionInstruction" rows="2" placeholder="ข้อควรระวัง มาตรฐานรับงาน หรือรายละเอียดพิเศษ" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></textarea></div>
                         </div>
                         <div class="border border-emerald-100 bg-white rounded-xl p-3 space-y-2">
@@ -1828,7 +1832,17 @@
                             <div id="dyeingKpiPeriodSelectWrap"></div>
                         </div>
                         <div id="dyeingKpiPeriodSummary" class="p-3 border-b border-slate-100"></div>
+                        <!-- NEW (2026-10-16): "ในงานบันทึกการสั่งย้อม ให้แยกรายการ ย้อมภายในบริษัท กับ ไหมจ้างย้อม" — แท็บ "บันทึกสั่งย้อม" แสดง 2 ส่วนในหน้าเดียว -->
+                        <div id="dyeingKpiInternalHeading" class="hidden px-4 pt-3 flex flex-wrap items-center gap-2"></div>
                         <div id="dyeingKpiSplitContainer"></div>
+                        <div id="dyeingKpiExternalInline" class="hidden border-t-4 border-sky-100">
+                            <div class="px-4 pt-3 pb-1 flex flex-wrap items-center gap-2">
+                                <h4 class="font-bold text-sky-900 text-sm"><i class="fa-solid fa-truck-fast mr-1.5 text-sky-600"></i> ไหมจ้างย้อม <span class="text-[11px] font-normal text-slate-500">(ผู้รับจ้างย้อมภายนอก — ไม่นับรวมใน KPI ย้อมภายในบริษัท)</span></h4>
+                                <span id="dyeingKpiExternalInlineBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200"></span>
+                                <button type="button" onclick="addDyeOrderLogFromSelect(true)" class="ml-auto shrink-0 bg-sky-600 hover:bg-sky-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5"><i class="fa-solid fa-plus-circle"></i> เพิ่มรายการจ้างย้อม</button>
+                            </div>
+                            <div id="dyeingKpiExternalInlineContainer" class="px-0"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -4081,7 +4095,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-82';
+        const APP_BUILD = 'QCDashboard-85';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6334,6 +6348,7 @@
                 ['ตำแหน่งและรายละเอียดสี', order.colorPlacement],
                 ['แผนไหม/สีสำหรับผลิต', order.yarnPlan],
                 ['งานทากาว (Latexing)', order.latexing],
+                ['ยางกันลื่น', order.antiSlip ? (antiSlipCalcText(order) || 'ปะยางกันลื่น') : ''],
                 ['Tuft bind', order.tuftBind],
                 ['Sprouting / Label', order.sproutingLabel],
                 ['คำสั่งพิเศษถึงฝ่ายผลิต / QC', order.productionInstruction]
@@ -6545,7 +6560,7 @@
                         <tr>
                             <td style="width:38%;">1.วัตถุดิบ/Raw Material<br>&nbsp;&nbsp;Yarn Type: <span class="so-fill">${v(order.yarnType)}</span></td>
                             <td rowspan="2" style="width:24%;">APPROVED BY</td>
-                            <td style="width:38%;">3. Latexing: <span class="so-fill">${v(order.latexing)}</span></td>
+                            <td style="width:38%;">3. Latexing: <span class="so-fill">${v(order.latexing)}</span>${order.antiSlip ? '<br>&nbsp;&nbsp;<b>☑ ปะยางกันลื่น</b>' + (computeAntiSlip(order).rolls > 0 ? ' (' + computeAntiSlip(order).rolls.toFixed(2) + ' ม้วน)' : '') : ''}</td>
                         </tr>
                         <tr>
                             <td>2.ทอ/Tufting<br>&nbsp;&nbsp;Design: <span class="so-fill">${v(order.designRef)}</span><br>&nbsp;&nbsp;Tufting Spec: <span class="so-fill">${v(order.tuftingSpec)}</span><br>&nbsp;&nbsp;Surface: <span class="so-fill">${v(order.surface)}</span><br>&nbsp;&nbsp;Texture: <span class="so-fill">${v(order.texture)}</span><br>&nbsp;&nbsp;Color&amp; Color Placement: <span class="so-fill">${v(order.colorPlacement)}</span></td>
@@ -6842,7 +6857,7 @@
                                     ${qcLine(9, 'Surface: <span class="mo-fill">&nbsp;' + v(surfaceQc) + '</span>')}
                                     ${qcLine(10, 'Texture: <span class="mo-fill">&nbsp;' + v(textureQc) + '</span>')}
                                     ${qcLine(13, 'Color &amp; Color Placement: <span class="mo-fill">&nbsp;' + v(order.colorPlacement) + '</span>')}
-                                    ${qcLine(15, '3. Latexing : <span class="mo-fill">&nbsp;' + v(order.latexing) + '</span>')}
+                                    ${qcLine(15, '3. Latexing : <span class="mo-fill">&nbsp;' + v(order.latexing) + '</span>' + (order.antiSlip ? ' <b>☑ ยางกันลื่น' + (computeAntiSlip(order).rolls > 0 ? ' ' + computeAntiSlip(order).rolls.toFixed(2) + ' ม้วน' : '') + '</b>' : ''))}
                                     ${qcLine(18, '4. ตกแต่ง /Finishing')}
                                     ${qcLine(19, 'Size: <span class="mo-fill">&nbsp;' + v(refSize) + '</span>')}
                                     ${qcLine(21, 'Tuft Bind : <span class="mo-fill">&nbsp;' + v(order.tuftBind) + '</span>')}
@@ -9621,6 +9636,7 @@
                 colorPlacement: raw.colorPlacement || '',
                 yarnPlan: raw.yarnPlan || '',
                 latexing: raw.latexing || '',
+                antiSlip: raw.antiSlip === true || raw.antiSlip === 'true' || raw.antiSlip === 1 || raw.antiSlip === '1',
                 tuftBind: raw.tuftBind || '',
                 sproutingLabel: raw.sproutingLabel || '',
                 productionInstruction: raw.productionInstruction || '',
@@ -16816,6 +16832,7 @@
                                 ${optionsHtml}
                             </select>
                         ` : ''}
+                        ${Array.isArray(row.sharedWith) && row.sharedWith.length ? `<span class="text-[10px] text-violet-600 whitespace-nowrap" data-dye-shared title="ย้อมรวมกับ ${escapeHtml(row.sharedWith.join(', '))} (ยอดของ M/O นี้จากใบสรุปย้อมรวม)">ย้อมรวม +${escapeHtml(row.sharedWith.join(', '))}${Number(row.sharedTotalKg) > 0 ? ` · รวม ${Number(row.sharedTotalKg).toFixed(2)} กก.` : ''}</span>` : ''}
                         <button type="button" onclick="removeDyeingColorOrderRow(${orderIndex}, '${row.id}')" class="text-rose-400 hover:text-rose-600 px-1"><i class="fa-solid fa-trash text-[10px]"></i></button>
                     </div>
                 `;
@@ -17664,6 +17681,7 @@
             });
             // NEW (2026-09-12): "SPECIFICATIONS" checklist — see resetNewOrderSpecState()/submitNewOrder().
             resetNewOrderSpecState();
+            { const as = document.getElementById('newOrderAntiSlip'); if (as) as.checked = false; updateNewOrderAntiSlipCalc(); }
             document.getElementById('newOrderTypeMo').checked = true;
             updateNewOrderTypeStyle();
             // NEW (2026-09c): market has no default (must be explicitly chosen — see submitNewOrder()'s
@@ -18261,6 +18279,7 @@
         function updateNewOrderSizeSummaryOnly() {
             const { totalSqm, totalPieces } = collectNewOrderSizeItems();
             document.getElementById('newOrderSizeSummary').textContent = `${totalSqm.toFixed(2)} ตร.ม. • ${totalPieces} ชิ้น`;
+            updateNewOrderAntiSlipCalc();
         }
 
         // Keeps the M/O, S/O type picker visually in sync (indigo=M/O, amber=S/O), matching the same
@@ -18463,6 +18482,7 @@
                 colorPlacement: colorPlacement,
                 yarnPlan: yarnPlan,
                 latexing: latexing,
+                antiSlip: !!(document.getElementById('newOrderAntiSlip') || {}).checked,
                 tuftBind: tuftBind,
                 sproutingLabel: sproutingLabel,
                 productionInstruction: productionInstruction,
@@ -18674,6 +18694,33 @@
         // Full BOM computation for one order — quantities, resolved unit prices, and costs (corrected
         // totals per the note above). Area comes straight from order.totalSqm (the same total-area field
         // used everywhere else in the app, e.g. the delivery note / Mark & Nos totals).
+        // NEW (2026-10-16): ยางกันลื่น (Anti-slip rubber) — M/O ที่ติ๊ก antiSlip ให้เอาตร.ม.รวมทั้งหมด
+        // (order.totalSqm) มาหารขนาดม้วน: 1 ม้วน = กว้าง 1.2 ม. × ยาว 45.70 ม. = 54.84 ตร.ม.
+        const ANTISLIP_ROLL_WIDTH_M = 1.2;
+        const ANTISLIP_ROLL_LENGTH_M = 45.70;
+        const ANTISLIP_ROLL_SQM = Math.round(ANTISLIP_ROLL_WIDTH_M * ANTISLIP_ROLL_LENGTH_M * 100) / 100; // 54.84
+        function computeAntiSlip(order, areaOverride) {
+            const area = areaOverride !== undefined ? (Number(areaOverride) || 0) : (Number(order && order.totalSqm) || 0);
+            const enabled = !!(order && order.antiSlip);
+            const rolls = enabled && area > 0 ? Math.round((area / ANTISLIP_ROLL_SQM) * 100) / 100 : 0;
+            return { enabled, area, rollSqm: ANTISLIP_ROLL_SQM, rolls, rollsCeil: rolls > 0 ? Math.ceil(rolls - 1e-9) : 0 };
+        }
+        function antiSlipCalcText(order, areaOverride) {
+            const r = computeAntiSlip(order, areaOverride);
+            if (!r.enabled) return '';
+            if (!(r.area > 0)) return 'ยังไม่มีตร.ม.รวม — กรอกขนาด/ตร.ม. เพื่อคำนวณยางกันลื่น';
+            return `ยางกันลื่น: ${r.area.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ตร.ม. ÷ ${r.rollSqm} ตร.ม./ม้วน (1.2 × 45.70 ม.) = ${r.rolls.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ม้วน (ต้องใช้ ${r.rollsCeil} ม้วน)`;
+        }
+        function updateNewOrderAntiSlipCalc() {
+            const cb = document.getElementById('newOrderAntiSlip'), out = document.getElementById('newOrderAntiSlipCalc');
+            if (!cb || !out) return;
+            if (!cb.checked) { out.classList.add('hidden'); out.textContent = ''; return; }
+            let area = 0;
+            try { area = collectNewOrderSizeItems().totalSqm; } catch (e) { area = 0; }
+            out.textContent = antiSlipCalcText({ antiSlip: true }, area);
+            out.classList.remove('hidden');
+        }
+
         function computeBomForOrder(order) {
             const area = Number(order.totalSqm) || 0;
             const bom = (order.planning && order.planning.bom) || { yarnSkuCode: '', prices: {} };
@@ -18776,17 +18823,19 @@
 
             let bomExtYarnKg = 0;
             try { (((order.dyeing || {}).dyeOrderLog) || []).forEach(it => { if (it && isOutsourcedDyeRow(it)) bomExtYarnKg += getDyeRowYarnSource(it).external; }); } catch (e) { bomExtYarnKg = 0; }
+            const antiSlip = computeAntiSlip(order);
             const qtyRows = [
                 [bomExtYarnKg > 0.005 ? `ไหมพรม (Yarn) <span class="text-[9px] text-orange-700 font-semibold" title="ไหมที่ซื้อจากโรงย้อมที่รับกลับมาแล้ว — เป็นไหมภายนอก ไม่ใช่ไหมของเรา">•ไหมภายนอก ${fmtBomNum(bomExtYarnKg, 2)} กก.</span>` : 'ไหมพรม (Yarn)', bom.quantities.yarnKg, 'กก.', bom.costs.yarnCost],
                 [bom.canvasFromSizes ? 'ผ้าใบ (Canvas) <span class="text-[9px] text-teal-600 font-semibold">•ตามหน้าผ้าจริง</span>' : 'ผ้าใบ (Canvas)', bom.quantities.canvasSqm, 'ตร.ม.', bom.costs.canvasCost],
                 ['น้ำยางลาเท็กซ์ (Latex)', bom.quantities.latexKg, 'กก.', bom.costs.latexCost],
                 ['ผ้ารองหลัง (Backing)', bom.quantities.backingSqm, 'ตร.ม.', bom.costs.backingCost],
+                ...(antiSlip.enabled ? [[`ยางกันลื่น (Anti-slip) <span class="text-[9px] text-emerald-700 font-semibold" data-bom-antislip title="${escapeHtml(antiSlipCalcText(order))}">•${fmtBomNum(antiSlip.area, 2)} ÷ ${antiSlip.rollSqm} ตร.ม./ม้วน</span>`, antiSlip.rolls, 'ม้วน', null]] : []),
                 ['ค่าแรงช่างทอ (Labor)', bom.quantities.laborSqm, 'ตร.ม.', bom.costs.laborCost]
             ].map(([label, qty, unit, cost]) => `
                 <tr class="border-b border-slate-100 last:border-0">
                     <td class="py-1 pr-2 text-slate-600">${label}</td>
                     <td class="py-1 pr-2 text-right whitespace-nowrap">${fmtBomNum(qty, 2)} ${unit}</td>
-                    <td class="py-1 text-right font-medium text-slate-700 whitespace-nowrap">${fmtBomNum(cost, 2)} บาท</td>
+                    <td class="py-1 text-right font-medium text-slate-700 whitespace-nowrap">${cost === null ? '<span class="text-slate-400" title="ยังไม่ได้ตั้งราคายางกันลื่น">—</span>' : fmtBomNum(cost, 2) + ' บาท'}</td>
                 </tr>
             `).join('');
 
@@ -19390,6 +19439,10 @@
                             <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Sprouting / Label</label>
                             <input type="text" value="${escapeHtml(order.sproutingLabel || '')}" onchange="${f('sproutingLabel')}" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
                         </div>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2" data-antislip-box>
+                        <label class="flex items-center gap-2 text-[11px] font-semibold text-slate-700 cursor-pointer"><input type="checkbox" data-antislip-check ${order.antiSlip ? 'checked' : ''} onchange="updateOrderField(${orderIndex}, 'antiSlip', this.checked)" class="w-4 h-4"> ปะยางกันลื่น (Anti-slip rubber)</label>
+                        ${order.antiSlip ? `<p class="text-[11px] text-emerald-700 mt-1" data-antislip-calc>${escapeHtml(antiSlipCalcText(order))}</p>` : ''}
                     </div>
                 </div>
             `;
@@ -21817,10 +21870,21 @@
                     if (wantExternal ? isOutsourcedDyeRow(item) : (!isOutsourcedDyeRow(item) && !!item.isExtra === wantExtra)) flatRows.push({ order, orderIndex, item, itemIndex });
                 });
             });
-            flatRows = flatRows.filter(r => reportMonthMatchDate(r.item.orderDate, r.order));
-            flatRows.sort((a, b) => String(b.item.orderDate || '').localeCompare(String(a.item.orderDate || ''))
+            const sortFlat = (arr) => arr.filter(r => reportMonthMatchDate(r.item.orderDate, r.order)).sort((a, b) => String(b.item.orderDate || '').localeCompare(String(a.item.orderDate || ''))
                 || String(a.order.moSo || '').localeCompare(String(b.order.moSo || ''))
                 || String(a.item.colorCode || '').localeCompare(String(b.item.colorCode || '')));
+            flatRows = sortFlat(flatRows);
+            // NEW (2026-10-16): แท็บ "บันทึกสั่งย้อม" แสดงแถวไหมจ้างย้อมเป็นส่วนที่ 2 ในหน้าเดียวกัน (แยกจากย้อมภายในบริษัท)
+            const showInlineExternal = !wantExtra && !wantExternal;
+            let inlineExtRows = [];
+            if (showInlineExternal) {
+                const tmp = [];
+                productionOrders.forEach((order, orderIndex) => {
+                    const log = Array.isArray((order.dyeing || {}).dyeOrderLog) ? order.dyeing.dyeOrderLog : [];
+                    log.forEach((item, itemIndex) => { if (isOutsourcedDyeRow(item)) tmp.push({ order, orderIndex, item, itemIndex }); });
+                });
+                inlineExtRows = sortFlat(tmp);
+            }
             try { renderDyeExternalPlanSection(); } catch (e) { console.error('renderDyeExternalPlanSection failed:', e); }
 
             const periodSummaryEl = document.getElementById('dyeingKpiPeriodSummary');
@@ -21917,8 +21981,27 @@
 
             const moRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) !== 'SO');
             const soRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO');
+            {
+                const sumKg = (arr) => arr.reduce((t0, r) => t0 + (Number(r.item.actualTransferKg) || 0), 0);
+                const heading = document.getElementById('dyeingKpiInternalHeading');
+                if (heading) {
+                    heading.classList.toggle('hidden', !showInlineExternal);
+                    if (showInlineExternal) heading.innerHTML = `<h4 class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-industry mr-1.5 text-indigo-600"></i> ย้อมภายในบริษัท</h4><span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200" data-dye-internal-badge>${flatRows.length} รายการ · นน.โอนจริง ${f2n(sumKg(flatRows))} กก.</span>`;
+                }
+                const extSec = document.getElementById('dyeingKpiExternalInline');
+                if (extSec) {
+                    extSec.classList.toggle('hidden', !showInlineExternal);
+                    if (showInlineExternal) {
+                        const badge = document.getElementById('dyeingKpiExternalInlineBadge');
+                        if (badge) badge.textContent = `${inlineExtRows.length} รายการ · รับกลับ ${f2n(sumKg(inlineExtRows))} กก.`;
+                        const eMo = inlineExtRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) !== 'SO');
+                        const eSo = inlineExtRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO');
+                        renderSplitOrderTypeTables('dyeingKpiExternalInlineContainer', DYEING_EXTERNAL_THEAD_HTML, eMo.map(externalRowHtml).join(''), eSo.map(externalRowHtml).join(''), eMo.length, eSo.length, 16);
+                    }
+                }
+            }
             if (wantExternal) {
-                renderSplitOrderTypeTables('dyeingKpiSplitContainer', DYEING_EXTERNAL_THEAD_HTML, moRows.map(externalRowHtml).join(''), soRows.map(externalRowHtml).join(''), moRows.length, soRows.length, 17);
+                renderSplitOrderTypeTables('dyeingKpiSplitContainer', DYEING_EXTERNAL_THEAD_HTML, moRows.map(externalRowHtml).join(''), soRows.map(externalRowHtml).join(''), moRows.length, soRows.length, 16);
             } else {
                 renderSplitOrderTypeTables('dyeingKpiSplitContainer', DYEING_ORDER_THEAD_HTML, moRows.map(rowHtml).join(''), soRows.map(rowHtml).join(''), moRows.length, soRows.length, 19);
             }
@@ -22086,14 +22169,14 @@
                 isExtra: false, orderDate: today, colorNo: '', colorCode, yarnType: '', lotNo: '', hang: '',
                 orderKg: Math.round(Math.max(0, required - got) * 100) / 100, dyeTubNo: '', requisitionKg: Math.round(Math.max(0, required - got) * ownShare * 100) / 100, actualTransferKg: 0,
                 plannedDate: '', actualDate: '', dueDate: order.dueDate || '', remark: 'สร้างจากใบสั่งย้อมแผนกวางแผน',
-                isDamaged: false, vendor: 'จ้างย้อมภายนอก'
+                isDamaged: false, vendor: (colorRow && colorRow.dyeVendor) || 'จ้างย้อมภายนอก'
             });
             persistOrderChange(order);
             renderDyeOrderLogTable();
             showToast(`เพิ่มรายการจ้างย้อม ${colorCode} ของ ${order.moSo} แล้ว — ใส่ผู้รับจ้าง/น้ำหนักที่รับในตารางด้านล่าง`);
         }
 
-        function addDyeOrderLogFromSelect() {
+        function addDyeOrderLogFromSelect(forceExternal) {
             const select = document.getElementById('dyeingKpiMoSoSelect');
             const moSo = select ? select.value : '';
             const orderIndex = productionOrders.findIndex(o => o.moSo === moSo);
@@ -22105,7 +22188,7 @@
                 isExtra: currentDyeingKpiTab === 'extra', orderDate: '', colorNo: '', colorCode: '', yarnType: '', lotNo: '', hang: '',
                 orderKg: 0, dyeTubNo: '', requisitionKg: 0, actualTransferKg: 0, plannedDate: '', actualDate: '', dueDate: '', remark: '',
                 isDamaged: false,
-                ...(currentDyeingKpiTab === 'external' ? { vendor: 'จ้างย้อมภายนอก' } : {})
+                ...((currentDyeingKpiTab === 'external' || forceExternal === true) ? { vendor: 'จ้างย้อมภายนอก' } : {})
             });
             persistOrderChange(order);
             renderDyeOrderLogTable();
@@ -22127,6 +22210,7 @@
         function updateDyeOrderLogItemField(orderIndex, itemIndex, field, value) {
             const order = productionOrders[orderIndex];
             if (!order || !order.dyeing || !Array.isArray(order.dyeing.dyeOrderLog) || !order.dyeing.dyeOrderLog[itemIndex]) return;
+            const wasOutsourced = isOutsourcedDyeRow(order.dyeing.dyeOrderLog[itemIndex]);
             order.dyeing.dyeOrderLog[itemIndex][field] = value;
             // NEW (2026-10-15): แถวจ้างย้อมที่กรอก นน.รับกลับเอง → ตัดสต๊อกไหมของเราให้อัตโนมัติ (นน.รับกลับ × สัดส่วนไหมของเรา) ถ้ายังไม่เคยกรอก นน.โอนจากใบเบิกเอง
             // กรอก นน.โอนจากใบเบิกเอง → ใช้ค่าที่กรอก (เลิกคำนวณอัตโนมัติ)
@@ -22138,11 +22222,11 @@
                 }
             }
             // แถวไหมจ้างย้อมต้องมีผู้รับจ้างหรือเลขที่ใบเสมอ — ถ้าลบทั้งสองช่อง แถวจะกลายเป็นย้อมในบริษัทและหายจากแท็บนี้
-            if ((field === 'vendor' || field === 'slipNo') && currentDyeingKpiTab === 'external' && !isOutsourcedDyeRow(order.dyeing.dyeOrderLog[itemIndex])) {
+            if ((field === 'vendor' || field === 'slipNo') && wasOutsourced && !isOutsourcedDyeRow(order.dyeing.dyeOrderLog[itemIndex])) {
                 order.dyeing.dyeOrderLog[itemIndex].vendor = 'จ้างย้อมภายนอก';
             }
             persistOrderChange(order);
-            if (currentDyeingKpiTab === 'external' && ['actualTransferKg', 'colorCode', 'vendor', 'slipNo'].includes(field)) {
+            if ((currentDyeingKpiTab === 'external' || (currentDyeingKpiTab === 'regular' && wasOutsourced)) && ['actualTransferKg', 'colorCode', 'vendor', 'slipNo'].includes(field)) {
                 try { renderDyeOrderLogTable(); } catch (e) { console.error(e); }
             }
             // Keep "สรุปรายเดือน" (ย้อมขาด depends on requisitionKg/actualTransferKg, the yarn table on
@@ -23616,6 +23700,84 @@
             return result;
         }
 
+        // สถานที่ย้อมในใบสั่งย้อม: SIAM.C / SIAM C = ย้อมภายในบริษัท ('internal'); SIAMDYE / SIAM DYE(MASTER) = จ้างย้อมนอกบริษัท ('external'); อื่นๆ/ว่าง = ''
+        function parsePlanningDyeLocation(v) {
+            const t = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s._-]+/g, '');
+            if (!t || t === '"') return '';
+            if (/DYE/.test(t)) return 'external';
+            if (/^SIAMC$/.test(t) || /^SIAMCARPETS?$/.test(t)) return 'internal';
+            return '';
+        }
+
+        // อ่านใบสรุปย้อมรวม: แถวหัว = เลข M/O (186/26, 187/26, 188/26 …) แต่ละ M/O อาจรวมเซลล์ 2 คอลัมน์ (ข้อมูลอยู่คอลัมน์ขวาของช่วงที่รวม)
+        // แถวสี = คอลัมน์ B (G40, G40-L …) → ยอดต่อ M/O ต่อสี; คอลัมน์ TOTAL / เลขลำดับไม่นับ
+        function parsePlanningSharedDyeSheet(ws) {
+            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+            const merges = ws['!merges'] || [];
+            const moRe = /^\s*([A-Za-z]{0,3})\s*(\d{1,6})\s*\/\s*(\d{2})\s*$/;
+            let hRow = -1;
+            for (let r = 0; r < Math.min(aoa.length, 6); r++) {
+                if ((aoa[r] || []).filter(c => typeof c === 'string' && moRe.test(c)).length >= 2) { hRow = r; break; }
+            }
+            if (hRow === -1) return null;
+            const cols = [];
+            (aoa[hRow] || []).forEach((cell, c) => {
+                const m = typeof cell === 'string' ? cell.match(moRe) : null;
+                if (!m) return;
+                const mg = merges.find(g => g.s.r === hRow && g.s.c === c && g.e.c > g.s.c);
+                cols.push({ disp: `${m[1].toUpperCase()}${m[2]}/${m[3]}`, key: normalizeDyeingMoSoMatchKey(cell), col: mg ? mg.e.c : c });
+            });
+            const rows = [];
+            for (let r = hRow + 1; r < aoa.length; r++) {
+                const row = aoa[r] || [];
+                const code = typeof row[1] === 'string' ? row[1].trim() : '';
+                if (!code) continue;
+                const vals = {};
+                cols.forEach(cd => { const n = Number(row[cd.col]); if (Number.isFinite(n) && n > 0 && row[cd.col] !== null) vals[cd.key] = n; });
+                rows.push({ code, vals });
+            }
+            return { cols, rows };
+        }
+
+        function applyPlanningImportSharedDye(item, aoa, workbook) {
+            // รายชื่อ M/O ที่ย้อมรวมกัน จากข้อความในใบสั่งย้อม
+            let textList = null;
+            for (let r = 0; r < Math.min(aoa.length, 40) && !textList; r++) {
+                for (const cell of (aoa[r] || [])) {
+                    if (typeof cell !== 'string' || !/ย้อมรวม/.test(cell)) continue;
+                    const m = cell.match(/(?:^|[^A-Za-z])(TH|SC|DM|MP|D)?\s*(\d{1,6}(?:\s*\+\s*\d{1,6})+)\s*\/\s*(\d{2})/i);
+                    if (m) { textList = m[2].split('+').map(x => `${(m[1] || '').toUpperCase()}${x.trim()}/${m[3]}`); break; }
+                }
+            }
+            const sumName = workbook.SheetNames.find(n => /ใบสรุปย้อมรวม|สรุปย้อมรวม/.test(String(n)));
+            const sum = sumName ? parsePlanningSharedDyeSheet(workbook.Sheets[sumName]) : null;
+            const myKey = normalizeDyeingMoSoMatchKey(item.moSo);
+            const myCol = sum ? sum.cols.find(c => c.key === myKey) : null;
+            const hasMine = !!myCol && sum.rows.some(r => r.vals[myKey] > 0);
+            if (!textList && !hasMine) return;
+            const list = textList || sum.cols.filter(c => sum.rows.some(r => r.vals[c.key] > 0)).map(c => c.disp);
+            item.sharedMoList = list;
+            item.sharedWith = list.filter(d => normalizeDyeingMoSoMatchKey(d) !== myKey);
+            if (!hasMine) {
+                item.warnings.push(`ใบสั่งย้อมระบุว่าย้อมรวมกับ ${item.sharedWith.join(', ') || list.join(', ')} แต่${sumName ? 'ไม่พบ M/O นี้ใน' : 'ไม่พบ'}ชีต "ใบสรุปย้อมรวม" — ใช้น้ำหนักจาก Dye Order A`);
+                return;
+            }
+            // ยอดของ M/O นี้ต่อสีจากใบสรุป (ตัวเลขในคอลัมน์ของ M/O นี้) + ยอดรวมทุก M/O ต่อสี
+            let overridden = 0, added = 0;
+            sum.rows.forEach(r => {
+                const kg = r.vals[myKey];
+                if (!(kg > 0)) return;
+                const total = Math.round(Object.values(r.vals).reduce((a, b) => a + b, 0) * 100) / 100;
+                const ck = normalizeDyeColorCodeKey(r.code);
+                const c = item.colors.find(x => normalizeDyeColorCodeKey(x.colorCode) === ck);
+                if (c) { if (Math.abs(c.kg - kg) > 0.005) overridden++; c.sheetKg = c.kg; c.kg = Math.round(kg * 100) / 100; c.fromSummary = true; c.sharedTotalKg = total; }
+                else { item.colors.push({ colorCode: r.code, kg: Math.round(kg * 100) / 100, where: '', fromSummary: true, sharedTotalKg: total }); added++; }
+            });
+            item.colors.forEach(c => { if (!c.fromSummary) c.sheetKg = undefined; });
+            item.totalKg = Math.round(item.colors.reduce((s, c) => s + c.kg, 0) * 100) / 100;
+            item.warnings.push(`ย้อมรวม ${list.join(' + ')} — ใช้ยอดของ ${myCol.disp} จากชีต "${sumName}" (${overridden > 0 ? `ต่างจาก Dye Order A ${overridden} สี` : 'ตรงกับ Dye Order A'}${added > 0 ? `, เพิ่ม ${added} สีที่มีเฉพาะในใบสรุป` : ''})`);
+        }
+
         // อ่าน 1 workbook -> ผลที่พรีวิวได้ (ไม่แตะข้อมูลจริง). ต้องมี sheet "Dye Order A" ถึงจะนำเข้าได้
         function parsePlanningDyeGradeWorkbook(workbook, fileName) {
             const item = { fileName, ok: false, error: '', warnings: [] };
@@ -23658,6 +23820,10 @@
             const headerIdx = aoa.findIndex(row => row && String(row[0] == null ? '' : row[0]).trim() === 'No.');
             const colorMap = new Map();
             let rawColorRows = 0;
+            // NEW (2026-10-15): คอลัมน์ "สถานที่/ย้อม" (หัวตารางภาษาไทยอยู่แถวเหนือ "No.") — SIAM.C = ย้อมภายในบริษัท, SIAMDYE = จ้าง Siamdye ย้อม (นอกบริษัท)
+            let locCol = -1;
+            if (headerIdx > 0) { (aoa[headerIdx - 1] || []).forEach((cell, ci) => { if (locCol === -1 && typeof cell === 'string' && /^สถานที่/.test(cell.trim())) locCol = ci; }); }
+            let locConflict = false;
             if (headerIdx !== -1) {
                 for (let i = headerIdx + 1; i < aoa.length; i++) {
                     const row = aoa[i] || [];
@@ -23668,12 +23834,16 @@
                     if (!code && kg <= 0) continue;
                     rawColorRows++;
                     const key = code.toUpperCase().replace(/\s+/g, ' ');
+                    const where = locCol !== -1 ? parsePlanningDyeLocation(row[locCol]) : '';
                     const existing = colorMap.get(key);
-                    if (existing) existing.kg += kg;
-                    else colorMap.set(key, { colorCode: code, kg });
+                    if (existing) { existing.kg += kg; if (where) { if (existing.where && existing.where !== where) locConflict = true; else existing.where = where; } }
+                    else colorMap.set(key, { colorCode: code, kg, where });
                 }
             }
-            item.colors = Array.from(colorMap.values()).map(c => ({ colorCode: c.colorCode, kg: Math.round(c.kg * 100) / 100 }));
+            item.colors = Array.from(colorMap.values()).map(c => ({ colorCode: c.colorCode, kg: Math.round(c.kg * 100) / 100, where: c.where || '' }));
+            if (locConflict) item.warnings.push('สีเดียวกันระบุสถานที่ย้อมไม่เหมือนกันในหลายแถว — ใช้ค่าของแถวแรก');
+            // NEW (2026-10-15): M/O ที่ย้อมรวมกับ M/O อื่น (ข้อความ "M/O 186+187+188/26 สีเดียวกัน ย้อมรวมกัน") → ดูยอดของ M/O นี้จากชีต "ใบสรุปย้อมรวม"
+            applyPlanningImportSharedDye(item, aoa, workbook);
             item.totalKg = Math.round(item.colors.reduce((s, c) => s + c.kg, 0) * 100) / 100;
             if (item.colors.length === 0) item.warnings.push('ไม่พบรายการสี/น้ำหนักไหมในตาราง Dye Order A');
             else if (rawColorRows > item.colors.length) item.warnings.push(`รวมแถวที่ Color Code ซ้ำกัน ${rawColorRows} แถว เป็น ${item.colors.length} สี (รวมน้ำหนักให้)`);
@@ -23792,9 +23962,10 @@
                 const actionBadge = existingIdx === -1
                     ? `<span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold">เปิด ${item.orderType === 'SO' ? 'S/O' : 'M/O'} ใหม่</span>`
                     : `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">เติมเข้า ${item.orderType === 'SO' ? 'S/O' : 'M/O'} เดิม</span>`;
+                const whereBadge = w => w === 'external' ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-semibold">จ้าง Siamdye ย้อม (นอก)</span>' : (w === 'internal' ? '<span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-semibold">ย้อมภายใน (SIAM.C)</span>' : '<span class="text-slate-300">-</span>');
                 const colorRows = item.colors.length === 0
-                    ? '<tr><td colspan="2" class="px-2 py-2 text-center text-slate-400">ไม่มีรายการสี</td></tr>'
-                    : item.colors.map(c => `<tr><td class="px-2 py-1 border-t border-slate-100 font-mono">${escapeHtml(c.colorCode || '-')}</td><td class="px-2 py-1 border-t border-slate-100 text-right">${fmtKg(c.kg)}</td></tr>`).join('');
+                    ? '<tr><td colspan="3" class="px-2 py-2 text-center text-slate-400">ไม่มีรายการสี</td></tr>'
+                    : item.colors.map(c => `<tr><td class="px-2 py-1 border-t border-slate-100 font-mono">${escapeHtml(c.colorCode || '-')}</td><td class="px-2 py-1 border-t border-slate-100">${whereBadge(c.where)}</td><td class="px-2 py-1 border-t border-slate-100 text-right">${fmtKg(c.kg)}${c.fromSummary ? ` <span class="text-[10px] text-violet-600" title="ยอดจากชีตใบสรุปย้อมรวม${c.sheetKg !== undefined ? ' (Dye Order A: ' + fmtKg(c.sheetKg) + ')' : ''}">ย้อมรวม ${fmtKg(c.sharedTotalKg)}</span>` : ''}</td></tr>`).join('');
                 let gradeHtml;
                 if (item.gradeInfo) {
                     gradeHtml = `<p class="text-xs text-slate-600"><span class="font-semibold">เกรดทอ ${escapeHtml(item.weavingGrade)}</span> → % ลาย ${item.gradeInfo.patternPct}, สีสูงสุด ${item.gradeInfo.maxColors}, ก้าว ${escapeHtml(item.stitchingUsed || 'N')}, พื้นที่รวม ${fmtKg(item.totalSqm)} ตร.ม. → ช่อง "AI ช่วยคำนวณเวลา" (ระบบคำนวณเกรด ${escapeHtml(item.engineGrade || '-')})${item.finishingGrade ? `<br><span class="text-slate-400">เกรดแต่งในไฟล์: ${escapeHtml(item.finishingGrade)} — ระบบคำนวณเกรดแต่งจาก % ลายเดียวกับเกรดทอ จึงไม่ได้ตั้งแยก</span>` : ''}</p>`;
@@ -23810,8 +23981,8 @@
                         </div>
                         <p class="text-xs text-slate-600">ลูกค้า: <span class="font-medium">${escapeHtml(item.customerName || '-')}</span> • คุณภาพ: ${escapeHtml(item.quality || '-')} • กำหนดส่ง: ${escapeHtml(item.dueDate || '-')} • ${item.colorsCount || item.colors.length} สี</p>
                         <div class="border border-slate-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
-                            <table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500"><tr><th class="px-2 py-1 text-left font-semibold">Color Code</th><th class="px-2 py-1 text-right font-semibold">น้ำหนัก (กก.)</th></tr></thead><tbody>${colorRows}</tbody>
-                            <tfoot><tr class="bg-slate-50 font-semibold"><td class="px-2 py-1 border-t border-slate-200">รวม</td><td class="px-2 py-1 border-t border-slate-200 text-right">${fmtKg(item.totalKg)}</td></tr></tfoot></table>
+                            <table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500"><tr><th class="px-2 py-1 text-left font-semibold">Color Code</th><th class="px-2 py-1 text-left font-semibold">ย้อมที่</th><th class="px-2 py-1 text-right font-semibold">น้ำหนัก (กก.)</th></tr></thead><tbody>${colorRows}</tbody>
+                            <tfoot><tr class="bg-slate-50 font-semibold"><td class="px-2 py-1 border-t border-slate-200" colspan="2">รวม</td><td class="px-2 py-1 border-t border-slate-200 text-right">${fmtKg(item.totalKg)}</td></tr></tfoot></table>
                         </div>
                         ${gradeHtml}${warnHtml}
                     </div>`;
@@ -23828,7 +23999,10 @@
             const gradeBuilt = item.gradeInfo
                 ? buildPlanningImportProductionCalc(existed ? productionOrders[orderIndex].productionCalc : {}, item.weavingGrade, item.gradeInfo, item.totalSqm)
                 : null;
-            const newColorRows = item.colors.map(c => ({ id: 'co_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), colorCode: c.colorCode, kg: c.kg, useSurplus: false, surplusKg: 0, surplusLedgerId: '' }));
+            const newColorRows = item.colors.map(c => Object.assign({ id: 'co_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), colorCode: c.colorCode, kg: c.kg, useSurplus: false, surplusKg: 0, surplusLedgerId: '' },
+                // NEW (2026-10-15): สถานที่ย้อมจากใบสั่งย้อม (SIAM.C = ใน, SIAMDYE = จ้าง Siam Dyemaster ย้อมนอก) + ข้อมูลย้อมรวมจากใบสรุป
+                c.where ? { dyeWhere: c.where } : {}, c.where === 'external' ? { dyeVendor: SIAM_DYE_VENDOR } : {},
+                item.sharedWith && item.sharedWith.length && c.fromSummary ? { sharedWith: item.sharedWith.slice(), sharedTotalKg: c.sharedTotalKg } : {}));
 
             if (!existed) {
                 const d = new Date();
@@ -23867,7 +24041,11 @@
             order.dyeing.colorOrders = order.dyeing.colorOrders.filter(r => r.colorCode || Number(r.kg) > 0 || r.useSurplus);
             newColorRows.forEach(nr => {
                 const match = order.dyeing.colorOrders.find(r => normalizeDyeColorCodeKey(r.colorCode) === normalizeDyeColorCodeKey(nr.colorCode)); // CUT/LOOP = -C/-L
-                if (match) match.kg = nr.kg; // คง useSurplus/surplusKg/surplusLedgerId เดิมไว้
+                if (match) {
+                    match.kg = nr.kg; // คง useSurplus/surplusKg/surplusLedgerId เดิมไว้
+                    if (nr.dyeWhere) { match.dyeWhere = nr.dyeWhere; if (nr.dyeVendor) match.dyeVendor = nr.dyeVendor; else delete match.dyeVendor; }
+                    if (nr.sharedWith) { match.sharedWith = nr.sharedWith; match.sharedTotalKg = nr.sharedTotalKg; }
+                }
                 else order.dyeing.colorOrders.push(nr);
             });
             persistOrderChange(order);
