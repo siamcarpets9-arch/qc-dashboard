@@ -1807,6 +1807,9 @@
                                 <button onclick="addDyeOrderLogFromSelect()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5">
                                     <i class="fa-solid fa-plus-circle"></i> เพิ่มรายการ
                                 </button>
+                                <button id="dyeingKpiDedupeBtn" onclick="removeDuplicateDyeLogRows()" type="button" title="ลบแถวที่ข้อมูลซ้ำกันทุกช่อง (เช่น กดส่งรายการสีเข้าบันทึกสั่งย้อมซ้ำ) เก็บไว้แถวเดียว" class="hidden shrink-0 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-medium px-3 py-1.5 rounded-lg transition text-xs items-center gap-1.5">
+                                    <i class="fa-solid fa-clone"></i> <span data-dedupe-label>ลบรายการซ้ำ</span>
+                                </button>
                                 <button onclick="exportDyeingKpiOrderLog()" type="button" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5">
                                     <i class="fa-solid fa-file-export"></i> ส่งออก Excel
                                 </button>
@@ -4093,7 +4096,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-87';
+        const APP_BUILD = 'QCDashboard-88';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -7053,6 +7056,50 @@
         // Each click appends fresh rows (like reprinting/re-confirming an order is expected to be
         // repeatable) rather than trying to guess whether an earlier push already covered this — Planning
         // presses it once per real hand-off, same as "พิมพ์ใบสั่งย้อม" itself can be re-clicked freely.
+        // NEW (2026-10-19): "ถ้ารายการไหนซ้ำกันให้ตัดออก" — แถวบันทึกสั่งย้อมที่ข้อมูลเหมือนกันทุกช่อง (มักเกิดจากกด "ส่งรายการสีเข้าบันทึกสั่งย้อม" ซ้ำ)
+        // ลายนิ้วมือ = ทุกฟิลด์ (ไม่สนช่องว่าง/null/false/0 ต่างกัน, ตัวเลขปัด 3 ตำแหน่ง, ตัดช่องว่างหน้าหลังข้อความ)
+        function dyeLogRowSignature(item) {
+            const o = {};
+            Object.keys(item || {}).sort().forEach(k => {
+                let v = item[k];
+                if (v === '' || v === null || v === undefined || v === false || v === 0) return;
+                if (typeof v === 'number') v = Math.round(v * 1000) / 1000;
+                else if (typeof v === 'string') { v = v.trim(); if (!v) return; }
+                o[k] = v;
+            });
+            return JSON.stringify(o);
+        }
+        function findDuplicateDyeLogRows() {
+            const dups = [];
+            (productionOrders || []).forEach((order, orderIndex) => {
+                const log = Array.isArray((order.dyeing || {}).dyeOrderLog) ? order.dyeing.dyeOrderLog : [];
+                const seen = new Set();
+                log.forEach((item, itemIndex) => {
+                    if (!item) return;
+                    const sig = dyeLogRowSignature(item);
+                    if (seen.has(sig)) dups.push({ orderIndex, itemIndex }); else seen.add(sig);
+                });
+            });
+            return dups;
+        }
+        function removeDuplicateDyeLogRows(silent) {
+            const dups = findDuplicateDyeLogRows();
+            if (dups.length === 0) { if (!silent) showToast('ไม่พบรายการซ้ำในบันทึกสั่งย้อม', 'fa-circle-check', 'text-emerald-400'); return 0; }
+            const orders = new Set(dups.map(d => d.orderIndex));
+            if (!silent && !confirm(`พบรายการซ้ำ ${dups.length} แถว (ข้อมูลเหมือนกันทุกช่อง) ใน ${orders.size} M/O, S/O\nลบส่วนที่ซ้ำ เก็บไว้แถวเดียว?`)) return 0;
+            const byOrder = new Map();
+            dups.forEach(d => { if (!byOrder.has(d.orderIndex)) byOrder.set(d.orderIndex, new Set()); byOrder.get(d.orderIndex).add(d.itemIndex); });
+            byOrder.forEach((idxSet, orderIndex) => {
+                const order = productionOrders[orderIndex];
+                order.dyeing.dyeOrderLog = order.dyeing.dyeOrderLog.filter((_, i) => !idxSet.has(i));
+                persistOrderChange(order);
+            });
+            try { renderDyeOrderLogTable(); } catch (e) { console.error(e); }
+            try { if (document.getElementById('dyeingKpiSummarySection')) renderDyeingSummaryTab(); } catch (e) { /* summary not mounted */ }
+            showToast(`ลบรายการซ้ำ ${dups.length} แถวแล้ว (เก็บไว้แถวเดียว)`, 'fa-clone', 'text-emerald-400');
+            return dups.length;
+        }
+
         function sendDyeingColorListToKpiLog(orderIndex) {
             const order = productionOrders[orderIndex];
             if (!order) return;
@@ -7064,7 +7111,13 @@
             if (!order.dyeing) order.dyeing = {};
             if (!Array.isArray(order.dyeing.dyeOrderLog)) order.dyeing.dyeOrderLog = [];
             const today = new Date().toISOString().split('T')[0];
-            colors.forEach(c => {
+            // กันส่งซ้ำ: สีที่มีแถว (ไม่ใช่ย้อมเพิ่ม/จ้างย้อม) รหัสสีและ นน.ในใบสั่งเท่ากันอยู่แล้ว → ข้าม
+            const existingSig = new Set(order.dyeing.dyeOrderLog.filter(it => it && !it.isExtra && !isOutsourcedDyeRow(it)).map(it => normalizeDyeColorCodeKey(it.colorCode) + '|' + (Math.round((Number(it.orderKg) || 0) * 100) / 100)));
+            const before = colors.length;
+            const toAdd = colors.filter(c => { const k = normalizeDyeColorCodeKey(c.colorCode) + '|' + (Math.round((Number(c.dyeKg) || 0) * 100) / 100); if (existingSig.has(k)) return false; existingSig.add(k); return true; });
+            const skipped = before - toAdd.length;
+            if (toAdd.length === 0) { showToast(`ทุกสี (${before} รายการ) มีในบันทึกสั่งย้อมอยู่แล้ว — ไม่ส่งซ้ำ`, 'fa-circle-info', 'text-sky-400'); return; }
+            toAdd.forEach(c => {
                 order.dyeing.dyeOrderLog.push(Object.assign({
                     isExtra: false,
                     orderDate: today,
@@ -7086,7 +7139,7 @@
             persistOrderChange(order);
             // The KPI report panel may or may not be mounted right now — refresh it only if it is.
             if (document.getElementById('dyeingKpiSplitContainer')) renderDyeOrderLogTable();
-            showToast(`ส่งรายการสี ${colors.length} รายการเข้าบันทึกสั่งย้อม (KPI) แล้ว`, 'fa-droplet', 'text-violet-500');
+            showToast(`ส่งรายการสี ${toAdd.length} รายการเข้าบันทึกสั่งย้อม (KPI) แล้ว${skipped > 0 ? ` (ข้าม ${skipped} สีที่มีอยู่แล้ว)` : ''}`, 'fa-droplet', 'text-violet-500');
         }
 
         // =========================================================================================
@@ -21967,6 +22020,8 @@
                 inlineExtRows = sortFlat(tmp);
             }
             try { renderDyeExternalPlanSection(); } catch (e) { console.error('renderDyeExternalPlanSection failed:', e); }
+            { const dupBtn = document.getElementById('dyeingKpiDedupeBtn');
+              if (dupBtn) { const nDup = findDuplicateDyeLogRows().length; dupBtn.classList.toggle('hidden', nDup === 0); dupBtn.classList.toggle('flex', nDup > 0); const lb = dupBtn.querySelector('[data-dedupe-label]'); if (lb) lb.textContent = `ลบรายการซ้ำ ${nDup} แถว`; } }
 
             const periodSummaryEl = document.getElementById('dyeingKpiPeriodSummary');
             if (periodSummaryEl) {
