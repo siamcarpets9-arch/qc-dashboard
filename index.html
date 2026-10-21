@@ -1833,17 +1833,7 @@
                             <div id="dyeingKpiPeriodSelectWrap"></div>
                         </div>
                         <div id="dyeingKpiPeriodSummary" class="p-3 border-b border-slate-100"></div>
-                        <!-- NEW (2026-10-16): "ในงานบันทึกการสั่งย้อม ให้แยกรายการ ย้อมภายในบริษัท กับ ไหมจ้างย้อม" — แท็บ "บันทึกสั่งย้อม" แสดง 2 ส่วนในหน้าเดียว -->
-                        <div id="dyeingKpiInternalHeading" class="hidden px-4 pt-3 flex flex-wrap items-center gap-2"></div>
                         <div id="dyeingKpiSplitContainer"></div>
-                        <div id="dyeingKpiExternalInline" class="hidden border-t-4 border-sky-100">
-                            <div class="px-4 pt-3 pb-1 flex flex-wrap items-center gap-2">
-                                <h4 class="font-bold text-sky-900 text-sm"><i class="fa-solid fa-truck-fast mr-1.5 text-sky-600"></i> ไหมจ้างย้อม <span class="text-[11px] font-normal text-slate-500">(ผู้รับจ้างย้อมภายนอก — ไม่นับรวมใน KPI ย้อมภายในบริษัท)</span></h4>
-                                <span id="dyeingKpiExternalInlineBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200"></span>
-                                <button type="button" onclick="addDyeOrderLogFromSelect(true)" class="ml-auto shrink-0 bg-sky-600 hover:bg-sky-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5"><i class="fa-solid fa-plus-circle"></i> เพิ่มรายการจ้างย้อม</button>
-                            </div>
-                            <div id="dyeingKpiExternalInlineContainer" class="px-0"></div>
-                        </div>
                     </div>
                 </div>
 
@@ -4096,7 +4086,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-89';
+        const APP_BUILD = 'QCDashboard-90';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -22008,17 +21998,7 @@
                 || String(a.order.moSo || '').localeCompare(String(b.order.moSo || ''))
                 || String(a.item.colorCode || '').localeCompare(String(b.item.colorCode || '')));
             flatRows = sortFlat(flatRows);
-            // NEW (2026-10-16): แท็บ "บันทึกสั่งย้อม" แสดงแถวไหมจ้างย้อมเป็นส่วนที่ 2 ในหน้าเดียวกัน (แยกจากย้อมภายในบริษัท)
-            const showInlineExternal = !wantExtra && !wantExternal;
-            let inlineExtRows = [];
-            if (showInlineExternal) {
-                const tmp = [];
-                productionOrders.forEach((order, orderIndex) => {
-                    const log = Array.isArray((order.dyeing || {}).dyeOrderLog) ? order.dyeing.dyeOrderLog : [];
-                    log.forEach((item, itemIndex) => { if (isOutsourcedDyeRow(item)) tmp.push({ order, orderIndex, item, itemIndex }); });
-                });
-                inlineExtRows = sortFlat(tmp);
-            }
+            // 2026-10-21: แท็บ "บันทึกสั่งย้อม" แสดงเฉพาะย้อมภายในบริษัท — ไหมจ้างย้อมอยู่แท็บ "ไหมจ้างย้อม" ของตัวเอง (ยกเลิกส่วนที่ 2 ที่เพิ่มใน -84)
             try { renderDyeExternalPlanSection(); } catch (e) { console.error('renderDyeExternalPlanSection failed:', e); }
             { const dupBtn = document.getElementById('dyeingKpiDedupeBtn');
               if (dupBtn) { const nDup = findDuplicateDyeLogRows().length; dupBtn.classList.toggle('hidden', nDup === 0); dupBtn.classList.toggle('flex', nDup > 0); const lb = dupBtn.querySelector('[data-dedupe-label]'); if (lb) lb.textContent = `ลบรายการซ้ำ ${nDup} แถว`; } }
@@ -22124,25 +22104,6 @@
 
             const moRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) !== 'SO');
             const soRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO');
-            {
-                const sumKg = (arr) => arr.reduce((t0, r) => t0 + (Number(r.item.actualTransferKg) || 0), 0);
-                const heading = document.getElementById('dyeingKpiInternalHeading');
-                if (heading) {
-                    heading.classList.toggle('hidden', !showInlineExternal);
-                    if (showInlineExternal) heading.innerHTML = `<h4 class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-industry mr-1.5 text-indigo-600"></i> ย้อมภายในบริษัท</h4><span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200" data-dye-internal-badge>${flatRows.length} รายการ · นน.โอนจริง ${f2n(sumKg(flatRows))} กก.</span>`;
-                }
-                const extSec = document.getElementById('dyeingKpiExternalInline');
-                if (extSec) {
-                    extSec.classList.toggle('hidden', !showInlineExternal);
-                    if (showInlineExternal) {
-                        const badge = document.getElementById('dyeingKpiExternalInlineBadge');
-                        if (badge) badge.textContent = `${inlineExtRows.length} รายการ · รับกลับ ${f2n(sumKg(inlineExtRows))} กก.`;
-                        const eMo = inlineExtRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) !== 'SO');
-                        const eSo = inlineExtRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO');
-                        renderSplitOrderTypeTables('dyeingKpiExternalInlineContainer', DYEING_EXTERNAL_THEAD_HTML, eMo.map(externalRowHtml).join(''), eSo.map(externalRowHtml).join(''), eMo.length, eSo.length, 16);
-                    }
-                }
-            }
             if (wantExternal) {
                 renderSplitOrderTypeTables('dyeingKpiSplitContainer', DYEING_EXTERNAL_THEAD_HTML, moRows.map(externalRowHtml).join(''), soRows.map(externalRowHtml).join(''), moRows.length, soRows.length, 16);
             } else {
