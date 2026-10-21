@@ -653,8 +653,7 @@
                 <!-- injected via JS -->
             </div>
 
-            <!-- NEW (2026-10-09): ประมาณการไหมที่ต้องใช้ แยกตามชนิดไหม (ตร.ม. ที่ยังไม่ย้อม × 3.5) — renderYarnEstimatePanel() -->
-            <div id="overviewYarnPanel" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3"></div>
+            <!-- 2026-10-21: เอาแผงประมาณการไหมที่ต้องใช้ (overviewYarnPanel) ออกจากภาพรวมตามคำขอ — renderYarnEstimatePanel() ยังอยู่แต่ไม่ทำอะไรถ้าไม่มี container -->
             <!-- NEW (2026-10-09): รับไหมแต่ละชนิด + ตัดยอดเบิกไปย้อม = สต๊อกคงเหลือ — renderYarnStockPanel() -->
             <div id="overviewYarnStockPanel" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3"></div>
 
@@ -1804,7 +1803,7 @@
                             <h3 id="dyeingKpiSectionTitle" class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-droplet mr-2 text-indigo-600"></i> บันทึกสั่งย้อม</h3>
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <select id="dyeingKpiMoSoSelect" class="text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg"></select>
-                                <button onclick="addDyeOrderLogFromSelect()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5">
+                                <button id="dyeingKpiAddBtn" onclick="addDyeOrderLogFromSelect()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5">
                                     <i class="fa-solid fa-plus-circle"></i> เพิ่มรายการ
                                 </button>
                                 <button id="dyeingKpiDedupeBtn" onclick="removeDuplicateDyeLogRows()" type="button" title="ลบแถวที่ข้อมูลซ้ำกันทุกช่อง (เช่น กดส่งรายการสีเข้าบันทึกสั่งย้อมซ้ำ) เก็บไว้แถวเดียว" class="hidden shrink-0 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-medium px-3 py-1.5 rounded-lg transition text-xs items-center gap-1.5">
@@ -1824,7 +1823,7 @@
                             <div class="px-4 py-2.5 flex flex-wrap items-center gap-2">
                                 <h4 class="font-bold text-sky-900 text-xs"><i class="fa-solid fa-clipboard-list mr-1.5 text-sky-600"></i>ใบสั่งย้อมจากแผนกวางแผน (เทียบกับที่ผู้รับจ้างส่งจริง)</h4>
                                 <span class="text-[10px] bg-sky-50 text-sky-700 font-semibold px-2 py-0.5 rounded-full border border-sky-200"><span id="dyeingExternalPlanCount">0</span> M/O</span>
-                                <span class="text-[10px] text-slate-400">อ่านอย่างเดียว — แก้ใบสั่งย้อมที่แผนกวางแผน · กด "+ จ้าง" เพื่อสร้างแถวจ้างย้อมในตารางด้านล่าง</span>
+                                <span class="text-[10px] text-slate-400">อ่านอย่างเดียว — แก้ใบสั่งย้อมที่แผนกวางแผน · ยอดที่รับจากผู้รับจ้างมาจากการนำเข้า Packing Slip</span>
                             </div>
                             <div id="dyeingExternalPlanBody"></div>
                         </div>
@@ -4086,7 +4085,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-90';
+        const APP_BUILD = 'QCDashboard-92';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -21763,6 +21762,8 @@
                         : '<i class="fa-solid fa-droplet mr-2 text-indigo-600"></i> บันทึกสั่งย้อม');
             }
 
+            // 2026-10-21: แท็บไหมจ้างย้อมไม่มีตารางให้กรอกแล้ว → ซ่อนช่องเลือก M/O + ปุ่มเพิ่มรายการ
+            ['dyeingKpiMoSoSelect', 'dyeingKpiAddBtn'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = currentDyeingKpiTab === 'external' ? 'none' : ''; });
             if (currentDyeingKpiTab === 'summary') {
                 renderDyeingSummaryTab();
             } else {
@@ -22105,7 +22106,8 @@
             const moRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) !== 'SO');
             const soRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO');
             if (wantExternal) {
-                renderSplitOrderTypeTables('dyeingKpiSplitContainer', DYEING_EXTERNAL_THEAD_HTML, moRows.map(externalRowHtml).join(''), soRows.map(externalRowHtml).join(''), moRows.length, soRows.length, 16);
+                // 2026-10-21: แท็บ "ไหมจ้างย้อม" ไม่แสดงตารางรายการจ้างย้อม (M/O) อีกต่อไป — เหลือเฉพาะ "ใบสั่งย้อมจากแผนกวางแผน" (ข้อมูลแถวจ้างย้อมยังอยู่และนับในสต๊อก/ใบสั่งเหมือนเดิม)
+                const sc = document.getElementById('dyeingKpiSplitContainer'); if (sc) sc.innerHTML = '';
             } else {
                 renderSplitOrderTypeTables('dyeingKpiSplitContainer', DYEING_ORDER_THEAD_HTML, moRows.map(rowHtml).join(''), soRows.map(rowHtml).join(''), moRows.length, soRows.length, 19);
             }
@@ -22231,9 +22233,7 @@
                     : g.rows.map(r => {
                         const st = STATUS[r.status];
                         const vend = [...r.vendors, ...r.slips.map(s => 'ใบ ' + s)].join(' · ');
-                        const addBtn = (r.inPlan && r.remainKg > 0.01)
-                            ? `<button type="button" onclick="addExternalDyeRowFromPlan(${g.orderIndex}, decodeURIComponent('${encodeURIComponent(r.code)}'))" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-sky-600 text-white hover:bg-sky-700 transition whitespace-nowrap" title="สร้างแถวจ้างย้อมในตารางด้านล่าง (นน.ในใบสั่งย้อม = ${f(r.remainKg)} กก.)"><i class="fa-solid fa-plus mr-1"></i>จ้าง</button>`
-                            : '';
+                        const addBtn = ''; // 2026-10-21: เอาปุ่ม "+ จ้าง" ออก (ไม่มีตารางรายการจ้างย้อมให้กรอกต่อแล้ว)
                         return `<tr class="hover:bg-slate-50/80" data-ext-plan-row="${escapeHtml(r.key)}">
                             <td class="px-3 py-1.5 font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(r.code)}</td>
                             <td class="px-3 py-1.5 text-right tabular-nums">${r.inPlan ? f(r.planKg) : '-'}</td>
