@@ -1785,6 +1785,10 @@
                         <button onclick="setDyeingKpiTab('extra')" id="dyeingKpiTabExtraBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                             <i class="fa-solid fa-droplet-slash"></i> ย้อมเพิ่ม
                         </button>
+                        <!-- NEW (2026-10-21): แท็บ "ย้อมภายในบริษัท" — ใบสั่งย้อมจากแผนกวางแผนเทียบกับที่ย้อมจริง (แยกออกมาจากแท็บบันทึกสั่งย้อม) -->
+                        <button onclick="setDyeingKpiTab('internal')" id="dyeingKpiTabInternalBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                            <i class="fa-solid fa-industry"></i> ย้อมภายในบริษัท
+                        </button>
                         <!-- NEW (2026-10-08): ไหมจ้างย้อมภายนอก (เช่น Siam Dyemaster) แยกออกจาก KPI แผนกย้อม -->
                         <button onclick="setDyeingKpiTab('external')" id="dyeingKpiTabExternalBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                             <i class="fa-solid fa-truck-fast"></i> ไหมจ้างย้อม
@@ -1818,12 +1822,18 @@
                                 </label>
                             </div>
                         </div>
-                        <!-- NEW (2026-10-21): "ในบันทึกสั่งย้อม ย้อมภายในบริษัท ให้ทำรายการเหมือนกับไหมจ้างย้อม" — ใบสั่งย้อมจากแผนกวางแผน เทียบกับที่ย้อม/โอนจริง (เฉพาะแท็บ "บันทึกสั่งย้อม") — renderDyeInternalPlanSection() -->
+                        <!-- NEW (2026-10-21): "ในบันทึกสั่งย้อม ย้อมภายในบริษัท ให้ทำรายการเหมือนกับไหมจ้างย้อม" — ใบสั่งย้อมจากแผนกวางแผน เทียบกับที่ย้อม/โอนจริง (เฉพาะแท็บ "ย้อมภายในบริษัท") — renderDyeInternalPlanSection() -->
                         <div id="dyeingInternalPlanSection" class="hidden border-b border-slate-100">
                             <div class="px-4 py-2.5 flex flex-wrap items-center gap-2">
-                                <h4 class="font-bold text-indigo-900 text-xs"><i class="fa-solid fa-clipboard-list mr-1.5 text-indigo-600"></i>ใบสั่งย้อมจากแผนกวางแผน (เทียบกับที่ย้อมจริง — ย้อมภายในบริษัท)</h4>
+                                <h4 class="font-bold text-indigo-900 text-xs"><i class="fa-solid fa-clipboard-list mr-1.5 text-indigo-600"></i>ใบสั่งย้อมจากแผนกวางแผน (เทียบกับที่ย้อมจริง)</h4>
                                 <span class="text-[10px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full border border-indigo-200"><span id="dyeingInternalPlanCount">0</span> M/O</span>
-                                <span class="text-[10px] text-slate-400">อ่านอย่างเดียว — แก้ใบสั่งย้อมที่แผนกวางแผน · ยอดที่ย้อมแล้วมาจากตารางบันทึกสั่งย้อมด้านล่าง</span>
+                                <span class="text-[10px] text-slate-400">อ่านอย่างเดียว — แก้ใบสั่งย้อมที่แผนกวางแผน · ยอดที่ย้อมแล้วมาจากแท็บ "บันทึกสั่งย้อม"</span>
+                            </div>
+                            <div class="px-4 pb-2 flex flex-wrap items-center gap-2" data-dye-plan-filter="int">
+                                <input type="text" id="dyePlanSearch_int" oninput="setDyePlanFilter('int')" placeholder="ค้นหา M/O, S/O, ลูกค้า..." class="text-xs px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg w-44">
+                                <label class="text-[10px] text-slate-500 flex items-center gap-1">วันที่ <input type="date" id="dyePlanDay_int" onchange="setDyePlanFilter('int')" class="text-xs px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg"></label>
+                                <button type="button" onclick="clearDyePlanFilter('int')" class="text-[10px] text-slate-500 hover:text-slate-700 underline">ล้างตัวกรอง</button>
+                                <span class="text-[10px] text-slate-400" id="dyePlanHint_int">แสดงเป็นรายการ M/O, S/O — กดที่ M/O เพื่อดูรายสี · เลือกวันที่เพื่อดูเฉพาะที่มีรายการวันนั้น</span>
                             </div>
                             <div id="dyeingInternalPlanBody"></div>
                         </div>
@@ -1833,6 +1843,12 @@
                                 <h4 class="font-bold text-sky-900 text-xs"><i class="fa-solid fa-clipboard-list mr-1.5 text-sky-600"></i>ใบสั่งย้อมจากแผนกวางแผน (เทียบกับที่ผู้รับจ้างส่งจริง)</h4>
                                 <span class="text-[10px] bg-sky-50 text-sky-700 font-semibold px-2 py-0.5 rounded-full border border-sky-200"><span id="dyeingExternalPlanCount">0</span> M/O</span>
                                 <span class="text-[10px] text-slate-400">อ่านอย่างเดียว — แก้ใบสั่งย้อมที่แผนกวางแผน · ยอดที่รับจากผู้รับจ้างมาจากการนำเข้า Packing Slip</span>
+                            </div>
+                            <div class="px-4 pb-2 flex flex-wrap items-center gap-2" data-dye-plan-filter="ext">
+                                <input type="text" id="dyePlanSearch_ext" oninput="setDyePlanFilter('ext')" placeholder="ค้นหา M/O, S/O, ลูกค้า..." class="text-xs px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg w-44">
+                                <label class="text-[10px] text-slate-500 flex items-center gap-1">วันที่ <input type="date" id="dyePlanDay_ext" onchange="setDyePlanFilter('ext')" class="text-xs px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg"></label>
+                                <button type="button" onclick="clearDyePlanFilter('ext')" class="text-[10px] text-slate-500 hover:text-slate-700 underline">ล้างตัวกรอง</button>
+                                <span class="text-[10px] text-slate-400" id="dyePlanHint_ext">แสดงเป็นรายการ M/O, S/O — กดที่ M/O เพื่อดูรายสี · เลือกวันที่เพื่อดูเฉพาะที่มีรายการวันนั้น</span>
                             </div>
                             <div id="dyeingExternalPlanBody"></div>
                         </div>
@@ -4094,7 +4110,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-93';
+        const APP_BUILD = 'QCDashboard-95';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -21747,7 +21763,7 @@
         function isOutsourcedDyeRow(item) { return !!(item && typeof item === 'object' && (item.vendor || item.slipNo)); }
 
         function setDyeingKpiTab(tab) {
-            currentDyeingKpiTab = (tab === 'extra' || tab === 'summary' || tab === 'external') ? tab : 'regular';
+            currentDyeingKpiTab = (tab === 'extra' || tab === 'summary' || tab === 'external' || tab === 'internal') ? tab : 'regular';
             const activeCls = "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition";
             const inactiveCls = "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
             document.getElementById('dyeingKpiTabRegularBtn').className = currentDyeingKpiTab === 'regular' ? activeCls : inactiveCls;
@@ -21756,6 +21772,8 @@
             if (summaryBtn) summaryBtn.className = currentDyeingKpiTab === 'summary' ? activeCls : inactiveCls;
             const externalBtn = document.getElementById('dyeingKpiTabExternalBtn');
             if (externalBtn) externalBtn.className = currentDyeingKpiTab === 'external' ? activeCls : inactiveCls;
+            const internalBtn = document.getElementById('dyeingKpiTabInternalBtn');
+            if (internalBtn) internalBtn.className = currentDyeingKpiTab === 'internal' ? activeCls : inactiveCls;
 
             const orderLogSection = document.getElementById('dyeingKpiOrderLogSection');
             const summarySection = document.getElementById('dyeingKpiSummarySection');
@@ -21764,7 +21782,9 @@
 
             const titleEl = document.getElementById('dyeingKpiSectionTitle');
             if (titleEl) {
-                titleEl.innerHTML = currentDyeingKpiTab === 'extra'
+                titleEl.innerHTML = currentDyeingKpiTab === 'internal'
+                    ? '<i class="fa-solid fa-industry mr-2 text-indigo-600"></i> ย้อมภายในบริษัท <span class="ml-1 text-[11px] font-normal text-slate-500">(ใบสั่งย้อมจากแผนกวางแผน เทียบกับที่ย้อมจริง)</span>'
+                    : currentDyeingKpiTab === 'extra'
                     ? '<i class="fa-solid fa-droplet-slash mr-2 text-indigo-600"></i> ย้อมเพิ่ม'
                     : (currentDyeingKpiTab === 'external'
                         ? '<i class="fa-solid fa-truck-fast mr-2 text-sky-600"></i> ไหมจ้างย้อมภายนอก <span class="ml-1 text-[11px] font-normal text-slate-500">(แยกจาก KPI แผนกย้อม — ไม่นับรวมในบันทึกสั่งย้อม/ย้อมเพิ่ม/สรุปรายเดือน)</span>'
@@ -21772,7 +21792,7 @@
             }
 
             // 2026-10-21: แท็บไหมจ้างย้อมไม่มีตารางให้กรอกแล้ว → ซ่อนช่องเลือก M/O + ปุ่มเพิ่มรายการ
-            ['dyeingKpiMoSoSelect', 'dyeingKpiAddBtn'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = currentDyeingKpiTab === 'external' ? 'none' : ''; });
+            ['dyeingKpiMoSoSelect', 'dyeingKpiAddBtn'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = (currentDyeingKpiTab === 'external' || currentDyeingKpiTab === 'internal') ? 'none' : ''; });
             if (currentDyeingKpiTab === 'summary') {
                 renderDyeingSummaryTab();
             } else {
@@ -22115,7 +22135,10 @@
 
             const moRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) !== 'SO');
             const soRows = flatRows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO');
-            if (wantExternal) {
+            if (currentDyeingKpiTab === 'internal') {
+                // 2026-10-21: แท็บ "ย้อมภายในบริษัท" แสดงเฉพาะแผงใบสั่งย้อมจากแผนกวางแผน — ตารางบันทึกอยู่แท็บ "บันทึกสั่งย้อม"
+                const sc0 = document.getElementById('dyeingKpiSplitContainer'); if (sc0) sc0.innerHTML = '';
+            } else if (wantExternal) {
                 // 2026-10-21: แท็บ "ไหมจ้างย้อม" ไม่แสดงตารางรายการจ้างย้อม (M/O) อีกต่อไป — เหลือเฉพาะ "ใบสั่งย้อมจากแผนกวางแผน" (ข้อมูลแถวจ้างย้อมยังอยู่และนับในสต๊อก/ใบสั่งเหมือนเดิม)
                 const sc = document.getElementById('dyeingKpiSplitContainer'); if (sc) sc.innerHTML = '';
             } else {
@@ -22211,8 +22234,11 @@
             const body = document.getElementById('dyeingExternalPlanBody');
             const countEl = document.getElementById('dyeingExternalPlanCount');
             if (!body) return;
-            const groups = buildDyeExternalPlanRows();
+            const allGroups = buildDyeExternalPlanRows();
+            const groups = allGroups.filter(g => dyePlanOrderMatches('ext', g.order));
             if (countEl) countEl.textContent = String(groups.length);
+            dyePlanFilterHint('ext', groups.length, allGroups.length);
+            if (groups.length === 0 && allGroups.length > 0) { body.innerHTML = '<div class="p-4 text-center text-xs text-slate-400">ไม่พบ M/O, S/O ตามตัวกรอง</div>'; return; }
             if (groups.length === 0) {
                 body.innerHTML = '<div class="p-4 text-center text-xs text-slate-400">ยังไม่มี M/O ที่จ้างย้อมภายนอกในเดือนที่เลือก — ตั้ง M/O เป็น "ไหมสั่งย้อมนอกบริษัท" ในแผนกวางแผน หรือนำเข้า Packing Slip ผู้รับจ้าง</div>';
                 return;
@@ -22257,11 +22283,59 @@
                             <td class="px-3 py-1.5 text-right">${addBtn}</td>
                         </tr>`;
                     }).join('');
-                return head + `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500 text-[11px]"><tr>
+                return dyePlanWrapGroup('ext', o, head, `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500 text-[11px]"><tr>
                     <th class="px-3 py-1.5 text-left">code สี</th><th class="px-3 py-1.5 text-right">นน.ในใบสั่งย้อม (Kg.)</th><th class="px-3 py-1.5 text-right">หัก Surplus (Kg.)</th><th class="px-3 py-1.5 text-right">ต้องย้อม (Kg.)</th>
                     <th class="px-3 py-1.5 text-right">รับจากผู้รับจ้าง (Kg.)</th><th class="px-3 py-1.5 text-right">คงเหลือ (Kg.)</th><th class="px-3 py-1.5 text-left" title="ไหมของเราที่ส่งไปย้อม / ไหมที่ซื้อจากผู้รับจ้างย้อม (ตั้งที่แผนกวางแผน)">ไหมที่ใช้ (Kg.)</th><th class="px-3 py-1.5 text-left">สถานะ</th><th class="px-3 py-1.5 text-left">ผู้รับจ้าง / ใบส่ง</th><th class="px-3 py-1.5"></th>
-                    </tr></thead><tbody class="divide-y divide-slate-100">${rows}</tbody></table></div>`;
+                    </tr></thead><tbody class="divide-y divide-slate-100">${rows}</tbody></table></div>`);
             }).join('');
+        }
+
+        // NEW (2026-10-21): "รายการที่รับ order ใบสั่งย้อมจากแผนกวางแผนไม่ต้องโชว์รายการทั้งหมด ให้กดดูได้เป็นราย M/O,S/O, รายวัน"
+        // แผงใบสั่งย้อมจากแผนกวางแผน (แท็บไหมจ้างย้อม + ย้อมภายในบริษัท) แสดงเป็นแถว M/O,S/O พับเก็บไว้ กดเพื่อดูรายสี;
+        // ตัวกรองข้อความ (M/O,S/O,ลูกค้า) และวันที่ (มีรายการสั่งย้อม/ย้อม/ต้องการในวันนั้น) — เมื่อกรองอยู่จะกางให้อัตโนมัติ
+        const dyePlanFilter = { ext: { text: '', day: '' }, int: { text: '', day: '' } };
+        const dyePlanOpen = new Set(); // 'kind|moSo' ที่ผู้ใช้กางไว้
+        function setDyePlanFilter(kind) {
+            const t = document.getElementById('dyePlanSearch_' + kind), d = document.getElementById('dyePlanDay_' + kind);
+            dyePlanFilter[kind] = { text: t ? t.value.trim() : '', day: d ? d.value : '' };
+            if (kind === 'ext') renderDyeExternalPlanSection(); else renderDyeInternalPlanSection();
+        }
+        function clearDyePlanFilter(kind) {
+            const t = document.getElementById('dyePlanSearch_' + kind), d = document.getElementById('dyePlanDay_' + kind);
+            if (t) t.value = ''; if (d) d.value = '';
+            setDyePlanFilter(kind);
+        }
+        function dyePlanOrderMatches(kind, order) {
+            const f = dyePlanFilter[kind] || { text: '', day: '' };
+            if (f.text) {
+                const q = f.text.toLowerCase();
+                const hay = (String(order.moSo || '') + ' ' + String(order.customerName || '') + ' ' + String(order.customerPO || '')).toLowerCase();
+                if (!hay.includes(q) && !normalizeDyeingMoSoMatchKey(order.moSo).includes(normalizeDyeingMoSoMatchKey(f.text))) return false;
+            }
+            if (f.day) {
+                const dyeing = order.dyeing || {};
+                const log = Array.isArray(dyeing.dyeOrderLog) ? dyeing.dyeOrderLog : [];
+                const day = f.day;
+                const hit = log.some(r => r && typeof r === 'object' && (kind === 'ext' ? isOutsourcedDyeRow(r) : !isOutsourcedDyeRow(r)) && (normalizeDateString(r.orderDate) === day || normalizeDateString(r.actualDate) === day || normalizeDateString(r.plannedDate) === day))
+                    || (Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders : []).some(r => r && typeof r === 'object' && (kind === 'ext' ? getDyeRowWhere(order, r) !== 'internal' : getDyeRowWhere(order, r) === 'internal') && normalizeDateString(r.reqDate) === day);
+                if (!hit) return false;
+            }
+            return true;
+        }
+        function dyePlanWrapGroup(kind, order, headHtml, tableHtml) {
+            const f = dyePlanFilter[kind] || { text: '', day: '' };
+            const key = kind + '|' + order.moSo;
+            const open = !!(f.text || f.day) || dyePlanOpen.has(key);
+            return `<details class="group" data-dye-plan-group="${escapeHtml(order.moSo)}" ${open ? 'open' : ''} ontoggle="dyePlanToggled('${kind}', decodeURIComponent('${encodeURIComponent(order.moSo)}'), this.open)">
+                <summary class="list-none cursor-pointer hover:brightness-95 flex items-start gap-1"><i class="fa-solid fa-chevron-right text-[9px] text-slate-400 mt-3 ml-2 shrink-0 transition group-open:rotate-90"></i><div class="flex-1 min-w-0">${headHtml}</div></summary>
+                ${tableHtml}
+            </details>`;
+        }
+        function dyePlanToggled(kind, moSo, isOpen) { const k = kind + '|' + moSo; if (isOpen) dyePlanOpen.add(k); else dyePlanOpen.delete(k); }
+        function dyePlanFilterHint(kind, shown, total) {
+            const h = document.getElementById('dyePlanHint_' + kind); if (!h) return;
+            const f = dyePlanFilter[kind] || {};
+            h.textContent = (f.text || f.day) ? `แสดง ${shown} จาก ${total} M/O, S/O ตามตัวกรอง` : 'แสดงเป็นรายการ M/O, S/O — กดที่ M/O เพื่อดูรายสี · เลือกวันที่เพื่อดูเฉพาะที่มีรายการวันนั้น';
         }
 
         // NEW (2026-10-21): ใบสั่งย้อมจากแผนกวางแผน เทียบกับที่ย้อม/โอนจริง ของ "ย้อมภายในบริษัท" (หน้าตาเหมือนแผงของแท็บไหมจ้างย้อม)
@@ -22322,14 +22396,17 @@
         function renderDyeInternalPlanSection() {
             const sec = document.getElementById('dyeingInternalPlanSection');
             if (!sec) return;
-            const on = currentDyeingKpiTab === 'regular';
+            const on = currentDyeingKpiTab === 'internal';
             sec.classList.toggle('hidden', !on);
             if (!on) return;
             const body = document.getElementById('dyeingInternalPlanBody');
             const countEl = document.getElementById('dyeingInternalPlanCount');
             if (!body) return;
-            const groups = buildDyeInternalPlanRows();
+            const allGroups = buildDyeInternalPlanRows();
+            const groups = allGroups.filter(g => dyePlanOrderMatches('int', g.order));
             if (countEl) countEl.textContent = String(groups.length);
+            dyePlanFilterHint('int', groups.length, allGroups.length);
+            if (groups.length === 0 && allGroups.length > 0) { body.innerHTML = '<div class="p-4 text-center text-xs text-slate-400">ไม่พบ M/O, S/O ตามตัวกรอง</div>'; return; }
             if (groups.length === 0) {
                 body.innerHTML = '<div class="p-4 text-center text-xs text-slate-400">ยังไม่มีใบสั่งย้อมในบริษัทในเดือนที่เลือก — แผนกวางแผนลงใบสั่งย้อม (code สี/น้ำหนัก) ที่หน้าแผนกวางแผน</div>';
                 return;
@@ -22366,10 +22443,10 @@
                         <td class="px-3 py-1.5 text-[11px] text-slate-500">${r.nLog > 0 ? `บันทึก ${r.nLog} แถว` : '<span class="text-slate-300">-</span>'}</td>
                     </tr>`;
                 }).join('');
-                return head + `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500 text-[11px]"><tr>
+                return dyePlanWrapGroup('int', o, head, `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500 text-[11px]"><tr>
                     <th class="px-3 py-1.5 text-left">code สี</th><th class="px-3 py-1.5 text-right">นน.ในใบสั่งย้อม (Kg.)</th><th class="px-3 py-1.5 text-right">หัก Surplus (Kg.)</th><th class="px-3 py-1.5 text-right">ต้องย้อม (Kg.)</th>
                     <th class="px-3 py-1.5 text-right">ย้อมแล้ว/โอนจริง (Kg.)</th><th class="px-3 py-1.5 text-right">คงเหลือ (Kg.)</th><th class="px-3 py-1.5 text-left">สถานะ</th><th class="px-3 py-1.5 text-left">บันทึกสั่งย้อม</th>
-                    </tr></thead><tbody class="divide-y divide-slate-100">${rows}</tbody></table></div>`;
+                    </tr></thead><tbody class="divide-y divide-slate-100">${rows}</tbody></table></div>`);
             }).join('');
         }
 
