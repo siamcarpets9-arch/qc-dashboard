@@ -4096,7 +4096,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-88';
+        const APP_BUILD = 'QCDashboard-89';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -23435,37 +23435,45 @@
         }
         // เลขล่าสุดที่มีในระบบ แยกตามชุดเลข (รหัสหน้าเลข: '' = M/O ต่างประเทศ, SC, TH, DM, MP, D)
         function histExistingBaselines() {
+            // เก็บทุกเลขที่มีในระบบแยกตามชุดเลข (ใช้หาเลขล่าสุดแบบตัดค่าผิดปกติออกอีกที ตอน histMarkLatestRows)
             const base = {};
             productionOrders.forEach(o => {
                 const m = String(o.moSo || '').trim().match(/^([A-Za-z]*)\s*0*(\d+)\s*[\/\-]\s*(\d{2,4})$/);
                 if (!m) return;
                 const seq = histSeqOf(m[2], Number(m[3]) % 100);
                 const key = m[1].toUpperCase();
-                if (seq > (base[key] ? base[key].seq : 0)) base[key] = { seq, moSo: String(o.moSo).trim() };
+                (base[key] = base[key] || []).push({ seq, moSo: String(o.moSo).trim() });
             });
             return base;
         }
-        // โหมดงานใหม่: "เอาเฉพาะ M/O ล่าสุด" = เลขที่ใหม่กว่าเลขล่าสุดของชุดเลขนั้นในระบบ และยังไม่มีในระบบ
-        // ชุดเลขที่ระบบยังไม่มีเลยจะไม่มีเลขอ้างอิง → ใช้เฉพาะที่เปิด M/O ภายใน 60 วันล่าสุด
+        // โหมดงานใหม่: เอา M/O ที่ยังไม่มีในระบบ และเข้าข่ายอย่างใดอย่างหนึ่ง
+        //   (1) เลขที่ใหม่กว่าเลขล่าสุดของชุดเลขนั้นในระบบ  (2) เปิด M/O ภายใน 60 วันล่าสุด
+        // 2026-10-21 FIX: เดิมใช้เลขสูงสุดในระบบเป็นตัวตัดอย่างเดียว ถ้าในระบบมีเลขแปลก ๆ สูงเกินจริง (พิมพ์ผิด/ปีผิด/เลขสำรอง)
+        // M/O ใหม่จริงอย่าง 0193/26 จะถูกตัดทิ้งหมด → "ไม่มี M/O ใหม่" จึงตัดเลขที่สูงกว่าเลขสูงสุดในไฟล์ทิ้ง
+        // และเพิ่มเงื่อนไข 60 วันเป็นตัวช่วยเสมอ
         function histMarkLatestRows(result) {
-            const base = histExistingBaselines();
+            const baseAll = histExistingBaselines();
             const bySeries = {};
-            result.rows.forEach(e => { if (e.status === 'new') (bySeries[e.prefix] = bySeries[e.prefix] || []).push(e); });
+            result.rows.forEach(e => { (bySeries[e.prefix] = bySeries[e.prefix] || []).push(e); });
             result.series = [];
+            const cut = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
             Object.keys(bySeries).forEach(prefix => {
-                const rows = bySeries[prefix];
-                const b = base[prefix];
+                const allRows = bySeries[prefix];
+                const rows = allRows.filter(e => e.status === 'new');
+                const fileMax = allRows.reduce((m, e) => Math.max(m, e.seq || 0), 0);
+                // เลขล่าสุดในระบบ: ไม่นับเลขที่สูงกว่าเลขสูงสุดในไฟล์ (ผิดปกติ) 
+                let b = null, ignored = 0;
+                (baseAll[prefix] || []).forEach(x => {
+                    if (x.seq > fileMax) { ignored++; return; }
+                    if (!b || x.seq > b.seq) b = x;
+                });
+                const isRecent = e => !!(e.raw.openDate && e.raw.openDate >= cut);
                 let picked, rule;
-                if (b) { picked = rows.filter(e => e.seq > b.seq); rule = 'baseline'; }
-                else {
-                    // ยังไม่มีเลขชุดนี้ในระบบเลย → เอาเฉพาะที่เปิด M/O ภายใน 60 วันล่าสุด (กันดึงงานเก่าหลายปีเข้าแผน)
-                    const cut = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
-                    picked = rows.filter(e => e.raw.openDate && e.raw.openDate >= cut);
-                    rule = 'recent60';
-                }
+                if (b) { picked = rows.filter(e => e.seq > b.seq || isRecent(e)); rule = 'baseline'; }
+                else { picked = rows.filter(isRecent); rule = 'recent60'; }
                 picked.forEach(e => { e.latest = true; });
                 picked.sort((a, c) => a.seq - c.seq);
-                result.series.push({ prefix, baseline: b ? b.moSo : '', rule, count: picked.length, firstNo: picked[0] && picked[0].moSo, lastNo: picked.length ? picked[picked.length - 1].moSo : '', olderMissing: rows.length - picked.length });
+                result.series.push({ prefix, baseline: b ? b.moSo : '', rule, ignoredBaselines: ignored, count: picked.length, firstNo: picked[0] && picked[0].moSo, lastNo: picked.length ? picked[picked.length - 1].moSo : '', olderMissing: rows.length - picked.length });
             });
             result.latestCount = result.rows.filter(e => e.latest).length;
         }
@@ -23618,7 +23626,7 @@
             if (st.mode === 'new') {
                 const latestRows = c.rows.filter(e => e.latest).sort((a, b) => (a.prefix > b.prefix) - (a.prefix < b.prefix) || a.seq - b.seq);
                 const pickedRows = latestRows.filter(e => !st.skipKeys.has(e.key));
-                const serHtml = (c.series || []).map(sr => `<div class="text-[11px] ${sr.count > 0 ? 'text-slate-600' : 'text-slate-400'}"><b>${escapeHtml(sr.prefix || 'M/O ต่างประเทศ')}</b>: ${sr.baseline ? `ในระบบล่าสุด ${escapeHtml(sr.baseline)} → ` : 'ยังไม่มีเลขชุดนี้ในระบบ → ใช้เฉพาะที่เปิด M/O ภายใน 60 วัน → '}${sr.count > 0 ? `จะนำเข้า ${sr.count} รายการ (${escapeHtml(sr.firstNo)}${sr.count > 1 ? ' – ' + escapeHtml(sr.lastNo) : ''})` : 'ไม่มีรายการใหม่กว่า'}${sr.olderMissing > 0 ? ` <span class="text-slate-400">• เลขเก่ากว่าที่ไม่มีในระบบ ${sr.olderMissing} รายการ (ไม่นำเข้า)</span>` : ''}</div>`).join('');
+                const serHtml = (c.series || []).map(sr => `<div class="text-[11px] ${sr.count > 0 ? 'text-slate-600' : 'text-slate-400'}"><b>${escapeHtml(sr.prefix || 'M/O ต่างประเทศ')}</b>: ${sr.baseline ? `ในระบบล่าสุด ${escapeHtml(sr.baseline)} (+ที่เปิดใน 60 วัน) → ` : 'ยังไม่มีเลขชุดนี้ในระบบ → ใช้เฉพาะที่เปิด M/O ภายใน 60 วัน → '}${sr.count > 0 ? `จะนำเข้า ${sr.count} รายการ (${escapeHtml(sr.firstNo)}${sr.count > 1 ? ' – ' + escapeHtml(sr.lastNo) : ''})` : 'ไม่มีรายการใหม่กว่า'}${sr.ignoredBaselines > 0 ? ` <span class="text-amber-600">• ข้ามเลขในระบบที่สูงผิดปกติ ${sr.ignoredBaselines} รายการ</span>` : ''}${sr.olderMissing > 0 ? ` <span class="text-slate-400">• เลขเก่ากว่าที่ไม่มีในระบบ ${sr.olderMissing} รายการ (ไม่นำเข้า)</span>` : ''}</div>`).join('');
                 if (latestRows.length === 0) {
                     monthsEl.innerHTML = `<div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-2">${serHtml}</div><p class="text-xs text-slate-500 text-center py-6"><i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i>ไม่มี M/O, S/O ใหม่กว่าที่มีในระบบ — ระบบเป็นปัจจุบันแล้ว</p>`;
                     confirmBtn.classList.add('hidden');
