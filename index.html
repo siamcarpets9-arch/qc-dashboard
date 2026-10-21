@@ -1818,6 +1818,15 @@
                                 </label>
                             </div>
                         </div>
+                        <!-- NEW (2026-10-21): "ในบันทึกสั่งย้อม ย้อมภายในบริษัท ให้ทำรายการเหมือนกับไหมจ้างย้อม" — ใบสั่งย้อมจากแผนกวางแผน เทียบกับที่ย้อม/โอนจริง (เฉพาะแท็บ "บันทึกสั่งย้อม") — renderDyeInternalPlanSection() -->
+                        <div id="dyeingInternalPlanSection" class="hidden border-b border-slate-100">
+                            <div class="px-4 py-2.5 flex flex-wrap items-center gap-2">
+                                <h4 class="font-bold text-indigo-900 text-xs"><i class="fa-solid fa-clipboard-list mr-1.5 text-indigo-600"></i>ใบสั่งย้อมจากแผนกวางแผน (เทียบกับที่ย้อมจริง — ย้อมภายในบริษัท)</h4>
+                                <span class="text-[10px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full border border-indigo-200"><span id="dyeingInternalPlanCount">0</span> M/O</span>
+                                <span class="text-[10px] text-slate-400">อ่านอย่างเดียว — แก้ใบสั่งย้อมที่แผนกวางแผน · ยอดที่ย้อมแล้วมาจากตารางบันทึกสั่งย้อมด้านล่าง</span>
+                            </div>
+                            <div id="dyeingInternalPlanBody"></div>
+                        </div>
                         <!-- NEW (2026-10-08): ใบสั่งย้อมจากแผนกวางแผน เทียบกับไหมที่รับจากผู้รับจ้างจริง — เฉพาะแท็บ "ไหมจ้างย้อม" (renderDyeExternalPlanSection) -->
                         <div id="dyeingExternalPlanSection" class="hidden border-b border-slate-100">
                             <div class="px-4 py-2.5 flex flex-wrap items-center gap-2">
@@ -4085,7 +4094,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-92';
+        const APP_BUILD = 'QCDashboard-93';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -22001,6 +22010,7 @@
             flatRows = sortFlat(flatRows);
             // 2026-10-21: แท็บ "บันทึกสั่งย้อม" แสดงเฉพาะย้อมภายในบริษัท — ไหมจ้างย้อมอยู่แท็บ "ไหมจ้างย้อม" ของตัวเอง (ยกเลิกส่วนที่ 2 ที่เพิ่มใน -84)
             try { renderDyeExternalPlanSection(); } catch (e) { console.error('renderDyeExternalPlanSection failed:', e); }
+            try { renderDyeInternalPlanSection(); } catch (e) { console.error('renderDyeInternalPlanSection failed:', e); }
             { const dupBtn = document.getElementById('dyeingKpiDedupeBtn');
               if (dupBtn) { const nDup = findDuplicateDyeLogRows().length; dupBtn.classList.toggle('hidden', nDup === 0); dupBtn.classList.toggle('flex', nDup > 0); const lb = dupBtn.querySelector('[data-dedupe-label]'); if (lb) lb.textContent = `ลบรายการซ้ำ ${nDup} แถว`; } }
 
@@ -22250,6 +22260,115 @@
                 return head + `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500 text-[11px]"><tr>
                     <th class="px-3 py-1.5 text-left">code สี</th><th class="px-3 py-1.5 text-right">นน.ในใบสั่งย้อม (Kg.)</th><th class="px-3 py-1.5 text-right">หัก Surplus (Kg.)</th><th class="px-3 py-1.5 text-right">ต้องย้อม (Kg.)</th>
                     <th class="px-3 py-1.5 text-right">รับจากผู้รับจ้าง (Kg.)</th><th class="px-3 py-1.5 text-right">คงเหลือ (Kg.)</th><th class="px-3 py-1.5 text-left" title="ไหมของเราที่ส่งไปย้อม / ไหมที่ซื้อจากผู้รับจ้างย้อม (ตั้งที่แผนกวางแผน)">ไหมที่ใช้ (Kg.)</th><th class="px-3 py-1.5 text-left">สถานะ</th><th class="px-3 py-1.5 text-left">ผู้รับจ้าง / ใบส่ง</th><th class="px-3 py-1.5"></th>
+                    </tr></thead><tbody class="divide-y divide-slate-100">${rows}</tbody></table></div>`;
+            }).join('');
+        }
+
+        // NEW (2026-10-21): ใบสั่งย้อมจากแผนกวางแผน เทียบกับที่ย้อม/โอนจริง ของ "ย้อมภายในบริษัท" (หน้าตาเหมือนแผงของแท็บไหมจ้างย้อม)
+        // แถว = สีในใบสั่งย้อมที่ตั้งย้อมในบริษัท (getDyeRowWhere = internal) + สีที่ย้อมในบริษัทแล้วแต่ไม่อยู่ในใบสั่ง ("นอกใบสั่ง")
+        // ยอดย้อมแล้ว = นน.โอนจริง (actualTransferKg) ของแถวย้อมในบริษัท (ไม่นับแถวจ้างภายนอก) — ตัวเลขชุดเดียวกับ % ย้อมของสีนั้น
+        function buildDyeInternalPlanRows() {
+            const groups = [];
+            (productionOrders || []).forEach((order, orderIndex) => {
+                const dyeing = (order && order.dyeing) || {};
+                const log = Array.isArray(dyeing.dyeOrderLog) ? dyeing.dyeOrderLog : [];
+                const intLog = log.filter(r => r && typeof r === 'object' && !isOutsourcedDyeRow(r));
+                const planRows = (Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders : []).filter(r => r && typeof r === 'object' && normalizeDyeColorCodeKey(r.colorCode) && getDyeRowWhere(order, r) === 'internal');
+                if (planRows.length === 0 && intLog.length === 0) return;
+                if (!(reportMonthMatchOrder(order) || intLog.some(r => reportMonthMatchDate(r.orderDate || r.actualDate, order)))) return;
+                const plan = new Map(); // key → { code, kg, required }
+                planRows.forEach(r => {
+                    const key = normalizeDyeColorCodeKey(r.colorCode);
+                    const kg = Number(r.kg) || 0;
+                    const req = r.useSurplus ? Math.max(0, kg - (Number(r.surplusKg) || 0)) : kg;
+                    const p = plan.get(key) || { code: String(r.colorCode).trim(), kg: 0, req: 0 };
+                    p.kg += kg; p.req += req; plan.set(key, p);
+                });
+                const got = new Map(); // key → { code, kg, n }
+                intLog.forEach(r => {
+                    const key = normalizeDyeColorCodeKey(r.colorCode);
+                    if (!key) return;
+                    const g = got.get(key) || { code: String(r.colorCode).trim(), kg: 0, n: 0 };
+                    g.kg += Number(r.actualTransferKg) || 0; g.n++; got.set(key, g);
+                });
+                const rows = [];
+                plan.forEach((p, key) => {
+                    const g = got.get(key);
+                    rows.push({ key, code: p.code, planKg: p.kg, surplusKg: Math.max(0, p.kg - p.req), requiredKg: p.req, gotKg: g ? g.kg : 0, nLog: g ? g.n : 0, inPlan: true });
+                });
+                got.forEach((g, key) => {
+                    if (plan.has(key)) return;
+                    // สีที่อยู่ในใบสั่งแต่ตั้งย้อมนอก ไม่ใช่ "นอกใบสั่ง"
+                    const inOtherPlan = (Array.isArray(dyeing.colorOrders) ? dyeing.colorOrders : []).some(r => r && normalizeDyeColorCodeKey(r.colorCode) === key);
+                    if (inOtherPlan) return;
+                    if (g.kg <= 0.005) return;
+                    rows.push({ key, code: g.code, planKg: 0, surplusKg: 0, requiredKg: 0, gotKg: g.kg, nLog: g.n, inPlan: false });
+                });
+                if (rows.length === 0) return;
+                rows.forEach(r => {
+                    const remain = r.requiredKg - r.gotKg;
+                    r.remainKg = r.inPlan ? Math.max(0, remain) : 0;
+                    if (!r.inPlan) r.status = 'extra';
+                    else if (r.gotKg <= 0.005) r.status = 'none';
+                    else if (r.gotKg < r.requiredKg - 0.01) r.status = 'partial';
+                    else if (r.gotKg > r.requiredKg + 0.01 && r.requiredKg > 0) { r.status = 'over'; r.overKg = Math.round((r.gotKg - r.requiredKg) * 100) / 100; }
+                    else r.status = 'done';
+                });
+                groups.push({ order, orderIndex, rows });
+            });
+            return groups;
+        }
+
+        function renderDyeInternalPlanSection() {
+            const sec = document.getElementById('dyeingInternalPlanSection');
+            if (!sec) return;
+            const on = currentDyeingKpiTab === 'regular';
+            sec.classList.toggle('hidden', !on);
+            if (!on) return;
+            const body = document.getElementById('dyeingInternalPlanBody');
+            const countEl = document.getElementById('dyeingInternalPlanCount');
+            if (!body) return;
+            const groups = buildDyeInternalPlanRows();
+            if (countEl) countEl.textContent = String(groups.length);
+            if (groups.length === 0) {
+                body.innerHTML = '<div class="p-4 text-center text-xs text-slate-400">ยังไม่มีใบสั่งย้อมในบริษัทในเดือนที่เลือก — แผนกวางแผนลงใบสั่งย้อม (code สี/น้ำหนัก) ที่หน้าแผนกวางแผน</div>';
+                return;
+            }
+            const f = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const STATUS = {
+                none: ['ยังไม่ได้ย้อม', 'bg-amber-50 text-amber-700 border-amber-200'],
+                partial: ['ย้อมบางส่วน', 'bg-sky-50 text-sky-700 border-sky-200'],
+                done: ['ย้อมครบตามใบสั่ง', 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+                over: ['เกินใบสั่ง', 'bg-rose-50 text-rose-700 border-rose-200'],
+                extra: ['นอกใบสั่ง', 'bg-violet-50 text-violet-700 border-violet-200']
+            };
+            body.innerHTML = groups.map(g => {
+                const o = g.order;
+                const tPlan = g.rows.reduce((s, r) => s + r.requiredKg, 0), tGot = g.rows.reduce((s, r) => s + r.gotKg, 0);
+                const tRemain = g.rows.reduce((s, r) => s + r.remainKg, 0);
+                const tOver = g.rows.reduce((s, r) => s + (r.overKg || 0), 0);
+                const head = `<div class="px-3 py-2 bg-indigo-50/60 border-t border-indigo-100 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-int-plan-order="${escapeHtml(o.moSo)}">
+                    <span class="font-bold ${moSoTextColorClass(o)}">${escapeHtml(o.moSo)}</span>
+                    ${o.customerName ? `<span class="text-slate-500">${escapeHtml(o.customerName)}</span>` : ''}
+                    ${o.dueDate ? `<span class="text-slate-400">กำหนดส่ง ${escapeHtml(String(o.dueDate))}</span>` : ''}
+                    <span class="ml-auto text-slate-600">ตามใบสั่ง <b>${f(tPlan)}</b> · ย้อมแล้ว <b>${f(tGot)}</b> · คงเหลือ <b class="${tRemain > 0.01 ? 'text-amber-700' : 'text-emerald-700'}">${f(tRemain)}</b> กก.${tOver > 0.01 ? ` · <b class="text-rose-600" data-int-plan-over>เกินใบสั่ง ${f(tOver)} กก.</b>` : ''}</span>
+                </div>`;
+                const rows = g.rows.map(r => {
+                    const st = STATUS[r.status];
+                    return `<tr class="hover:bg-slate-50/80" data-int-plan-row="${escapeHtml(r.key)}">
+                        <td class="px-3 py-1.5 font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(r.code)}</td>
+                        <td class="px-3 py-1.5 text-right tabular-nums">${r.inPlan ? f(r.planKg) : '-'}</td>
+                        <td class="px-3 py-1.5 text-right tabular-nums text-slate-500">${r.surplusKg > 0.005 ? f(r.surplusKg) : '-'}</td>
+                        <td class="px-3 py-1.5 text-right tabular-nums font-medium">${r.inPlan ? f(r.requiredKg) : '-'}</td>
+                        <td class="px-3 py-1.5 text-right tabular-nums font-medium text-indigo-700">${f(r.gotKg)}</td>
+                        <td class="px-3 py-1.5 text-right tabular-nums ${r.remainKg > 0.01 ? 'text-amber-700 font-medium' : 'text-slate-400'}">${r.inPlan ? f(r.remainKg) : '-'}</td>
+                        <td class="px-3 py-1.5 whitespace-nowrap"><span class="inline-flex px-2 py-0.5 rounded-full border text-[10px] font-semibold ${st[1]}">${st[0]}${r.overKg > 0.005 ? ' ' + f(r.overKg) + ' กก.' : ''}</span></td>
+                        <td class="px-3 py-1.5 text-[11px] text-slate-500">${r.nLog > 0 ? `บันทึก ${r.nLog} แถว` : '<span class="text-slate-300">-</span>'}</td>
+                    </tr>`;
+                }).join('');
+                return head + `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500 text-[11px]"><tr>
+                    <th class="px-3 py-1.5 text-left">code สี</th><th class="px-3 py-1.5 text-right">นน.ในใบสั่งย้อม (Kg.)</th><th class="px-3 py-1.5 text-right">หัก Surplus (Kg.)</th><th class="px-3 py-1.5 text-right">ต้องย้อม (Kg.)</th>
+                    <th class="px-3 py-1.5 text-right">ย้อมแล้ว/โอนจริง (Kg.)</th><th class="px-3 py-1.5 text-right">คงเหลือ (Kg.)</th><th class="px-3 py-1.5 text-left">สถานะ</th><th class="px-3 py-1.5 text-left">บันทึกสั่งย้อม</th>
                     </tr></thead><tbody class="divide-y divide-slate-100">${rows}</tbody></table></div>`;
             }).join('');
         }
