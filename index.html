@@ -1013,6 +1013,8 @@
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">จำนวนสี</label>
                         <input type="number" min="0" id="newOrderColorsCount" placeholder="0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="text" id="newOrderColorsRef" list="colorsRefOptions" placeholder="อ้างถึง เช่น ต่อ 1 ผืน / ต่อดีไซน์" class="mt-1.5 w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <datalist id="colorsRefOptions"><option value="ต่อ 1 ผืน"></option><option value="ต่อดีไซน์"></option><option value="ต่อขนาด"></option><option value="ทั้งใบสั่ง"></option></datalist>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">รหัสดีไซน์ (Design Ref.)</label>
@@ -4110,7 +4112,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-95';
+        const APP_BUILD = 'QCDashboard-96';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6384,7 +6386,7 @@
                         ${infoRow('เลขที่/ชื่อสถานที่ติดตั้ง', order.locationName)}
                         ${infoRow('คุณภาพ', order.quality)}
                         ${infoRow('บรรจุภัณฑ์', order.packaging)}
-                        ${order.colorsCount ? infoRow('จำนวนสี', String(order.colorsCount)) : ''}
+                        ${order.colorsCount ? infoRow('จำนวนสี', String(order.colorsCount) + (order.colorsRef ? ' (อ้างถึง: ' + order.colorsRef + ')' : '')) : ''}
                         ${infoRow('รหัสดีไซน์ (Design Ref.)', order.designRef)}
                         ${infoRow('วันที่ส่งแบบให้แผนกดีไซน์', order.designSentDate)}
                         ${infoRow('วันที่ได้รับแบบจากแผนกดีไซน์', order.designReceivedDate)}
@@ -6510,7 +6512,7 @@
                     <table class="so-grid">
                         <tr><td colspan="2" class="so-section-header">แผนกย้อม และแผนกกรอ/Dyeing &amp; Winding Department</td></tr>
                         <tr><td>ชนิดไหม/Yarn: <span class="so-fill">${v(order.yarnType)}</span></td><td>สิ่งที่แนบให้</td></tr>
-                        <tr><td>จำนวนสี/No. Of Colours......<span class="so-fill">${v(order.colorsCount ? String(order.colorsCount) : '')}</span>......สี POM:.......................</td><td>อ้างถึง/As per: <span class="so-fill">${v(order.refNote)}</span></td></tr>
+                        <tr><td>จำนวนสี/No. Of Colours......<span class="so-fill">${v(order.colorsCount ? String(order.colorsCount) + (order.colorsRef ? ' (' + order.colorsRef + ')' : '') : '')}</span>......สี POM:.......................</td><td>อ้างถึง/As per: <span class="so-fill">${v(order.refNote)}</span></td></tr>
                     </table>
                     <table class="so-grid so-color-table">
                         <thead>
@@ -6640,8 +6642,10 @@
             const pileLoop = anyPile ? sp('pileType', 'loop') : (hasLoopWord && !hasCutWord);
             const pileCutLoop = anyPile ? sp('pileType', 'cutLoop') : (hasCutWord && hasLoopWord);
             const anyCarve = ['hairline', 'carving', 'carvingBeveling', 'embossing', 'embossingBeveling', 'combination'].some(k => sp('carveStyle', k));
-            const carved = anyCarve || /แกะลาย|carv/i.test(surfaceText) || /แกะลาย|carv/i.test(qualityText);
-            const uncarved = /เรียบ|uncarv/i.test(surfaceText);
+            // 2026-10-23: มีช่องติ๊ก "แต่งเรียบ/Uncarved" ใน SPECIFICATIONS แล้ว — ติ๊กไว้ (และไม่ได้ติ๊ก A–F) = แต่งเรียบ ไม่ติ๊ก Carved
+            const explicitUncarved = sp('carveStyle', 'uncarved');
+            const carved = anyCarve || (!explicitUncarved && (/แกะลาย|carv/i.test(surfaceText) || /แกะลาย|carv/i.test(qualityText)));
+            const uncarved = explicitUncarved || /เรียบ|uncarv/i.test(surfaceText);
             const isExport = order.market === 'export', isDomestic = order.market === 'domestic';
 
             const totalSqmText = kgText(order.totalSqm);
@@ -6724,7 +6728,7 @@
                                     <div class="mo-r" style="height:8.5mm;"><div class="mo-c" style="flex:1;">คุณภาพ/Quality:&nbsp;<span class="mo-fill" style="font-size:11px;">${v(order.quality)}</span></div></div>
                                     <div class="mo-r" style="height:7mm;"><div class="mo-c" style="flex:1;">Design/PAT.:&nbsp;<span class="mo-fill">${v(order.designRef)}</span></div></div>
                                     <div class="mo-r" style="height:8mm;"><div class="mo-c" style="flex:1;">กำหนดส่งของ/Delivery:&nbsp;<span class="mo-fill" style="font-size:13px;">${v(fmtDMY(order.dueDate))}</span></div></div>
-                                    <div class="mo-r" style="height:6mm;"><div class="mo-c" style="flex:1;">จำนวนสี/No.of Colors:&nbsp;<span class="mo-fill">${v(order.colorsCount ? String(order.colorsCount) : '')}</span></div></div>
+                                    <div class="mo-r" style="height:6mm;"><div class="mo-c" style="flex:1;">จำนวนสี/No.of Colors:&nbsp;<span class="mo-fill">${v(order.colorsCount ? String(order.colorsCount) + (order.colorsRef ? ' (อ้างถึง: ' + order.colorsRef + ')' : '') : '')}</span></div></div>
                                 </div>
                                 <div style="flex:1; padding:1mm 1.6mm;">
                                     <div>จำนวนชิ้น/No.of Pcs.&nbsp;<span class="mo-fill" style="font-size:14px;">${v(order.totalPieces ? order.totalPieces + ' ชิ้น' : '')}</span>&nbsp;&nbsp;&nbsp;&nbsp;รายละเอียด/Details:</div>
@@ -6745,7 +6749,7 @@
                             <div class="mo-r" style="height:9.3mm;"><div class="mo-c" style="width:23mm; white-space:nowrap;">Pile Texture:</div><div class="mo-c mo-opts" style="flex:1;">${opt(pileCut, 'ขนตัด/CUT')}${opt(pileLoop, 'ขนห่วง/LOOP')}${opt(pileCutLoop, 'ขนตัด&amp;ขนห่วง/CUT&amp;LOOP')}</div></div>
                             <div class="mo-r" style="height:12mm;"><div class="mo-c" style="width:16mm;">Surface:</div><div class="mo-c" style="flex:1; flex-direction:column; align-items:flex-start; justify-content:center; gap:0.8mm;">
                                 <div class="mo-opts">${opt(carved, 'แกะลาย/Carved')}${opt(sp('carveStyle', 'hairline'), 'A)Hairline')}${opt(sp('carveStyle', 'carving'), 'B)Carving')}${opt(sp('carveStyle', 'carvingBeveling'), 'C)Carving&amp;Beveling')}</div>
-                                <div class="mo-opts">${opt(uncarved, 'เต่งเรียบ/Uncarved')}${opt(sp('carveStyle', 'embossing'), 'D)Embossing')}${opt(sp('carveStyle', 'embossingBeveling'), 'E) Embossing&amp;Beveling')}${opt(sp('carveStyle', 'combination'), 'F)Combination')}</div>
+                                <div class="mo-opts">${opt(uncarved, 'แต่งเรียบ/Uncarved')}${opt(sp('carveStyle', 'embossing'), 'D)Embossing')}${opt(sp('carveStyle', 'embossingBeveling'), 'E) Embossing&amp;Beveling')}${opt(sp('carveStyle', 'combination'), 'F)Combination')}</div>
                             </div></div>
                             <div class="mo-r" style="height:14mm;"><div class="mo-c" style="width:16mm;">Backing:</div><div class="mo-c" style="flex:1; flex-direction:column; align-items:flex-start; justify-content:center; gap:1.2mm;">
                                 <div class="mo-opts">${opt(sp('backing', 'scrim'), 'ปะตาข่าย/Scrim')}${opt(sp('backing', 'hessian'), 'ปะกระสอบ/Hessien')}${opt(sp('backing', 'canvas'), 'ปะผ้าใบ/Canvas')}</div>
@@ -9319,7 +9323,8 @@
                 { key: 'loop', label: 'ขนห่วง/LOOP' },
                 { key: 'cutLoop', label: 'ขนตัด&ขนห่วง/CUT&LOOP' }
             ]},
-            { key: 'carveStyle', label: 'ลวดลาย — แกะลาย/Carv เหมือน S/O • แต่งเรียบ/Uncarved', options: [
+            { key: 'carveStyle', label: 'ลวดลาย — แกะลาย/Carved เหมือน S/O • แต่งเรียบ/Uncarved', options: [
+                { key: 'uncarved', label: 'แต่งเรียบ/Uncarved' },
                 { key: 'hairline', label: 'A) Hairline' },
                 { key: 'carving', label: 'B) Carving' },
                 { key: 'carvingBeveling', label: 'C) Carving&Beveling' },
@@ -9686,6 +9691,7 @@
                 quality: raw.quality || '',                     // QUALITY (YARNS COUNT & TEXTURE TUFTING)
                 packaging: raw.packaging || '',                 // PACKAGING
                 colorsCount: Number(raw.colorsCount) || 0,       // COLORS (จำนวนสีของดีไซน์นี้)
+                colorsRef: String(raw.colorsRef || ''),          // 2026-10-23: จำนวนสี "อ้างถึงอะไร" (เช่น ต่อ 1 ผืน / ต่อดีไซน์ / ทั้งใบสั่ง)
                 carpetSizeNote: raw.carpetSizeNote || '',        // CARPET SIZE (คำอธิบายขนาดแบบข้อความอิสระ)
                 incoterms: raw.incoterms || '',                 // INCO-TERMS
                 postponeDispatchDate: normalizeDateString(raw.postponeDispatchDate) || '', // POSTPONE DISPATCH DATE
@@ -11979,6 +11985,7 @@
                         <div>
                             <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">จำนวนสี (Colors)</label>
                             <input type="number" min="0" step="1" value="${order.colorsCount || ''}" onchange="updateOrderField(${orderIndex}, 'colorsCount', Number(this.value))" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs">
+                            <input type="text" data-colors-ref list="colorsRefOptions" placeholder="อ้างถึง เช่น ต่อ 1 ผืน / ต่อดีไซน์" value="${escapeHtml(order.colorsRef || '')}" onchange="${f('colorsRef')}" class="mt-1 w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs">
                         </div>
                         <!-- MOVED (2026-09-16): was inside the now-removed production-requirements subsection
                              below — kept here since it's basic order-opening info, while the rest of that
@@ -17808,7 +17815,7 @@
             document.getElementById('newOrderLocationName').value = '';
             document.getElementById('newOrderQuality').value = '';
             document.getElementById('newOrderPackaging').value = '';
-            document.getElementById('newOrderColorsCount').value = '';
+            document.getElementById('newOrderColorsCount').value = ''; { const cr = document.getElementById('newOrderColorsRef'); if (cr) cr.value = ''; }
             document.getElementById('newOrderDesignRef').value = '';
             document.getElementById('newOrderCarpetSizeNote').value = '';
             document.getElementById('newOrderPostponeDispatchDate').value = '';
@@ -18549,6 +18556,7 @@
             const quality = document.getElementById('newOrderQuality').value.trim();
             const packaging = document.getElementById('newOrderPackaging').value.trim();
             const colorsCount = Number(document.getElementById('newOrderColorsCount').value) || 0;
+            const colorsRef = (document.getElementById('newOrderColorsRef') || { value: '' }).value.trim();
             const designRef = document.getElementById('newOrderDesignRef').value.trim();
             const carpetSizeNote = document.getElementById('newOrderCarpetSizeNote').value.trim();
             const postponeDispatchDate = document.getElementById('newOrderPostponeDispatchDate').value;
@@ -18614,6 +18622,7 @@
                 quality: quality,
                 packaging: packaging,
                 colorsCount: colorsCount,
+                colorsRef: colorsRef,
                 carpetSizeNote: carpetSizeNote,
                 postponeDispatchDate: postponeDispatchDate,
                 incoterms: incoterms,
@@ -23131,6 +23140,7 @@
             { key: 'quality', label: 'คุณภาพ', synonyms: ['QUALITY (YARNS COUNT & TEXTURE TUFTING)', 'Quality'] },
             { key: 'packaging', label: 'บรรจุภัณฑ์', synonyms: ['PACKAGING', 'Packaging'] },
             { key: 'colorsCount', label: 'จำนวนสี', type: 'number', synonyms: ['COLORS', 'Colors'] },
+            { key: 'colorsRef', label: 'จำนวนสี อ้างถึง' },
             { key: 'totalPieces', label: 'จำนวนชิ้น', type: 'number', synonyms: ['PCS.', 'PCS'] },
             { key: 'carpetSizeNote', label: 'ขนาดพรม', synonyms: ['CARPET SIZE', 'Carpet Size'] },
             { key: 'totalSqm', label: 'พื้นที่รวม (ตร.ม.)', type: 'number', synonyms: ['Quantity'] },
