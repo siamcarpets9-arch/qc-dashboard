@@ -4112,7 +4112,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-96';
+        const APP_BUILD = 'QCDashboard-97';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -10032,6 +10032,44 @@
             return entries;
         }
 
+        // 2026-10-26: "ประสิทธิภาพการทอพรมต่อวัน วันที่ 26/10 ทำไมไม่เข้า" — (1) ไฟล์ทอเขียนเลข M/O เป็น "161/26" แต่ในระบบเป็น
+        // "0161/26" (เติม 0 ให้ครบ 4 หลัก) จึงจับคู่ไม่เจอ → จับคู่แบบตัดเลข 0 นำหน้า/คำนำหน้า (เหมือนตัวจับคู่ใบสั่งย้อม);
+        // (2) แถวเดียวกัน (M/O + จอ + วัน) ที่มีหลายชิ้น (เช่น จอ 4 ชิ้น 51-60 และ 91-100) เดิมแถวหลังทับแถวแรก ยอดหาย → รวมกัน
+        function weavingFindOrderIndex(moSoText) {
+            const k = normalizeMoSoKey(moSoText);
+            if (!k) return -1;
+            let idx = productionOrders.findIndex(o => normalizeMoSoKey(o.moSo) === k);
+            if (idx !== -1) return idx;
+            const k2 = normalizeDyeingMoSoMatchKey(moSoText);
+            if (!k2) return -1;
+            return productionOrders.findIndex(o => normalizeDyeingMoSoMatchKey(o.moSo) === k2);
+        }
+        // เลขเดียวกันแต่ปีต่าง (เช่น 161/27 พิมพ์ผิดจาก 161/26) — ใช้เป็นคำใบ้ในพรีวิวเท่านั้น ไม่รวมให้เอง
+        function weavingSimilarOrderHint(moSoText) {
+            const m = normalizeDyeingMoSoMatchKey(moSoText).match(/^([A-Z]*)(\d+)\/(\d{2})$/);
+            if (!m) return '';
+            const hit = productionOrders.find(o => {
+                const mm = normalizeDyeingMoSoMatchKey(o.moSo).match(/^([A-Z]*)(\d+)\/(\d{2})$/);
+                return mm && mm[1] === m[1] && mm[2] === m[2] && mm[3] !== m[3];
+            });
+            return hit ? hit.moSo : '';
+        }
+        // รวมแถวที่ซ้ำ (วัน + จอ) ของ M/O เดียวกันในไฟล์เดียว: พื้นที่/ชั่วโมงบวกกัน, พนักงานรวมชื่อ, ประสิทธิภาพ = ตร.ม. ÷ ชม.
+        function mergeWeavingDaysByLoom(days) {
+            const map = new Map();
+            (days || []).forEach(d => {
+                const k = d.dateKey + '|' + String(d.loom || '');
+                const cur = map.get(k);
+                if (!cur) { map.set(k, Object.assign({}, d, { employees: [...(d.employees || [])], _rows: 1 })); return; }
+                cur.sqm = (Number(cur.sqm) || 0) + (Number(d.sqm) || 0);
+                cur.hours = (Number(cur.hours) || 0) + (Number(d.hours) || 0);
+                cur.employees = Array.from(new Set([...(cur.employees || []), ...(d.employees || [])]));
+                cur._rows++;
+                cur.efficiency = cur.hours > 0 ? cur.sqm / cur.hours : null;
+            });
+            return Array.from(map.values()).map(d => { d.sqm = Math.round((Number(d.sqm) || 0) * 10000) / 10000; return d; });
+        }
+
         // Reads every "date-named" sheet in the workbook (e.g. "1-9-26" — anything else, like the "SEP"
         // monthly rollup or the "รายชื่อพนักงานทอมือ" employee list, is skipped automatically since its
         // name won't match) and groups the resulting per-loom entries by M/O.
@@ -10104,10 +10142,10 @@
                     // don't exist in the system yet (need adding manually first) before anything is saved.
                     const rows = moSoKeys.map(key => {
                         const group = byMoSo[key];
-                        const orderIndex = productionOrders.findIndex(o => normalizeMoSoKey(o.moSo) === key);
+                        const orderIndex = weavingFindOrderIndex(group.moSoDisplay);
                         const totalSqmInFile = group.days.reduce((s, d) => s + (Number(d.sqm) || 0), 0);
                         const distinctDays = new Set(group.days.map(d => d.dateKey)).size;
-                        return { key, moSoDisplay: group.moSoDisplay, orderIndex, totalSqmInFile, distinctDays };
+                        return { key, moSoDisplay: group.moSoDisplay, orderIndex, totalSqmInFile, distinctDays, hint: orderIndex === -1 ? weavingSimilarOrderHint(group.moSoDisplay) : '' };
                     }).sort((a, b) => a.moSoDisplay.localeCompare(b.moSoDisplay));
 
                     const matchedCount = rows.filter(r => r.orderIndex !== -1).length;
@@ -10119,7 +10157,7 @@
                     preview.innerHTML = rows.map(r => {
                         const foundBadge = r.orderIndex !== -1
                             ? `<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> พบในระบบ</span>`
-                            : `<span class="text-rose-500"><i class="fa-solid fa-circle-exclamation"></i> ไม่พบ M/O นี้ในระบบ</span>`;
+                            : `<span class="text-rose-500"><i class="fa-solid fa-circle-exclamation"></i> ไม่พบ M/O นี้ในระบบ${r.hint ? ` <span class="text-amber-600" data-weave-hint>(คล้าย ${escapeHtml(r.hint)} — เลขปีต่างกัน? แก้ในไฟล์แล้วนำเข้าใหม่)</span>` : ''}</span>`;
                         return `<div class="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                             <div><span class="font-semibold text-slate-700">${escapeHtml(r.moSoDisplay)}</span>
                                 <span class="text-slate-400 ml-1">${r.distinctDays} วัน, รวม ${r.totalSqmInFile.toFixed(2)} ตร.ม.</span></div>
@@ -10171,7 +10209,7 @@
 
             Object.keys(byMoSo).forEach(key => {
                 const group = byMoSo[key];
-                const orderIndex = productionOrders.findIndex(o => normalizeMoSoKey(o.moSo) === key);
+                const orderIndex = weavingFindOrderIndex(group.moSoDisplay);
                 if (orderIndex === -1) return; // unmatched — already flagged in the preview, nothing to do
                 const order = productionOrders[orderIndex];
                 if (order.weaving.mode === 'external') {
@@ -10180,7 +10218,7 @@
                 }
                 if (!Array.isArray(order.weaving.dailyLog)) order.weaving.dailyLog = [];
 
-                group.days.forEach(d => {
+                mergeWeavingDaysByLoom(group.days).forEach(d => {
                     const entry = { date: d.dateKey, loom: d.loom, sqm: Number(d.sqm) || 0, hours: Number(d.hours) || 0, efficiency: d.efficiency, employees: d.employees || [] };
                     const existingIdx = order.weaving.dailyLog.findIndex(l => l.date === d.dateKey && String(l.loom || '') === String(d.loom || ''));
                     if (existingIdx === -1) order.weaving.dailyLog.push(entry);
@@ -12241,7 +12279,9 @@
             // (order.weaving.dailyLog[].sqm where date === today) across every M/O, S/O, regardless of
             // which entry path wrote it (native "บันทึกการทอรายวัน" form or the "นำเข้าข้อมูลทอ" Excel
             // import — both write the same dailyLog[] shape, see recomputeWeavingSqmFromLog()).
-            const todayKey = new Date().toISOString().split('T')[0];
+            // 2026-10-26: ใช้วันที่ตามเวลาเครื่อง (ไทย) — เดิมใช้วันที่ UTC ทำให้ช่วง 00:00–07:00 "วันนี้" ยังเป็นเมื่อวาน ยอดทอวันนี้ไม่ขึ้น
+            const _nowD = new Date();
+            const todayKey = `${_nowD.getFullYear()}-${String(_nowD.getMonth() + 1).padStart(2, '0')}-${String(_nowD.getDate()).padStart(2, '0')}`;
             let sqmWovenToday = 0;
             productionOrders.forEach(o => {
                 const log = (o.weaving && Array.isArray(o.weaving.dailyLog)) ? o.weaving.dailyLog : [];
