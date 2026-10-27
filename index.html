@@ -654,8 +654,7 @@
             </div>
 
             <!-- 2026-10-21: เอาแผงประมาณการไหมที่ต้องใช้ (overviewYarnPanel) ออกจากภาพรวมตามคำขอ — renderYarnEstimatePanel() ยังอยู่แต่ไม่ทำอะไรถ้าไม่มี container -->
-            <!-- NEW (2026-10-09): รับไหมแต่ละชนิด + ตัดยอดเบิกไปย้อม = สต๊อกคงเหลือ — renderYarnStockPanel() -->
-            <div id="overviewYarnStockPanel" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3"></div>
+            <!-- 2026-10-27: เอาแผง "รับไหม / สต๊อกไหมคงเหลือ (แยกตามชนิดไหม)" (overviewYarnStockPanel) ออกจากภาพรวมตามคำขอ — renderYarnStockPanel() ยังอยู่แต่ไม่ทำอะไรถ้าไม่มี container; ข้อมูลรับไหมที่เคยบันทึกยังอยู่ -->
 
             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3">
                 <div class="relative w-full sm:w-80">
@@ -4112,7 +4111,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-97';
+        const APP_BUILD = 'QCDashboard-99';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -23304,7 +23303,7 @@
                 // mode: pick the months, rows become still-to-produce orders on the planning board.
                 const simpleRows = parseMoOpenRowsFromAoa(aoa);
                 let parsedHistory = null;
-                try { parsedHistory = parseHistoryWorkbook(workbook, file.name); } catch (err) { console.error('importMoOpenReport: history parser failed', err); }
+                try { parsedHistory = parseHistoryWorkbook(workbook, file.name, { includeOnHand: true }); } catch (err) { console.error('importMoOpenReport: history parser failed', err); }
                 const historyRowCount = parsedHistory ? parsedHistory.sheets.reduce((n, sh) => n + (sh.skipped ? 0 : sh.rows.length), 0) : 0;
                 if (historyRowCount > 0 && (workbook.SheetNames.length > 1 || simpleRows.length === 0)) {
                     openImportHistoryModal('new');
@@ -23427,9 +23426,10 @@
         }
 
         // อ่าน 1 sheet (aoa) -> แถวดิบของ M/O, S/O (ยังไม่ใส่รหัสหน้าเลข/ตลาด — ทำตอนคำนวณใน computeHistoryImport())
-        function parseHistorySheet(aoa, sheetName, fileName) {
+        function parseHistorySheet(aoa, sheetName, fileName, opts) {
             const out = { sheetName, rows: [], skipped: '', orderType: 'MO', marketHint: '', cancelled: 0 };
-            if (/on\s*hand|currently/i.test(sheetName)) { out.skipped = 'งานค้างปัจจุบัน (ยังไม่ส่ง) — ข้าม'; return out; }
+            // 2026-10-27 FIX: S/O ใหม่ (ยังไม่ส่ง) อยู่ใน sheet "SAMPLES ON HAND (Currently SO)" — โหมดนำเข้างานใหม่ต้องอ่าน sheet นี้ (โหมดข้อมูลเก่ายังข้าม)
+            if (!(opts && opts.includeOnHand) && /on\s*hand|currently/i.test(sheetName)) { out.skipped = 'งานค้างปัจจุบัน (ยังไม่ส่ง) — ข้าม'; return out; }
             let h = -1;
             for (let i = 0; i < Math.min(aoa.length, 10); i++) {
                 const labels = (aoa[i] || []).map(histCellText);
@@ -23532,7 +23532,8 @@
                 rowsOut.push(row);
                 prevRow = row;
             };
-            const flushPending = () => { pending.forEach(p => emit(p.num, p.id, p.d, false)); pending = []; };
+            // 2026-10-27: เลขที่ว่างเปล่า (จองเลขไว้ ไม่มีลูกค้า/รายละเอียดอะไรเลย เช่น 0403, 0404) ไม่นำเข้า — เดิมไปยืมชื่อลูกค้าของแถวบนมาสร้างเป็นใบปลอม
+            const flushPending = () => { pending.forEach(p => { if (!p.inherited) emit(p.num, p.id, p.d, false); }); pending = []; };
 
             for (let i = start; i < aoa.length; i++) {
                 const r = aoa[i] || [];
@@ -23550,7 +23551,7 @@
                     let id = ownId;
                     if (!hasOwnIdentity && lastId) id = Object.assign({}, lastId, { cancelled: lastId.cancelled && false });
                     else if (hasOwnIdentity) lastId = ownId;
-                    if (!hasDetails && !cancelled) { pending.push({ num, id, d }); continue; }
+                    if (!hasDetails && !cancelled) { pending.push({ num, id, d, inherited: !hasOwnIdentity }); continue; }
                     pending.forEach(p => emit(p.num, p.id, Object.assign({}, d, { sqm: 0 }), false));
                     pending = [];
                     emit(num, id, d, true);
@@ -23578,7 +23579,7 @@
             return m ? m[1].toUpperCase() : '';
         }
 
-        function parseHistoryWorkbook(workbook, fileName) {
+        function parseHistoryWorkbook(workbook, fileName, opts) {
             const file = { fileName, sheets: [], codeHint: histFileCodeHint(fileName) };
             workbook.SheetNames.forEach(name => {
                 const ws = workbook.Sheets[name];
@@ -23588,7 +23589,7 @@
                 const quick = head.some(r => (r || []).some(c => /^open date$/i.test(histCellText(c)) || /^(m\/o|s\/o)\s*no\.?$/i.test(histCellText(c))));
                 if (!quick) { file.sheets.push({ sheetName: name, rows: [], skipped: 'ไม่ใช่ทะเบียนเปิด M/O, S/O — ข้าม', orderType: 'MO', marketHint: '', cancelled: 0 }); return; }
                 const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
-                file.sheets.push(parseHistorySheet(aoa, name, fileName));
+                file.sheets.push(parseHistorySheet(aoa, name, fileName, opts));
             });
             return file;
         }
@@ -23744,7 +23745,7 @@
                 reader.onload = (e) => {
                     try {
                         const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
-                        parsed.push(parseHistoryWorkbook(workbook, file.name));
+                        parsed.push(parseHistoryWorkbook(workbook, file.name, { includeOnHand: historyImportState.mode === 'new' }));
                     } catch (err) {
                         console.error('history import: cannot read', file.name, err);
                         parsed.push({ fileName: file.name, sheets: [{ sheetName: '-', rows: [], skipped: 'อ่านไฟล์ไม่สำเร็จ', orderType: 'MO', marketHint: '', cancelled: 0 }], codeHint: '' });
