@@ -213,11 +213,20 @@
            bottom — the original Excel's "รายละเอียดเพิ่มเติม" row alone was set to ~4x a normal row's
            height, which is most of what made it fill the page) — bigger table gaps, taller boxed note
            areas, and a lower/larger signature block bring it back in line with the original's proportions. */
-        .so-page2 table.so-grid { margin-bottom: 10px; }
-        .so-page2 table.so-grid td, .so-page2 table.so-grid th { padding: 4px 6px; line-height: 1.4; }
+        .so-page2 table.so-grid { margin-bottom: 6px; flex: none; }
+        .so-page2 table.so-grid td, .so-page2 table.so-grid th { padding: 3px 6px; line-height: 1.35; }
         .so-notes-cell { height: 68px; }
         .so-finishing-subrow td { height: 22px; }
         .so-signature-row { display: flex; justify-content: space-between; margin-top: 22px; font-size: 11px; gap: 20px; line-height: 1.9; }
+        /* 2026-11-02: หน้า 2 ของ S/O เต็มแผ่น A4 (พื้นที่พิมพ์ 277mm = 297 - 2x10mm margin) — ไม่เหลือแถบว่างด้านล่าง:
+           ช่อง "รายละเอียดเพิ่มเติม" ยืดกินพื้นที่ที่เหลือ (flex:1), ลายเซ็น/รหัสฟอร์มชิดล่างสุด */
+        .so-page2 { box-sizing: border-box; height: 276mm; display: flex; flex-direction: column; }
+        .so-notes-box { flex: 1 1 auto; min-height: 30mm; border: 1px solid #000; border-top: 0; margin-top: -6px; margin-bottom: 6px; padding: 3px 6px; font-size: 11px; line-height: 1.35; box-sizing: border-box; }
+        .so-page2 .so-signature-row { margin-top: 0; padding-top: 4mm; flex: none; }
+        .so-page2 .so-footer-code { flex: none; margin-top: 2mm; }
+/* ติ๊กรายการ SPECIFICATIONS ที่ติ๊กไว้ในใบ S/O ลงช่องวงกลมของแผนกตกแต่ง (พับขอบ/ปล่อยขอบ/แต่งเรียบ/แกะลาย/Label) */
+        .so-checkbox { width: 11px; height: 11px; box-sizing: border-box; text-align: center; font-size: 9px; line-height: 9px; font-weight: 800; }
+        .so-checkbox.so-checked::after { content: '\2713'; }
 
         /* NEW (2026-09-16): "ใบ M/O" (Manufacturing Order) — 2-page A3 replica of the company's official
            paper "MANUFACTURING ORDER" work sheet (แผนกขายให้เพิ่มแบบฟอร์มนี้ ดึงข้อมูลแต่ละแผนกมาใส่ให้
@@ -4111,7 +4120,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-99';
+        const APP_BUILD = 'QCDashboard-101';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6526,6 +6535,16 @@
                 </div>
             `;
 
+            // 2026-11-02: รายการที่ติ๊กไว้ใน SPECIFICATIONS ของใบ S/O → ติ๊กลงช่องวงกลมของแผนกตกแต่งในแบบพิมพ์หน้า 2
+            // (ขอบพรม: พับขอบ/ปล่อยขอบ • ลวดลาย: แต่งเรียบ, A–F = แกะลาย • เจ้าของวัสดุ/แบบ: บริษัท → SIAM CARPETS, ลูกค้า → OTHERS)
+            const soSpecs = order.specs || {};
+            const soSp = (g, k) => !!(soSpecs[g] && soSpecs[g][k]);
+            const soCb = (on) => `<span class="so-checkbox${on ? ' so-checked' : ''}"></span>`;
+            const spEdgeBinding = soSp('edge', 'binding'), spEdgeWall = soSp('edge', 'wallToWall');
+            const spUncarved = soSp('carveStyle', 'uncarved');
+            const spCarved = ['hairline', 'carving', 'carvingBeveling', 'embossing', 'embossingBeveling', 'combination'].some(k => soSp('carveStyle', k));
+            const spLabelSiam = soSp('ownership', 'siamCarpets'), spLabelOther = soSp('ownership', 'customer');
+
             const page2 = `
                 <div class="so-page so-page2">
                     <div class="so-page-number">หน้าที่ 2/2</div>
@@ -6538,7 +6557,7 @@
                         <tr><td>ตรวจสอบ</td><td></td></tr>
                     </table>
                     <table class="so-grid">
-                        <tr><td colspan="7" class="so-section-header">แผนกทอ/Tufting Department</td></tr>
+                        <tr><td colspan="8" class="so-section-header">แผนกทอ/Tufting Department</td></tr>
                         <tr>
                             <th style="width:10%;">ทอ</th><th style="width:10%;">ก้าว</th><th style="width:10%;">แถว</th>
                             <th style="width:20%;">ความสูง หลัง/ก่อน เจียร(มม.)</th><th style="width:6%;">&nbsp;</th>
@@ -6547,19 +6566,19 @@
                         <tr><td>Cut</td><td></td><td></td><td></td><td>1</td><td></td><td></td><td></td></tr>
                         <tr><td>Loop</td><td></td><td></td><td></td><td>2</td><td></td><td></td><td></td></tr>
                         <tr><td></td><td></td><td></td><td></td><td>3</td><td></td><td></td><td></td></tr>
-                        <tr><td colspan="8" class="so-notes-cell">รายละเอียดเพิ่มเติม</td></tr>
                     </table>
+                    <div class="so-notes-box">รายละเอียดเพิ่มเติม</div>
                     <table class="so-grid">
                         <tr><td colspan="4" class="so-section-header">แผนกตกแต่ง/Finishing Department</td></tr>
                         <tr>
-                            <td style="width:30%;"><span class="so-checkbox"></span>พับขอบ/Dinding</td>
-                            <td style="width:30%;"><span class="so-checkbox"></span>ปล่อยขอบ/Wall to Wall</td>
+                            <td style="width:30%;">${soCb(spEdgeBinding)}พับขอบ/Dinding</td>
+                            <td style="width:30%;">${soCb(spEdgeWall)}ปล่อยขอบ/Wall to Wall</td>
                             <td colspan="2">%เจียร/Tip Shear</td>
                         </tr>
                         <tr>
-                            <td><span class="so-checkbox"></span>แต่งเรียบ/Uncarved</td>
-                            <td><span class="so-checkbox"></span>แกะลาย/Carved</td>
-                            <td colspan="2">Label: <span class="so-checkbox"></span>SIAM CARPETS &nbsp; <span class="so-checkbox"></span>OTHERS</td>
+                            <td>${soCb(spUncarved)}แต่งเรียบ/Uncarved</td>
+                            <td>${soCb(spCarved)}แกะลาย/Carved</td>
+                            <td colspan="2">Label: ${soCb(spLabelSiam)}SIAM CARPETS &nbsp; ${soCb(spLabelOther)}OTHERS</td>
                         </tr>
                         <tr class="so-finishing-subrow"><td colspan="2"></td><td colspan="2">คนตกแต่ง</td></tr>
                         <tr class="so-finishing-subrow"><td colspan="2"></td><td colspan="2">วันแต่ง</td></tr>
