@@ -4124,7 +4124,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-103';
+        const APP_BUILD = 'QCDashboard-104';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -10044,10 +10044,22 @@
             };
         }
         // ตร.ม./ชม. ของพนักงานแต่ละคนจากกะปกติ+โอที (ใช้ได้ทั้งรายการที่นำเข้าและที่บันทึกจากฟอร์ม)
+        // 2026-11-05 (-104): กะที่มีพื้นที่แต่ "ไม่ได้ลงชื่อพนักงาน" (เช่น 3-11-26 จอ 3 M/O 163/26 ชิ้น 13-18 ช่องรายชื่อว่าง) ต้องไม่หายไป
+        // — เดิมตารางรายคนขาด 0.8 ตร.ม. เทียบกับยอดรวมในไฟล์ → ใส่ในแถว "(ไม่ได้ลงชื่อพนักงาน)" เพื่อให้ยอดรวมตรงกับ Excel
+        const WEAVING_UNNAMED_STAFF = '(ไม่ได้ลงชื่อพนักงาน)';
         function weavingStaffSharesFromShifts(regular, ot) {
             const map = new Map();
             [regular, ot].forEach(sh => {
-                if (!sh || !Array.isArray(sh.employees) || sh.employees.length === 0) return;
+                if (!sh) return;
+                if (!Array.isArray(sh.employees) || sh.employees.length === 0) {
+                    const area0 = Number(sh.areaDone) || 0;
+                    if (area0 > 0) {
+                        const cur0 = map.get(WEAVING_UNNAMED_STAFF) || { name: WEAVING_UNNAMED_STAFF, sqm: 0, hours: 0 };
+                        cur0.sqm += area0; cur0.hours += (Number(sh.staffCount) || 0) * (Number(sh.hours) || 0);
+                        map.set(WEAVING_UNNAMED_STAFF, cur0);
+                    }
+                    return;
+                }
                 const hrs = Number(sh.hours) || 0, area = Number(sh.areaDone) || 0;
                 if (hrs <= 0 && area <= 0) return;
                 sh.employees.forEach(nm => {
@@ -11023,7 +11035,7 @@
                     people.set(key, p); dates.add(r.date);
                 });
             });
-            return { people: Array.from(people.values()).sort((a, b) => a.name.localeCompare(b.name, 'th')), dates: Array.from(dates).sort(), approx };
+            return { people: Array.from(people.values()).sort((a, b) => ((a.name === WEAVING_UNNAMED_STAFF) - (b.name === WEAVING_UNNAMED_STAFF)) || a.name.localeCompare(b.name, 'th')), dates: Array.from(dates).sort(), approx };
         }
         function renderWeavingStaffDailySummary(rows) {
             const el = document.getElementById('weavingStaffDailySummary');
