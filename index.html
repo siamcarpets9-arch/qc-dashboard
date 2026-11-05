@@ -4120,7 +4120,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-101';
+        const APP_BUILD = 'QCDashboard-102';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -10091,29 +10091,39 @@
         // Reads every "date-named" sheet in the workbook (e.g. "1-9-26" — anything else, like the "SEP"
         // monthly rollup or the "รายชื่อพนักงานทอมือ" employee list, is skipped automatically since its
         // name won't match) and groups the resulting per-loom entries by M/O.
+        // 2026-11-05: "รายงานการผลิตประจำวัน ไม่ขึ้นในประวัติการทอ" — ชีต "2-11-26"/"3-11-26" คัดลอกมาจากชีตเก่าแล้วช่อง "วันที่"
+        // ในชีตยังเป็น 1/10/26 ค้างอยู่ ระบบเชื่อช่องนั้นก่อนชื่อชีต → ข้อมูล 2-3 พ.ย. ถูกลงเป็นวันที่ 1 ต.ค. (และสองวันทับกันเอง)
+        // กติกาใหม่: ถ้าวัน/เดือนของช่องวันที่ตรงกับชื่อชีต (ต่างกันแค่ปี เช่นชื่อชีตพิมพ์ -29 แทน -26) ใช้ช่องวันที่;
+        // ถ้าวัน/เดือนไม่ตรงกัน ใช้ชื่อชีตและแจ้งเตือนในหน้าพรีวิว
+        function resolveWeavingSheetDate(sheetName, dateCell) {
+            const pad = n => String(n).padStart(2, '0');
+            let nameKey = null, nameDM = '';
+            const m = String(sheetName).trim().match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
+            if (m) {
+                let y = m[3]; if (y.length === 2) y = '20' + y;
+                nameKey = `${y}-${pad(m[2])}-${pad(m[1])}`; nameDM = `${pad(m[2])}-${pad(m[1])}`;
+            }
+            let cellKey = null;
+            if (dateCell instanceof Date && !isNaN(dateCell)) cellKey = excelCellDateToDateKey(dateCell);
+            if (!cellKey && !nameKey) return { dateKey: null, note: '' };
+            if (!cellKey) return { dateKey: nameKey, note: '' };
+            if (!nameKey) return { dateKey: cellKey, note: '' };
+            if (cellKey.slice(5) === nameDM) return { dateKey: cellKey, note: '' };
+            return { dateKey: nameKey, note: `ช่อง "วันที่" ในชีตเป็น ${cellKey.split('-').reverse().join('/')} ไม่ตรงกับชื่อชีต จึงใช้วันที่ตามชื่อชีต` };
+        }
+
         function aggregateWeavingImport(workbook) {
             const dateSheetNames = workbook.SheetNames.filter(n => /^\d{1,2}-\d{1,2}-\d{2,4}$/.test(n.trim()));
             const byMoSo = {};
+            const dateNotes = [];
             let sheetsRead = 0;
             dateSheetNames.forEach(sheetName => {
                 const ws = workbook.Sheets[sheetName];
                 const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
                 const dateCell = aoa[1] ? aoa[1][2] : null;
-                let dateKey = null;
-                if (dateCell instanceof Date && !isNaN(dateCell)) {
-                    dateKey = excelCellDateToDateKey(dateCell);
-                } else {
-                    // Fallback if the "วันที่ :" cell wasn't a real date — parse straight from the sheet
-                    // name instead (best-effort; the sheet name is sometimes typo'd, e.g. "-29" instead
-                    // of "-26", so the in-sheet date cell is preferred whenever it's present).
-                    const m = sheetName.trim().match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
-                    if (m) {
-                        const d = m[1], mo = m[2];
-                        let y = m[3];
-                        if (y.length === 2) y = '20' + y;
-                        dateKey = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    }
-                }
+                const resolved = resolveWeavingSheetDate(sheetName, dateCell);
+                const dateKey = resolved.dateKey;
+                if (resolved.note) dateNotes.push({ sheetName, dateKey, note: resolved.note });
                 if (!dateKey) return; // can't tell what date this sheet is — skip rather than guess wrong
                 sheetsRead++;
                 parseDailySheetRows(aoa).forEach(en => {
@@ -10127,7 +10137,7 @@
                     });
                 });
             });
-            return { byMoSo, sheetsRead };
+            return { byMoSo, sheetsRead, dateNotes };
         }
 
         function handleWeavingExcelFile(input) {
@@ -10146,7 +10156,7 @@
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-                    const { byMoSo, sheetsRead } = aggregateWeavingImport(workbook);
+                    const { byMoSo, sheetsRead, dateNotes } = aggregateWeavingImport(workbook);
                     const moSoKeys = Object.keys(byMoSo);
                     if (sheetsRead === 0) {
                         status.textContent = 'ไม่พบ sheet ที่ชื่อเป็นวันที่ (เช่น 1-9-26) ในไฟล์นี้ — ตรวจสอบว่าเป็นไฟล์รายงานการผลิตประจำวันพรมทอมือที่ถูกต้อง';
@@ -10172,7 +10182,10 @@
                     status.textContent = `อ่านข้อมูลจาก ${sheetsRead} วัน พบ ${rows.length} M/O — ตรงกับระบบ ${matchedCount} รายการ${unmatchedRows.length > 0 ? `, ไม่พบในระบบ ${unmatchedRows.length} รายการ (จะข้ามให้อัตโนมัติ)` : ''}`;
 
                     preview.classList.remove('hidden');
-                    preview.innerHTML = rows.map(r => {
+                    const dateNotesHtml = (dateNotes && dateNotes.length > 0)
+                        ? `<div class="text-xs bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-3 py-2" data-weave-date-note><i class="fa-solid fa-triangle-exclamation mr-1"></i>วันที่ในบางชีตไม่ตรงกับชื่อชีต:<br>${dateNotes.map(n => `ชีต ${escapeHtml(n.sheetName)} → ใช้วันที่ ${escapeHtml(n.dateKey.split('-').reverse().join('/'))} (${escapeHtml(n.note)})`).join('<br>')}</div>`
+                        : '';
+                    preview.innerHTML = dateNotesHtml + rows.map(r => {
                         const foundBadge = r.orderIndex !== -1
                             ? `<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> พบในระบบ</span>`
                             : `<span class="text-rose-500"><i class="fa-solid fa-circle-exclamation"></i> ไม่พบ M/O นี้ในระบบ${r.hint ? ` <span class="text-amber-600" data-weave-hint>(คล้าย ${escapeHtml(r.hint)} — เลขปีต่างกัน? แก้ในไฟล์แล้วนำเข้าใหม่)</span>` : ''}</span>`;
