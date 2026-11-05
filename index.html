@@ -1493,6 +1493,10 @@
                         <div id="weavingLogPeriodSelectWrap"></div>
                     </div>
                     <div id="weavingLogPeriodSummary"></div>
+                    <details id="weavingStaffDailyDetails" open class="border border-slate-200 rounded-xl bg-white">
+                        <summary class="px-3 py-2 text-xs font-bold text-slate-700 cursor-pointer select-none"><i class="fa-solid fa-user-clock mr-1.5 text-teal-600"></i>สรุปการทอของพนักงานแต่ละคน ต่อวัน <span class="font-normal text-slate-400">(ตร.ม. • ชม. • ประสิทธิภาพ)</span></summary>
+                        <div id="weavingStaffDailySummary" class="px-3 pb-3"></div>
+                    </details>
                     <div id="weavingLogSplitContainer"></div>
                 </div>
             </div>
@@ -4120,7 +4124,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-102';
+        const APP_BUILD = 'QCDashboard-103';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -10011,6 +10015,51 @@
         // Splits one date-sheet's raw rows (from XLSX.utils.sheet_to_json(ws, {header:1})) into
         // per-loom entries. Data starts at row index 5 (0-based) — rows 0-4 are the fixed title/date/
         // header rows of the "รายงานการผลิตประจำวันพรมทอมือ" template.
+        // 2026-11-05: "ใส่คุณภาพและเกรด ตามรายงานการทอ + ตารางสรุปการทอของพนักงานแต่ละคนต่อวัน" — นอกจากยอดรวมของจอ ยังอ่าน
+        // คุณภาพ (D), เกรด (E), ชิ้นที่ (F), ขนาด (G) และแยกกะปกติ/โอที (พื้นที่ J/T, ชม.ต่อคน O/Y, เวลาเริ่ม-เลิก, รายชื่อ R/AB)
+        // เก็บเป็น regular/ot รูปแบบเดียวกับฟอร์ม "บันทึกการทอรายวัน" + staff[] = ตร.ม./ชม.ของพนักงานแต่ละคน (แบ่งพื้นที่ของกะ
+        // เท่ากันตามจำนวนคนที่ลงชื่อในกะนั้น) สำหรับตารางสรุปรายคนต่อวัน
+        function weavingNumCell(v) { const n = Number(v); return (v !== null && v !== undefined && String(v).trim() !== '' && isFinite(n)) ? n : null; }
+        function weavingClockText(n) { // 8 -> "08:00", 16.3 -> "16:30" (ไฟล์เขียนเวลาเป็น ชม.ทศนิยม เช่น 16.3 = 16:30)
+            const v = weavingNumCell(n); if (v === null) return '';
+            const h = Math.floor(v), m = Math.round((v - h) * 100);
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
+        function weavingBuildShift(block, c) { // c = ดัชนีคอลัมน์ของกะ
+            const first = block[0] || [];
+            const names = [];
+            block.forEach(r => { const v = r[c.emp]; if (v !== null && v !== undefined && String(v).trim() !== '') { const t = String(v).trim().replace(/\s+/g, ' '); if (!names.includes(t)) names.push(t); } });
+            const firstNum = (idx) => { for (const r of block) { const n = weavingNumCell(r[idx]); if (n !== null && n > 0) return n; } return null; };
+            const startCell = block.map(r => r[c.start]).find(v => weavingNumCell(v) !== null);
+            const endCell = block.map(r => r[c.end]).find(v => weavingNumCell(v) !== null);
+            const area = weavingNumCell(first[c.area]) || 0;
+            const staffInFile = weavingNumCell(first[c.staff]) || 0;
+            const totalHrsInFile = weavingNumCell(first[c.total]) || 0;
+            const active = staffInFile > 0 || area > 0 || totalHrsInFile > 0;   // ชื่อที่มีแต่เวลาลอย ๆ แต่ไม่มีจำนวนคน/พื้นที่/ชม.รวม = ไม่ได้ทำกะนี้
+            const hours = active ? (firstNum(c.hours) || 0) : 0;
+            return {
+                start: active ? weavingClockText(startCell) : '', end: active ? weavingClockText(endCell) : '', hours,
+                staffCount: active ? Math.max(staffInFile, 0) : 0, employees: names, areaDone: active ? area : 0,
+                efficiency: (active && names.length > 0 && hours > 0) ? Math.round((area / (names.length * hours)) * 10000) / 10000 : null
+            };
+        }
+        // ตร.ม./ชม. ของพนักงานแต่ละคนจากกะปกติ+โอที (ใช้ได้ทั้งรายการที่นำเข้าและที่บันทึกจากฟอร์ม)
+        function weavingStaffSharesFromShifts(regular, ot) {
+            const map = new Map();
+            [regular, ot].forEach(sh => {
+                if (!sh || !Array.isArray(sh.employees) || sh.employees.length === 0) return;
+                const hrs = Number(sh.hours) || 0, area = Number(sh.areaDone) || 0;
+                if (hrs <= 0 && area <= 0) return;
+                sh.employees.forEach(nm => {
+                    const k = String(nm).trim(); if (!k) return;
+                    const cur = map.get(k) || { name: k, sqm: 0, hours: 0 };
+                    cur.sqm += area / sh.employees.length; cur.hours += hrs;
+                    map.set(k, cur);
+                });
+            });
+            return Array.from(map.values()).map(x => ({ name: x.name, sqm: Math.round(x.sqm * 10000) / 10000, hours: Math.round(x.hours * 100) / 100 }));
+        }
+
         function parseDailySheetRows(aoa) {
             const entries = [];
             let block = [];
@@ -10018,18 +10067,25 @@
                 if (block.length === 0) return;
                 const first = block.find(r => r[2] !== null && r[2] !== undefined && String(r[2]).trim() !== '');
                 if (first) {
-                    const morningEmployees = [];
-                    const otEmployees = [];
-                    block.forEach(r => {
-                        const me = r[17], oe = r[27];
-                        if (me !== null && me !== undefined && String(me).trim() !== '') morningEmployees.push(String(me).trim());
-                        if (oe !== null && oe !== undefined && String(oe).trim() !== '') otEmployees.push(String(oe).trim());
-                    });
+                    const regular = weavingBuildShift(block, { emp: 17, start: 12, end: 13, hours: 14, area: 9, staff: 11, total: 15 });
+                    const ot = weavingBuildShift(block, { emp: 27, start: 22, end: 23, hours: 24, area: 19, staff: 21, total: 25 });
+                    const morningEmployees = regular.employees.slice();
+                    const otEmployees = ot.employees.slice();
                     const totalAreaDay = Number(first[28]);
+                    const gradeRaw = String(first[4] == null ? '' : first[4]).trim().toUpperCase().replace(/\s+/g, '');
+                    const grade = (typeof TUFTING_GRADE_OPTIONS !== 'undefined' && TUFTING_GRADE_OPTIONS.includes(gradeRaw)) ? gradeRaw : '';
+                    const pieceRaw = first[5], sizeRaw = first[6];
                     entries.push({
+                        rowNo: first._row || 0,
+                        shiftAreaSum: Math.round(((Number(first[9]) || 0) + (Number(first[19]) || 0)) * 10000) / 10000,
                         loom: first[1] !== null && first[1] !== undefined ? String(first[1]).trim() : '',
                         moSo: String(first[2]).trim(),
-                        quality: first[3] || '',
+                        quality: first[3] ? String(first[3]).trim() : '',
+                        grade,
+                        pieceNo: (pieceRaw !== null && pieceRaw !== undefined && String(pieceRaw).trim() !== '' && String(pieceRaw).trim() !== '-') ? String(pieceRaw).trim() : '',
+                        sizeText: (sizeRaw !== null && sizeRaw !== undefined && String(sizeRaw).trim() !== '') ? String(sizeRaw).trim() : '',
+                        regular, ot,
+                        staff: weavingStaffSharesFromShifts(regular, ot),
                         // Fallback if "รวมพื้นที่" (col AC / idx28) wasn't filled in: morning + OT area-done
                         // (col J / idx9 + col T / idx19), same as the sheet's own formula for that column.
                         totalAreaDay: !isNaN(totalAreaDay) && first[28] !== null ? totalAreaDay : ((Number(first[9]) || 0) + (Number(first[19]) || 0)),
@@ -10044,6 +10100,7 @@
                 const r = aoa[i] || [];
                 const isBlank = r.every(c => c === null || c === undefined || String(c).trim() === '');
                 if (isBlank) { flush(); continue; }
+                r._row = i + 1;
                 block.push(r);
             }
             flush();
@@ -10084,8 +10141,34 @@
                 cur.employees = Array.from(new Set([...(cur.employees || []), ...(d.employees || [])]));
                 cur._rows++;
                 cur.efficiency = cur.hours > 0 ? cur.sqm / cur.hours : null;
+                // 2026-11-05: คุณภาพ/เกรด/ชิ้นที่/ขนาด/กะ/พนักงานรายคน ของแถวที่ถูกรวม
+                if (!cur.quality && d.quality) cur.quality = d.quality;
+                if (!cur.grade && d.grade) cur.grade = d.grade;
+                if (!cur.sizeText && d.sizeText) cur.sizeText = d.sizeText;
+                if (d.pieceNo) cur.pieceNo = cur.pieceNo ? (cur.pieceNo === d.pieceNo ? cur.pieceNo : cur.pieceNo + ', ' + d.pieceNo) : d.pieceNo;
+                ['regular', 'ot'].forEach(k => {
+                    const a = cur[k], b = d[k];
+                    if (!b) return;
+                    if (!a) { cur[k] = JSON.parse(JSON.stringify(b)); return; }
+                    a.areaDone = Math.round(((Number(a.areaDone) || 0) + (Number(b.areaDone) || 0)) * 10000) / 10000;
+                    a.employees = Array.from(new Set([...(a.employees || []), ...(b.employees || [])]));
+                    a.hours = Math.max(Number(a.hours) || 0, Number(b.hours) || 0);
+                    a.staffCount = Math.max(Number(a.staffCount) || 0, Number(b.staffCount) || 0);
+                    a.efficiency = (a.employees.length > 0 && a.hours > 0) ? Math.round((a.areaDone / (a.employees.length * a.hours)) * 10000) / 10000 : null;
+                });
+                // พนักงานรายคน: รวมตามชื่อ (แถวที่ซ้ำคือชิ้นต่างกันของจอ/วันเดียวกัน → ตร.ม./ชม.บวกกัน)
+                const sm = new Map();
+                [...(cur.staff || []), ...(d.staff || [])].forEach(x => { const c2 = sm.get(x.name) || { name: x.name, sqm: 0, hours: 0 }; c2.sqm += Number(x.sqm) || 0; c2.hours += Number(x.hours) || 0; sm.set(x.name, c2); });
+                cur.staff = Array.from(sm.values()).map(x => ({ name: x.name, sqm: Math.round(x.sqm * 10000) / 10000, hours: Math.round(x.hours * 100) / 100 }));
             });
-            return Array.from(map.values()).map(d => { d.sqm = Math.round((Number(d.sqm) || 0) * 10000) / 10000; return d; });
+            return Array.from(map.values()).map(d => {
+                d.sqm = Math.round((Number(d.sqm) || 0) * 10000) / 10000;
+                // เทียบเกรด: ประสิทธิภาพจริง ÷ เป้าของเกรด (ถ้าไฟล์ระบุเกรด)
+                const target = d.grade ? getTuftingGradeTarget(d.grade) : null;
+                d.gradeTargetEfficiency = target || null;
+                d.gradePercent = (target && d.efficiency !== null && d.efficiency !== undefined) ? Math.round((d.efficiency / target) * 1000) / 10 : null;
+                return d;
+            });
         }
 
         // Reads every "date-named" sheet in the workbook (e.g. "1-9-26" — anything else, like the "SEP"
@@ -10116,6 +10199,7 @@
             const dateSheetNames = workbook.SheetNames.filter(n => /^\d{1,2}-\d{1,2}-\d{2,4}$/.test(n.trim()));
             const byMoSo = {};
             const dateNotes = [];
+            const areaWarnings = [];
             let sheetsRead = 0;
             dateSheetNames.forEach(sheetName => {
                 const ws = workbook.Sheets[sheetName];
@@ -10129,15 +10213,19 @@
                 parseDailySheetRows(aoa).forEach(en => {
                     const key = normalizeMoSoKey(en.moSo);
                     if (!key) return;
+                    // ยอด "รวมพื้นที่" (คอลัมน์ AC) ที่พิมพ์ทับสูตร แล้วไม่เท่ากับพื้นที่กะปกติ + โอที → เตือนในพรีวิว (ยังใช้ค่าตามไฟล์)
+                    if (en.shiftAreaSum > 0 && Math.abs(en.totalAreaDay - en.shiftAreaSum) > 0.01) areaWarnings.push({ sheetName, row: en.rowNo, moSo: en.moSo, loom: en.loom, fileTotal: en.totalAreaDay, shiftSum: en.shiftAreaSum });
                     if (!byMoSo[key]) byMoSo[key] = { moSoDisplay: en.moSo, days: [] };
                     byMoSo[key].days.push({
                         dateKey, sheetName, loom: en.loom,
                         sqm: en.totalAreaDay, hours: en.totalHoursDay, efficiency: en.efficiency,
-                        employees: en.employees
+                        employees: en.employees,
+                        quality: en.quality, grade: en.grade, pieceNo: en.pieceNo, sizeText: en.sizeText,
+                        regular: en.regular, ot: en.ot, staff: en.staff
                     });
                 });
             });
-            return { byMoSo, sheetsRead, dateNotes };
+            return { byMoSo, sheetsRead, dateNotes, areaWarnings };
         }
 
         function handleWeavingExcelFile(input) {
@@ -10156,7 +10244,7 @@
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-                    const { byMoSo, sheetsRead, dateNotes } = aggregateWeavingImport(workbook);
+                    const { byMoSo, sheetsRead, dateNotes, areaWarnings } = aggregateWeavingImport(workbook);
                     const moSoKeys = Object.keys(byMoSo);
                     if (sheetsRead === 0) {
                         status.textContent = 'ไม่พบ sheet ที่ชื่อเป็นวันที่ (เช่น 1-9-26) ในไฟล์นี้ — ตรวจสอบว่าเป็นไฟล์รายงานการผลิตประจำวันพรมทอมือที่ถูกต้อง';
@@ -10185,7 +10273,10 @@
                     const dateNotesHtml = (dateNotes && dateNotes.length > 0)
                         ? `<div class="text-xs bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-3 py-2" data-weave-date-note><i class="fa-solid fa-triangle-exclamation mr-1"></i>วันที่ในบางชีตไม่ตรงกับชื่อชีต:<br>${dateNotes.map(n => `ชีต ${escapeHtml(n.sheetName)} → ใช้วันที่ ${escapeHtml(n.dateKey.split('-').reverse().join('/'))} (${escapeHtml(n.note)})`).join('<br>')}</div>`
                         : '';
-                    preview.innerHTML = dateNotesHtml + rows.map(r => {
+                    const areaWarnHtml = (areaWarnings && areaWarnings.length > 0)
+                        ? `<div class="text-xs bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-3 py-2" data-weave-area-warn><i class="fa-solid fa-triangle-exclamation mr-1"></i>ยอด "รวมพื้นที่" ไม่เท่ากับพื้นที่กะปกติ + โอที (ระบบใช้ค่าตามไฟล์ ถ้าพิมพ์ผิดให้แก้ในไฟล์แล้วนำเข้าใหม่):<br>${areaWarnings.map(w => `ชีต ${escapeHtml(w.sheetName)} แถว ${w.row} • M/O ${escapeHtml(w.moSo)} จอ ${escapeHtml(String(w.loom))}: รวมในไฟล์ ${(Math.round(w.fileTotal * 100) / 100)} แต่กะปกติ+โอที = ${(Math.round(w.shiftSum * 100) / 100)}`).join('<br>')}</div>`
+                        : '';
+                    preview.innerHTML = dateNotesHtml + areaWarnHtml + rows.map(r => {
                         const foundBadge = r.orderIndex !== -1
                             ? `<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> พบในระบบ</span>`
                             : `<span class="text-rose-500"><i class="fa-solid fa-circle-exclamation"></i> ไม่พบ M/O นี้ในระบบ${r.hint ? ` <span class="text-amber-600" data-weave-hint>(คล้าย ${escapeHtml(r.hint)} — เลขปีต่างกัน? แก้ในไฟล์แล้วนำเข้าใหม่)</span>` : ''}</span>`;
@@ -10250,7 +10341,12 @@
                 if (!Array.isArray(order.weaving.dailyLog)) order.weaving.dailyLog = [];
 
                 mergeWeavingDaysByLoom(group.days).forEach(d => {
-                    const entry = { date: d.dateKey, loom: d.loom, sqm: Number(d.sqm) || 0, hours: Number(d.hours) || 0, efficiency: d.efficiency, employees: d.employees || [] };
+                    const entry = {
+                        date: d.dateKey, loom: d.loom, sqm: Number(d.sqm) || 0, hours: Number(d.hours) || 0, efficiency: d.efficiency, employees: d.employees || [],
+                        quality: d.quality || '', grade: d.grade || '', pieceNo: d.pieceNo || '', sizeText: d.sizeText || '',
+                        gradeTargetEfficiency: d.gradeTargetEfficiency || null, gradePercent: (d.gradePercent === undefined ? null : d.gradePercent),
+                        regular: d.regular || undefined, ot: d.ot || undefined, staff: d.staff || [], source: 'import'
+                    };
                     const existingIdx = order.weaving.dailyLog.findIndex(l => l.date === d.dateKey && String(l.loom || '') === String(d.loom || ''));
                     if (existingIdx === -1) order.weaving.dailyLog.push(entry);
                     else order.weaving.dailyLog[existingIdx] = entry; // upsert — re-importing the same date never double-counts
@@ -10869,7 +10965,8 @@
             const rows = [];
             productionOrders.forEach((order, orderIndex) => {
                 (order.weaving.dailyLog || []).forEach(entry => {
-                    rows.push(Object.assign({ orderIndex, moSo: order.moSo }, entry));
+                    // 2026-11-05: รายการที่นำเข้าก่อนหน้านี้ไม่มีคุณภาพ → แสดงคุณภาพของ M/O แทน (นำเข้าไฟล์ใหม่จะได้คุณภาพ/เกรดตามรายงานการทอ)
+                    rows.push(Object.assign({ orderIndex, moSo: order.moSo }, entry, { quality: entry.quality || order.quality || '' }));
                 });
             });
             return rows;
@@ -10895,6 +10992,71 @@
             <th class="py-1.5 px-2 text-center font-semibold">จัดการ</th>
         `;
 
+        // 2026-11-05: ตารางสรุปการทอของพนักงานแต่ละคนต่อวัน — แถว = พนักงาน, คอลัมน์ = วันที่ (เฉพาะวันที่มีข้อมูลในช่วงที่เลือก)
+        // ค่าในช่อง: ตร.ม. ที่ทอได้ / ชั่วโมงที่ทำงาน / ประสิทธิภาพ (ตร.ม.÷ชม.); ท้ายแถวรวมทั้งช่วง
+        // ที่มาของตัวเลขรายคน: entry.staff (นำเข้าจากไฟล์: แบ่งพื้นที่ของแต่ละกะเท่า ๆ กันตามคนที่ลงชื่อในกะ) → regular/ot ของฟอร์มบันทึก →
+        // รายการเก่าที่ไม่มีแยกกะ: แบ่งยอดรวมของจอเท่ากันตามรายชื่อ (ประมาณ)
+        function weavingEntryStaffShares(entry) {
+            if (Array.isArray(entry.staff) && entry.staff.length > 0 && entry.source !== 'manual') return { shares: entry.staff, approx: false };
+            const fromShifts = weavingStaffSharesFromShifts(entry.regular, entry.ot);
+            if (fromShifts.length > 0) return { shares: fromShifts, approx: false };
+            const emps = (entry.employees || []).map(x => String(x).trim()).filter(Boolean);
+            if (emps.length === 0) return { shares: [], approx: false };
+            const sqm = (Number(entry.sqm) || 0) / emps.length, hrs = (Number(entry.hours) || 0) / emps.length;
+            return { shares: emps.map(n => ({ name: n, sqm, hours: hrs })), approx: true };
+        }
+        function computeWeavingStaffDaily(rows) {
+            const people = new Map(); // key -> { name, days: { date: {sqm,hours} }, sqm, hours }
+            const dates = new Set();
+            let approx = false;
+            rows.forEach(r => {
+                const res = weavingEntryStaffShares(r);
+                if (res.approx) approx = true;
+                res.shares.forEach(sh => {
+                    const nm = String(sh.name || '').trim().replace(/\s+/g, ' ');
+                    if (!nm || !r.date) return;
+                    const key = nm.toLowerCase();
+                    const p = people.get(key) || { name: nm, days: {}, sqm: 0, hours: 0 };
+                    const d = p.days[r.date] || (p.days[r.date] = { sqm: 0, hours: 0 });
+                    d.sqm += Number(sh.sqm) || 0; d.hours += Number(sh.hours) || 0;
+                    p.sqm += Number(sh.sqm) || 0; p.hours += Number(sh.hours) || 0;
+                    people.set(key, p); dates.add(r.date);
+                });
+            });
+            return { people: Array.from(people.values()).sort((a, b) => a.name.localeCompare(b.name, 'th')), dates: Array.from(dates).sort(), approx };
+        }
+        function renderWeavingStaffDailySummary(rows) {
+            const el = document.getElementById('weavingStaffDailySummary');
+            if (!el) return;
+            const { people, dates, approx } = computeWeavingStaffDaily(rows);
+            if (people.length === 0) { el.innerHTML = '<p class="text-[11px] text-slate-400 py-2">ยังไม่มีข้อมูลพนักงานในช่วงที่เลือก — นำเข้าไฟล์รายงานการผลิตประจำวันพรมทอมือ หรือเลือกพนักงานในฟอร์มบันทึกการทอรายวัน</p>'; return; }
+            const f2 = n => (Math.round(n * 100) / 100).toFixed(2);
+            const eff = (sqm, hrs) => hrs > 0 ? (sqm / hrs).toFixed(4) : '-';
+            const dayLabel = d => { const m = String(d).match(/^\d{4}-(\d{2})-(\d{2})$/); return m ? `${Number(m[2])}/${Number(m[1])}` : d; };
+            const thead = `<tr class="bg-slate-50 text-slate-500">
+                <th class="py-1.5 px-2 text-left font-semibold sticky left-0 bg-slate-50 z-10 whitespace-nowrap">พนักงาน</th>
+                ${dates.map(d => `<th class="py-1.5 px-2 text-center font-semibold whitespace-nowrap" data-day="${escapeHtml(d)}">${escapeHtml(dayLabel(d))}</th>`).join('')}
+                <th class="py-1.5 px-2 text-right font-semibold whitespace-nowrap bg-teal-50 text-teal-700">รวม ตร.ม.</th>
+                <th class="py-1.5 px-2 text-right font-semibold whitespace-nowrap bg-teal-50 text-teal-700">รวม ชม.</th>
+                <th class="py-1.5 px-2 text-right font-semibold whitespace-nowrap bg-teal-50 text-teal-700">ประสิทธิภาพ</th>
+            </tr>`;
+            const cell = (d) => d && (d.sqm > 0 || d.hours > 0)
+                ? `<td class="py-1 px-2 text-center align-top" title="ประสิทธิภาพ ${eff(d.sqm, d.hours)} ตร.ม./ชม."><div class="font-semibold text-slate-800">${f2(d.sqm)}</div><div class="text-[9px] text-slate-400 whitespace-nowrap">${f2(d.hours)} ชม. • ${eff(d.sqm, d.hours)}</div></td>`
+                : '<td class="py-1 px-2 text-center text-slate-200">-</td>';
+            const body = people.map(p => `<tr class="border-t border-slate-100 hover:bg-slate-50" data-staff="${escapeHtml(p.name)}">
+                <td class="py-1.5 px-2 font-medium text-slate-700 sticky left-0 bg-white whitespace-nowrap">${escapeHtml(p.name)}</td>
+                ${dates.map(d => cell(p.days[d])).join('')}
+                <td class="py-1.5 px-2 text-right font-bold text-slate-800">${f2(p.sqm)}</td>
+                <td class="py-1.5 px-2 text-right">${f2(p.hours)}</td>
+                <td class="py-1.5 px-2 text-right font-semibold text-teal-700">${eff(p.sqm, p.hours)}</td>
+            </tr>`).join('');
+            const totSqm = people.reduce((a, p) => a + p.sqm, 0), totHrs = people.reduce((a, p) => a + p.hours, 0);
+            const dayTot = dates.map(d => { let sq = 0, hr = 0; people.forEach(p => { const x = p.days[d]; if (x) { sq += x.sqm; hr += x.hours; } }); return `<td class="py-1 px-2 text-center align-top font-semibold"><div>${f2(sq)}</div><div class="text-[9px] text-slate-400 font-normal whitespace-nowrap">${f2(hr)} ชม.</div></td>`; }).join('');
+            const foot = `<tr class="border-t-2 border-slate-300 bg-slate-50"><td class="py-1.5 px-2 font-bold text-slate-700 sticky left-0 bg-slate-50 whitespace-nowrap">รวมทุกคน</td>${dayTot}<td class="py-1.5 px-2 text-right font-bold">${f2(totSqm)}</td><td class="py-1.5 px-2 text-right font-bold">${f2(totHrs)}</td><td class="py-1.5 px-2 text-right font-bold text-teal-700">${eff(totSqm, totHrs)}</td></tr>`;
+            el.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-[11px] border-collapse" id="weavingStaffDailyTable"><thead>${thead}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
+                <p class="text-[10px] text-slate-400 mt-1.5">ตร.ม. รายคน = พื้นที่ของกะนั้นหารเท่า ๆ กันตามจำนวนพนักงานที่ลงชื่อในกะ • ชม. = ชั่วโมงของกะ (ปกติ + โอที) • ประสิทธิภาพ = ตร.ม. ÷ ชม.${approx ? ' • บางรายการเก่าไม่มีข้อมูลแยกกะ จึงแบ่งยอดรวมของจอเท่ากันทุกคน (ประมาณ) — นำเข้าไฟล์ใหม่เพื่อให้ได้ตัวเลขแยกกะ' : ''}</p>`;
+        }
+
         function renderWeavingLogTable() {
             const splitContainer = document.getElementById('weavingLogSplitContainer');
             const summaryEl = document.getElementById('weavingLogGradeSummary');
@@ -10914,6 +11076,7 @@
             }
             rows.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : String(a.loom).localeCompare(String(b.loom))));
 
+            renderWeavingStaffDailySummary(rows);
             const periodSummaryEl = document.getElementById('weavingLogPeriodSummary');
             if (periodSummaryEl) {
                 periodSummaryEl.innerHTML = renderPeriodSummaryTableHtml(rows, 'date', weavingLogPeriodGranularity, [
