@@ -4124,7 +4124,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-104';
+        const APP_BUILD = 'QCDashboard-105';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6549,6 +6549,10 @@
             const spCarved = ['hairline', 'carving', 'carvingBeveling', 'embossing', 'embossingBeveling', 'combination'].some(k => soSp('carveStyle', k));
             const spLabelSiam = soSp('ownership', 'siamCarpets'), spLabelOther = soSp('ownership', 'customer');
 
+            // 2026-11-09: "ผู้เปิด ให้ลงชื่อผู้เปิด วันที่ ให้ลงวันที่เปิด" — ผู้เปิด = ชื่อเซลของใบ (order.salesName), วันที่ = วันที่เปิด (order.openDate) ว่างไว้ให้เขียนเองถ้าไม่มีข้อมูล
+            const soOpenerName = v(String(order.salesName || '').trim());
+            const soOpenDateText = (() => { const m = String(order.openDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : v(String(order.openDate || '').trim()); })();
+
             const page2 = `
                 <div class="so-page so-page2">
                     <div class="so-page-number">หน้าที่ 2/2</div>
@@ -6607,7 +6611,7 @@
                         </tr>
                     </table>
                     <div class="so-signature-row">
-                        <div>ผู้เปิด Sample Order:……………………………………<br>วันที่............./…...…./……….</div>
+                        <div>ผู้เปิด Sample Order:${soOpenerName ? ` <span class="so-fill so-open-name">${soOpenerName}</span>` : '……………………………………'}<br>วันที่${soOpenDateText ? ` <span class="so-fill so-open-date">${soOpenDateText}</span>` : '............./…...…./……….'}</div>
                         <div>ผู้รับผิดชอบ Sample Order:………………………..……………………<br>วันที่............./…...…./……….</div>
                     </div>
                     <div class="so-footer-code">FM-QP-SL-001/04</div>
@@ -6817,7 +6821,7 @@
                         </div>
                     </div>
                     <div class="mo-sig-row">
-                        <div>จัดทำโดย<span class="mo-blank" style="min-width:42mm;"></span>&nbsp;วันที่&nbsp;<span class="mo-fill">${v(fmtDMY(order.openDate))}</span>&nbsp;&nbsp;&nbsp;อนุมัติโดย<span class="mo-blank" style="min-width:55mm;"></span>(Sale Manager)</div>
+                        <div>จัดทำโดย<span class="mo-blank" style="min-width:42mm;">${order.salesName ? `<span class="mo-fill">&nbsp;${v(order.salesName)}</span>` : ''}</span>&nbsp;วันที่&nbsp;<span class="mo-fill">${v(fmtDMY(order.openDate))}</span>&nbsp;&nbsp;&nbsp;อนุมัติโดย<span class="mo-blank" style="min-width:55mm;"></span>(Sale Manager)</div>
                         <div>Completed by <span class="mo-blank" style="min-width:55mm;"></span>&nbsp;(Manufacturing Manager) วันที่ <span class="mo-blank" style="min-width:40mm;"></span></div>
                     </div>
                 </div>
