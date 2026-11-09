@@ -986,6 +986,10 @@
                         <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ชื่อเซล (Sale)</label>
                         <input type="text" id="newOrderSalesName" placeholder="ชื่อพนักงานขายที่ดูแล M/O, S/O นี้" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ผู้เปิด M/O, S/O</label>
+                        <input type="text" id="newOrderOpenedBy" placeholder="ชื่อผู้เปิดใบ (ลงในแบบฟอร์มพิมพ์ M/O, S/O)" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -2708,6 +2712,10 @@
                     <input type="text" id="orderDetailSalesName" onchange="updateOrderField(currentDetailOrderIndex, 'salesName', this.value)" placeholder="ชื่อเซล" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-32">
                 </div>
                 <div>
+                    <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">ผู้เปิด M/O, S/O</label>
+                    <input type="text" id="orderDetailOpenedBy" onchange="updateOrderField(currentDetailOrderIndex, 'openedBy', this.value)" placeholder="ชื่อผู้เปิดใบ" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-32">
+                </div>
+                <div>
                     <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">ชื่อลูกค้า</label>
                     <input type="text" id="orderDetailCustomerName" onchange="updateOrderField(currentDetailOrderIndex, 'customerName', this.value)" placeholder="ชื่อลูกค้า" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs w-40">
                 </div>
@@ -4124,7 +4132,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-105';
+        const APP_BUILD = 'QCDashboard-106';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6392,6 +6400,7 @@
                     <table class="print-info-table">
                         <tr><th>M/O, S/O</th><td>${escapeHtml(order.moSo || '-')} (${escapeHtml(order.orderType || detectOrderTypeFromMoSo(order.moSo) || '-')} • ${escapeHtml(marketLabel)})</td></tr>
                         ${infoRow('ชื่อเซล', order.salesName)}
+                        ${infoRow('ผู้เปิด', order.openedBy)}
                         ${infoRow('ลูกค้า', order.customerName)}
                         ${infoRow('PO ลูกค้า / โปรเจกต์', order.customerPO)}
                         ${infoRow('วันที่เปิด M/O', order.openDate)}
@@ -6549,8 +6558,8 @@
             const spCarved = ['hairline', 'carving', 'carvingBeveling', 'embossing', 'embossingBeveling', 'combination'].some(k => soSp('carveStyle', k));
             const spLabelSiam = soSp('ownership', 'siamCarpets'), spLabelOther = soSp('ownership', 'customer');
 
-            // 2026-11-09: "ผู้เปิด ให้ลงชื่อผู้เปิด วันที่ ให้ลงวันที่เปิด" — ผู้เปิด = ชื่อเซลของใบ (order.salesName), วันที่ = วันที่เปิด (order.openDate) ว่างไว้ให้เขียนเองถ้าไม่มีข้อมูล
-            const soOpenerName = v(String(order.salesName || '').trim());
+            // 2026-11-09: "ผู้เปิด ให้ลงชื่อผู้เปิด วันที่ ให้ลงวันที่เปิด" — ผู้เปิด = order.openedBy (คนละคนกับเซล), วันที่ = วันที่เปิด (order.openDate) ว่างไว้ให้เขียนเองถ้าไม่มีข้อมูล
+            const soOpenerName = v(String(order.openedBy || '').trim());
             const soOpenDateText = (() => { const m = String(order.openDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : v(String(order.openDate || '').trim()); })();
 
             const page2 = `
@@ -6821,7 +6830,7 @@
                         </div>
                     </div>
                     <div class="mo-sig-row">
-                        <div>จัดทำโดย<span class="mo-blank" style="min-width:42mm;">${order.salesName ? `<span class="mo-fill">&nbsp;${v(order.salesName)}</span>` : ''}</span>&nbsp;วันที่&nbsp;<span class="mo-fill">${v(fmtDMY(order.openDate))}</span>&nbsp;&nbsp;&nbsp;อนุมัติโดย<span class="mo-blank" style="min-width:55mm;"></span>(Sale Manager)</div>
+                        <div>จัดทำโดย<span class="mo-blank" style="min-width:42mm;">${order.openedBy ? `<span class="mo-fill">&nbsp;${v(order.openedBy)}</span>` : ''}</span>&nbsp;วันที่&nbsp;<span class="mo-fill">${v(fmtDMY(order.openDate))}</span>&nbsp;&nbsp;&nbsp;อนุมัติโดย<span class="mo-blank" style="min-width:55mm;"></span>(Sale Manager)</div>
                         <div>Completed by <span class="mo-blank" style="min-width:55mm;"></span>&nbsp;(Manufacturing Manager) วันที่ <span class="mo-blank" style="min-width:40mm;"></span></div>
                     </div>
                 </div>
@@ -9747,6 +9756,8 @@
                 // this feature existed) — see marketFilter/matchesMarketFilter for how that's handled.
                 market: (raw.market === 'export' || raw.market === 'domestic') ? raw.market : '',
                 salesName: raw.salesName || '',
+                // 2026-11-09: ผู้เปิด M/O, S/O (คนละคนกับเซล) — พิมพ์ในช่อง "ผู้เปิด Sample Order" (S/O) และ "จัดทำโดย" (M/O)
+                openedBy: raw.openedBy || '',
                 // NEW (2026-09d): per-department target/plan finish dates ("กำหนดงานเสร็จของแต่ละแผนก")
                 // — set once by Planning (see renderPlanningChecklistHtml) and used by
                 // getDeadlineWarning() to warn the specific department that's actually behind, instead
@@ -18095,6 +18106,7 @@
             document.getElementById('newOrderMarketDomestic').checked = false;
             updateNewOrderMarketStyle();
             document.getElementById('newOrderSalesName').value = '';
+            const openedByInputEl = document.getElementById('newOrderOpenedBy'); if (openedByInputEl) openedByInputEl.value = '';
             document.getElementById('newOrderSizeItemsBody').innerHTML = '';
             addNewOrderSizeRow();
             setBoardDepartmentTab('sales');
@@ -18795,6 +18807,7 @@
             const market = document.getElementById('newOrderMarketExport').checked ? 'export'
                 : (document.getElementById('newOrderMarketDomestic').checked ? 'domestic' : '');
             const salesName = document.getElementById('newOrderSalesName').value.trim();
+            const openedBy = (document.getElementById('newOrderOpenedBy') || { value: '' }).value.trim();
             const customerName = document.getElementById('newOrderCustomerName').value.trim();
             const customerPO = document.getElementById('newOrderCustomerPO').value.trim();
             const { sizeItems, totalSqm, totalPieces } = collectNewOrderSizeItems();
@@ -18860,6 +18873,7 @@
                 orderType: orderType,
                 market: market,
                 salesName: salesName,
+                openedBy: openedBy,
                 customerName: customerName,
                 customerPO: customerPO,
                 sizeItems: sizeItems,
@@ -20047,6 +20061,7 @@
             if (printSampleOrderBtnEl) printSampleOrderBtnEl.classList.toggle('hidden', (order.orderType || detectOrderTypeFromMoSo(order.moSo)) !== 'SO');
             document.getElementById('orderDetailMarket').value = order.market || '';
             document.getElementById('orderDetailSalesName').value = order.salesName || '';
+            const detailOpenedByEl = document.getElementById('orderDetailOpenedBy'); if (detailOpenedByEl) detailOpenedByEl.value = order.openedBy || '';
             document.getElementById('orderDetailCustomerName').value = order.customerName || '';
             document.getElementById('orderDetailCustomerPO').value = order.customerPO || '';
             document.getElementById('orderDetailTotalSqm').value = order.totalSqm || '';
