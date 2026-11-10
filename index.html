@@ -4132,7 +4132,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-106';
+        const APP_BUILD = 'QCDashboard-107';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -11062,14 +11062,14 @@
             const dayLabel = d => { const m = String(d).match(/^\d{4}-(\d{2})-(\d{2})$/); return m ? `${Number(m[2])}/${Number(m[1])}` : d; };
             const thead = `<tr class="bg-slate-50 text-slate-500">
                 <th class="py-1.5 px-2 text-left font-semibold sticky left-0 bg-slate-50 z-10 whitespace-nowrap">พนักงาน</th>
-                ${dates.map(d => `<th class="py-1.5 px-2 text-center font-semibold whitespace-nowrap" data-day="${escapeHtml(d)}">${escapeHtml(dayLabel(d))}</th>`).join('')}
+                ${dates.map(d => `<th class="py-1.5 px-1.5 text-center font-semibold whitespace-nowrap" data-day="${escapeHtml(d)}">${escapeHtml(dayLabel(d))}</th>`).join('')}
                 <th class="py-1.5 px-2 text-right font-semibold whitespace-nowrap bg-teal-50 text-teal-700">รวม ตร.ม.</th>
                 <th class="py-1.5 px-2 text-right font-semibold whitespace-nowrap bg-teal-50 text-teal-700">รวม ชม.</th>
                 <th class="py-1.5 px-2 text-right font-semibold whitespace-nowrap bg-teal-50 text-teal-700">ประสิทธิภาพ</th>
             </tr>`;
             const cell = (d) => d && (d.sqm > 0 || d.hours > 0)
-                ? `<td class="py-1 px-2 text-center align-top" title="ประสิทธิภาพ ${eff(d.sqm, d.hours)} ตร.ม./ชม."><div class="font-semibold text-slate-800">${f2(d.sqm)}</div><div class="text-[9px] text-slate-400 whitespace-nowrap">${f2(d.hours)} ชม. • ${eff(d.sqm, d.hours)}</div></td>`
-                : '<td class="py-1 px-2 text-center text-slate-200">-</td>';
+                ? `<td class="py-1 px-1.5 text-center font-semibold text-slate-800 cursor-help" title="${f2(d.sqm)} ตร.ม. • ${f2(d.hours)} ชม. • ประสิทธิภาพ ${eff(d.sqm, d.hours)} ตร.ม./คน/ชม.">${f2(d.sqm)}</td>`
+                : '<td class="py-1 px-1.5 text-center text-slate-200">-</td>';
             const body = people.map(p => `<tr class="border-t border-slate-100 hover:bg-slate-50" data-staff="${escapeHtml(p.name)}">
                 <td class="py-1.5 px-2 font-medium text-slate-700 sticky left-0 bg-white whitespace-nowrap">${escapeHtml(p.name)}</td>
                 ${dates.map(d => cell(p.days[d])).join('')}
@@ -11078,10 +11078,10 @@
                 <td class="py-1.5 px-2 text-right font-semibold text-teal-700">${eff(p.sqm, p.hours)}</td>
             </tr>`).join('');
             const totSqm = people.reduce((a, p) => a + p.sqm, 0), totHrs = people.reduce((a, p) => a + p.hours, 0);
-            const dayTot = dates.map(d => { let sq = 0, hr = 0; people.forEach(p => { const x = p.days[d]; if (x) { sq += x.sqm; hr += x.hours; } }); return `<td class="py-1 px-2 text-center align-top font-semibold"><div>${f2(sq)}</div><div class="text-[9px] text-slate-400 font-normal whitespace-nowrap">${f2(hr)} ชม.</div></td>`; }).join('');
+            const dayTot = dates.map(d => { let sq = 0, hr = 0; people.forEach(p => { const x = p.days[d]; if (x) { sq += x.sqm; hr += x.hours; } }); return `<td class="py-1 px-1.5 text-center font-semibold cursor-help" title="${f2(sq)} ตร.ม. • ${f2(hr)} ชม. • ประสิทธิภาพ ${eff(sq, hr)}">${f2(sq)}</td>`; }).join('');
             const foot = `<tr class="border-t-2 border-slate-300 bg-slate-50"><td class="py-1.5 px-2 font-bold text-slate-700 sticky left-0 bg-slate-50 whitespace-nowrap">รวมทุกคน</td>${dayTot}<td class="py-1.5 px-2 text-right font-bold">${f2(totSqm)}</td><td class="py-1.5 px-2 text-right font-bold">${f2(totHrs)}</td><td class="py-1.5 px-2 text-right font-bold text-teal-700">${eff(totSqm, totHrs)}</td></tr>`;
             el.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-[11px] border-collapse" id="weavingStaffDailyTable"><thead>${thead}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
-                <p class="text-[10px] text-slate-400 mt-1.5">ตร.ม. รายคน = พื้นที่ของกะนั้นหารเท่า ๆ กันตามจำนวนพนักงานที่ลงชื่อในกะ • ชม. = ชั่วโมงของกะ (ปกติ + โอที) • ประสิทธิภาพ = ตร.ม. ÷ ชม.${approx ? ' • บางรายการเก่าไม่มีข้อมูลแยกกะ จึงแบ่งยอดรวมของจอเท่ากันทุกคน (ประมาณ) — นำเข้าไฟล์ใหม่เพื่อให้ได้ตัวเลขแยกกะ' : ''}</p>`;
+                <p class="text-[10px] text-slate-400 mt-1.5">ตัวเลขในแต่ละวัน = ตร.ม. (เอาเมาส์ชี้เพื่อดู ชม. และประสิทธิภาพของวันนั้น) • ตร.ม. รายคน = พื้นที่ของกะนั้นหารเท่า ๆ กันตามจำนวนพนักงานที่ลงชื่อในกะ • ชม. = ชั่วโมงของกะ (ปกติ + โอที) • ประสิทธิภาพ = ตร.ม. ÷ ชม. (ดูรวมทั้งช่วงได้ที่ท้ายแถว)${approx ? ' • บางรายการเก่าไม่มีข้อมูลแยกกะ จึงแบ่งยอดรวมของจอเท่ากันทุกคน (ประมาณ) — นำเข้าไฟล์ใหม่เพื่อให้ได้ตัวเลขแยกกะ' : ''}</p>`;
         }
 
         function renderWeavingLogTable() {
