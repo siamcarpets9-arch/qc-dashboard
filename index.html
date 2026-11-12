@@ -2523,10 +2523,10 @@
                     <!-- 6) CBM ส่งทางเรือ / น้ำหนักคิดเงินทางอากาศ (QCDashboard-108) -->
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3 xl:col-span-2" id="cbmCalcCard">
                         <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">6</span>CBM ส่งทางเรือ / น้ำหนักคิดเงินทางอากาศ</h4>
-                        <p class="text-[11px] text-slate-400">กรอกขนาดหีบห่อ 1 ชิ้น (ซม.) · CBM = กว้าง × ยาว × สูง ÷ 1,000,000 · ทางอากาศ น้ำหนักตามปริมาตร = กว้าง × ยาว × สูง ÷ 6,000 (กก.) แล้วเทียบกับน้ำหนักจริง ใช้ค่าที่มากกว่าคิดเงิน · ตู้คอนเทนเนอร์ใช้ความจุมาตรฐาน 20’ ≈ 33 / 40’ ≈ 67 / 40’HQ ≈ 76 CBM (ประมาณการ ยังไม่รวมการจัดเรียงจริง)</p>
+                        <p class="text-[11px] text-slate-400">กรอกขนาดหีบห่อ 1 ชิ้น: กว้าง (ซม.) × สูง (ซม.) × ยาว (เมตร) · CBM = กว้าง × สูง × ยาว ÷ 10,000 · ทางอากาศ น้ำหนักตามปริมาตร = กว้าง × สูง × ยาว(ซม.) ÷ 6,000 (กก.) แล้วเทียบกับน้ำหนักจริง ใช้ค่าที่มากกว่าคิดเงิน · ตู้คอนเทนเนอร์ใช้ความจุมาตรฐาน 20’ ≈ 33 / 40’ ≈ 67 / 40’HQ ≈ 76 CBM (ประมาณการ ยังไม่รวมการจัดเรียงจริง)</p>
                         <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2">
                             <label class="text-[11px] font-semibold text-slate-600">กว้าง (ซม.)<input id="cbW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
-                            <label class="text-[11px] font-semibold text-slate-600">ยาว (ซม.)<input id="cbL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ยาว (เมตร)<input id="cbL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
                             <label class="text-[11px] font-semibold text-slate-600">สูง (ซม.)<input id="cbH" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
                             <label class="text-[11px] font-semibold text-slate-600">จำนวน (หีบห่อ)<input id="cbQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
                             <label class="text-[11px] font-semibold text-slate-600">น้ำหนักจริง/หีบห่อ (กก.)<input id="cbKg" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
@@ -4173,7 +4173,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-108';
+        const APP_BUILD = 'QCDashboard-109';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -18348,12 +18348,12 @@
             } catch (e) { console.error('areaCalcRecalc failed:', e); }
         }
 
-        // ส่วนที่ 6 (QCDashboard-108): CBM ทางเรือ + น้ำหนักคิดเงินทางอากาศ. ขนาดหีบห่อเป็น ซม.
+        // ส่วนที่ 6 (QCDashboard-109): CBM ทางเรือ + น้ำหนักคิดเงินทางอากาศ. กว้าง/สูงเป็น ซม. ยาวเป็นเมตร (CBM = ก×ส×ย ÷ 10,000)
         const CBM_CONTAINERS = [['cbOut20', 33], ['cbOut40', 67], ['cbOut40hq', 76]];
         const CBM_AIR_DIVISOR = 6000;
         function areaCalcCbm() {
             const w = acNum('cbW'), l = acNum('cbL'), h = acNum('cbH'), qty = acQty('cbQty');
-            const cbm1 = (w > 0 && l > 0 && h > 0) ? w * l * h / 1e6 : 0;
+            const cbm1 = (w > 0 && l > 0 && h > 0) ? w * h * l / 10000 : 0; // กว้าง(ซม.) × สูง(ซม.) × ยาว(เมตร) ÷ 10,000
             const cbmTotal = cbm1 * qty;
             acSet('cbOutCbm1', cbm1, 4, true); acSet('cbOutCbmTotal', cbmTotal, 4, true);
             CBM_CONTAINERS.forEach(([id, cap]) => {
@@ -18364,7 +18364,7 @@
                 el.dataset.raw = pct.toFixed(1);
             });
             acSet('cbOutLcmCost', cbmTotal * acNum('cbLclRate'), 2, !(acNum('cbLclRate') > 0 && cbmTotal > 0));
-            const vol1 = cbm1 * 1e6 / CBM_AIR_DIVISOR, volTotal = vol1 * qty;
+            const vol1 = (w > 0 && l > 0 && h > 0) ? w * h * (l * 100) / CBM_AIR_DIVISOR : 0, volTotal = vol1 * qty;
             const actual = acNum('cbKg') * qty;
             acSet('cbOutVol1', vol1, 2, true); acSet('cbOutVolTotal', volTotal, 2, true);
             acSet('cbOutActual', actual, 2, true);
