@@ -2390,7 +2390,7 @@
                             <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Sales</span>
                             <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">Planning</span>
                         </div>
-                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-calculator mr-2 text-teal-600"></i>เครื่องคำนวณพื้นที่พรมและม้วนพรม</h3>
+                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-calculator mr-2 text-teal-600"></i>เครื่องคำนวณพื้นที่พรม ม้วนพรม และ CBM</h3>
                         <p class="text-[11px] text-slate-400 mt-0.5">กรอกเฉพาะช่องที่ต้องการ — ผลลัพธ์คำนวณอัตโนมัติ (ไม่บันทึกลงระบบ)</p>
                     </div>
                     <button onclick="clearAreaCalc()" id="areaCalcClearBtn" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-teal-700 border border-teal-300 hover:bg-teal-50 transition"><i class="fa-solid fa-eraser mr-1"></i>ล้างทุกช่อง</button>
@@ -2517,6 +2517,47 @@
                                 <thead class="bg-slate-50 text-slate-500 text-[11px] sticky top-0"><tr><th class="px-3 py-1.5 text-center">ม้วนพรมรอบที่</th><th class="px-3 py-1.5 text-right">ความยาวพรม (เมตร)</th><th class="px-3 py-1.5 text-right">เส้นผ่านศูนย์กลาง (cm.)</th></tr></thead>
                                 <tbody id="rcRTableBody" class="divide-y divide-slate-100"></tbody>
                             </table>
+                        </div>
+                    </div>
+
+                    <!-- 6) CBM ส่งทางเรือ / น้ำหนักคิดเงินทางอากาศ (QCDashboard-108) -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3 xl:col-span-2" id="cbmCalcCard">
+                        <h4 class="font-bold text-slate-800 text-sm"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] mr-1.5">6</span>CBM ส่งทางเรือ / น้ำหนักคิดเงินทางอากาศ</h4>
+                        <p class="text-[11px] text-slate-400">กรอกขนาดหีบห่อ 1 ชิ้น (ซม.) · CBM = กว้าง × ยาว × สูง ÷ 1,000,000 · ทางอากาศ น้ำหนักตามปริมาตร = กว้าง × ยาว × สูง ÷ 6,000 (กก.) แล้วเทียบกับน้ำหนักจริง ใช้ค่าที่มากกว่าคิดเงิน · ตู้คอนเทนเนอร์ใช้ความจุมาตรฐาน 20’ ≈ 33 / 40’ ≈ 67 / 40’HQ ≈ 76 CBM (ประมาณการ ยังไม่รวมการจัดเรียงจริง)</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2">
+                            <label class="text-[11px] font-semibold text-slate-600">กว้าง (ซม.)<input id="cbW" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ยาว (ซม.)<input id="cbL" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">สูง (ซม.)<input id="cbH" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">จำนวน (หีบห่อ)<input id="cbQty" type="number" min="1" step="1" value="1" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">น้ำหนักจริง/หีบห่อ (กก.)<input id="cbKg" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ค่าระวางเรือ LCL (ต่อ CBM)<input id="cbLclRate" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                            <label class="text-[11px] font-semibold text-slate-600">ค่าระวางอากาศ (ต่อ กก.)<input id="cbAirRate" type="number" min="0" step="any" oninput="areaCalcRecalc()" class="mt-1 w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></label>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div class="rounded-xl border border-sky-100 bg-sky-50/40 p-3 space-y-2">
+                                <div class="text-xs font-bold text-sky-800"><i class="fa-solid fa-ship mr-1.5"></i>ทางเรือ</div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="rc-tile"><div class="rc-tile-l">CBM ต่อหีบห่อ (ลบ.ม.)</div><div class="rc-tile-v" id="cbOutCbm1">-</div></div>
+                                    <div class="rc-tile"><div class="rc-tile-l">CBM รวมทั้งหมด (ลบ.ม.)</div><div class="rc-tile-v" id="cbOutCbmTotal">-</div></div>
+                                    <div class="rc-tile"><div class="rc-tile-l">ตู้ 20’ (33 CBM)</div><div class="rc-tile-v" id="cbOut20">-</div></div>
+                                    <div class="rc-tile"><div class="rc-tile-l">ตู้ 40’ (67 CBM)</div><div class="rc-tile-v" id="cbOut40">-</div></div>
+                                    <div class="rc-tile"><div class="rc-tile-l">ตู้ 40’HQ (76 CBM)</div><div class="rc-tile-v" id="cbOut40hq">-</div></div>
+                                    <div class="rc-tile"><div class="rc-tile-l">ค่าระวาง LCL รวม</div><div class="rc-tile-v" id="cbOutLcmCost">-</div></div>
+                                </div>
+                                <div class="flex flex-wrap gap-2"><button onclick="areaCalcCopy('cbOutCbmTotal')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก CBM รวม</button></div>
+                            </div>
+                            <div class="rounded-xl border border-amber-100 bg-amber-50/40 p-3 space-y-2">
+                                <div class="text-xs font-bold text-amber-800"><i class="fa-solid fa-plane mr-1.5"></i>ทางอากาศ (หาร 6,000)</div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="rc-tile"><div class="rc-tile-l">น้ำหนักตามปริมาตร/หีบห่อ (กก.)</div><div class="rc-tile-v" id="cbOutVol1">-</div></div>
+                                    <div class="rc-tile"><div class="rc-tile-l">น้ำหนักตามปริมาตรรวม (กก.)</div><div class="rc-tile-v" id="cbOutVolTotal">-</div></div>
+                                    <div class="rc-tile"><div class="rc-tile-l">น้ำหนักจริงรวม (กก.)</div><div class="rc-tile-v" id="cbOutActual">-</div></div>
+                                    <div class="rc-tile"><div class="rc-tile-l">น้ำหนักคิดเงิน (กก.)</div><div class="rc-tile-v" id="cbOutCharge">-</div></div>
+                                    <div class="rc-tile"><div class="rc-tile-l">คิดเงินตาม</div><div class="rc-tile-v" id="cbOutBasis">-</div></div>
+                                    <div class="rc-tile"><div class="rc-tile-l">ค่าระวางอากาศรวม</div><div class="rc-tile-v" id="cbOutAirCost">-</div></div>
+                                </div>
+                                <div class="flex flex-wrap gap-2"><button onclick="areaCalcCopy('cbOutCharge')" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอก น้ำหนักคิดเงิน (กก.)</button></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -4132,7 +4173,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-107';
+        const APP_BUILD = 'QCDashboard-108';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -18300,8 +18341,38 @@
                 acSet('rcBOutReal', real, 4, !(design > 0));
                 const plan = acNum('rcBPlan');
                 acSet('rcBOutRatio', (design > 0 && plan > 0) ? plan / design : 0, 4, true);
+
+                // 6) CBM ส่งทางเรือ / น้ำหนักคิดเงินทางอากาศ
+                areaCalcCbm();
                 areaCalcRoll();
             } catch (e) { console.error('areaCalcRecalc failed:', e); }
+        }
+
+        // ส่วนที่ 6 (QCDashboard-108): CBM ทางเรือ + น้ำหนักคิดเงินทางอากาศ. ขนาดหีบห่อเป็น ซม.
+        const CBM_CONTAINERS = [['cbOut20', 33], ['cbOut40', 67], ['cbOut40hq', 76]];
+        const CBM_AIR_DIVISOR = 6000;
+        function areaCalcCbm() {
+            const w = acNum('cbW'), l = acNum('cbL'), h = acNum('cbH'), qty = acQty('cbQty');
+            const cbm1 = (w > 0 && l > 0 && h > 0) ? w * l * h / 1e6 : 0;
+            const cbmTotal = cbm1 * qty;
+            acSet('cbOutCbm1', cbm1, 4, true); acSet('cbOutCbmTotal', cbmTotal, 4, true);
+            CBM_CONTAINERS.forEach(([id, cap]) => {
+                const el = document.getElementById(id); if (!el) return;
+                if (cbmTotal <= 0) { el.textContent = '-'; el.dataset.raw = ''; return; }
+                const pct = cbmTotal / cap * 100, n = Math.ceil(cbmTotal / cap - 1e-9);
+                el.textContent = `${pct.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% • ${n} ตู้`;
+                el.dataset.raw = pct.toFixed(1);
+            });
+            acSet('cbOutLcmCost', cbmTotal * acNum('cbLclRate'), 2, !(acNum('cbLclRate') > 0 && cbmTotal > 0));
+            const vol1 = cbm1 * 1e6 / CBM_AIR_DIVISOR, volTotal = vol1 * qty;
+            const actual = acNum('cbKg') * qty;
+            acSet('cbOutVol1', vol1, 2, true); acSet('cbOutVolTotal', volTotal, 2, true);
+            acSet('cbOutActual', actual, 2, true);
+            const charge = Math.max(volTotal, actual);
+            acSet('cbOutCharge', charge, 2, true);
+            const basis = document.getElementById('cbOutBasis');
+            if (basis) basis.textContent = charge <= 0 ? '-' : (volTotal >= actual ? 'น้ำหนักตามปริมาตร' : 'น้ำหนักจริง');
+            acSet('cbOutAirCost', charge * acNum('cbAirRate'), 2, !(acNum('cbAirRate') > 0 && charge > 0));
         }
 
         function areaCalcBlankEdit(which) {
@@ -18337,8 +18408,8 @@
         }
 
         function clearAreaCalc() {
-            ['rcFtW', 'rcInW', 'rcFtL', 'rcInL', 'rcSqft', 'rcSqm', 'rcCDia', 'rcEBig', 'rcESmall', 'rcBW', 'rcBL', 'rcBPlan', 'rcBPct', 'rcBArea', 'rcRLen'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
-            [['rcQty', '1'], ['rcCQty', '1'], ['rcEQty', '1'], ['rcCAllow', '10'], ['rcEAllow', '10'], ['rcRPile', '10'], ['rcRBack', '4']].forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.value = v; });
+            ['rcFtW', 'rcInW', 'rcFtL', 'rcInL', 'rcSqft', 'rcSqm', 'rcCDia', 'rcEBig', 'rcESmall', 'rcBW', 'rcBL', 'rcBPlan', 'rcBPct', 'rcBArea', 'rcRLen', 'cbW', 'cbL', 'cbH', 'cbKg', 'cbLclRate', 'cbAirRate'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+            [['rcQty', '1'], ['cbQty', '1'], ['rcCQty', '1'], ['rcEQty', '1'], ['rcCAllow', '10'], ['rcEAllow', '10'], ['rcRPile', '10'], ['rcRBack', '4']].forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.value = v; });
             [['rcCUnit', 'm'], ['rcEUnit', 'm'], ['rcCPi', '22/7'], ['rcEPi', '3.14'], ['rcRCore', '12.15']].forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.value = v; });
             areaCalcBlankLast = 'pct';
             areaCalcRecalc();
