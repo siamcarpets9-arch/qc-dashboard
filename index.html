@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -1910,13 +1912,21 @@
                         </div>
                     </div>
 
-                    <div id="dyeingSummaryStatusCards" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+                    <div id="dyeingSummaryStatusCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
 
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                         <div class="p-4 bg-indigo-50/50 border-b border-slate-100">
                             <h3 class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-scale-balanced mr-2 text-indigo-600"></i> สรุปไหมแต่ละชนิดที่เบิกใช้ต่อเดือน</h3>
                         </div>
                         <div id="dyeingSummaryYarnTable"></div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" id="dyeingSummarySurplusCard">
+                        <div class="p-4 bg-emerald-50/50 border-b border-slate-100">
+                            <h3 class="font-bold text-emerald-900 text-sm"><i class="fa-solid fa-recycle mr-2 text-emerald-600"></i> ไหม Surplus ที่นำมาใช้ต่อเดือน</h3>
+                            <p class="text-[11px] text-slate-400 mt-0.5">รวมจากแถวบันทึกสั่งย้อมที่ตั้งประเภทไหมเป็น Surplus (กก. = นน.ในใบสั่งย้อม) — จัดเดือนตามวันที่ย้อมเสร็จ หรือถ้าไม่มี ใช้วันที่ต้องการ/วันที่รับ order</p>
+                        </div>
+                        <div id="dyeingSummarySurplusTable"></div>
                     </div>
                 </div>
             </div>
@@ -4173,7 +4183,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-110';
+        const APP_BUILD = 'QCDashboard-111';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -22158,6 +22168,15 @@
         // orderDate which is when the order was merely received.
         // ============================================================================================
 
+        // NEW (2026-11-13): วันที่ที่ใช้จัดเดือนในแท็บ "สรุปรายเดือน" — ใช้วันที่ย้อมเสร็จจริง; แถวไหม Surplus (ไม่ได้ย้อม จึงมักไม่มีวันที่ย้อมเสร็จ)
+        // ใช้วันที่ต้องการ → วันที่รับ order แทน เพื่อให้นับเข้าเดือนที่นำ Surplus มาใช้
+        function dyeSummaryItemDate(item) {
+            if (item.actualDate) return item.actualDate;
+            return item.yarnSource === 'surplus' ? (item.plannedDate || item.orderDate || '') : '';
+        }
+        // กก. ของแถวบันทึกสั่งย้อม (ลำดับเดียวกับ getOrderRawYarnFraction): นน.ในใบสั่งย้อม → นน.โอนจากใบเบิก → นน.โอนจริง
+        function dyeLogItemKg(item) { return Number(item.orderKg) || Number(item.requisitionKg) || Number(item.actualTransferKg) || 0; }
+
         function dyeingSummaryFilteredRows() {
             const moSoFilter = (document.getElementById('dyeingSummaryMoSoFilter') || {}).value || '';
             const monthFilter = (document.getElementById('dyeingSummaryMonthFilter') || {}).value || '';
@@ -22173,10 +22192,10 @@
 
             const filtered = all.filter(({ order, item }) => {
                 if (moSoNeedle && !String(order.moSo || '').toLowerCase().includes(moSoNeedle)) return false;
-                const actualNorm = normalizeDateString(item.actualDate);
+                const actualNorm = normalizeDateString(dyeSummaryItemDate(item));
                 if (monthFilter && (!actualNorm || actualNorm.slice(0, 7) !== monthFilter)) return false;
                 // NEW (2026-10-07): ตัวเลือก "เดือน" ของแท็บนี้ว่าง (= ตามเดือนด้านบน) → ใช้เดือนเดียวกับหน้ารายงานทุกแผนก (วันที่ย้อมเสร็จจริง → วันที่สั่งย้อม → วันที่เปิด M/O)
-                if (!monthFilter && !dateFrom && !dateTo && !reportMonthMatchDate(item.actualDate || item.orderDate, order)) return false;
+                if (!monthFilter && !dateFrom && !dateTo && !reportMonthMatchDate(dyeSummaryItemDate(item) || item.orderDate, order)) return false;
                 if (dateFrom && (!actualNorm || actualNorm < dateFrom)) return false;
                 if (dateTo && (!actualNorm || actualNorm > dateTo)) return false;
                 return true;
@@ -22202,7 +22221,7 @@
             if (monthSelect) {
                 const currentVal = monthSelect.value;
                 const months = Array.from(new Set(all.map(({ item }) => {
-                    const norm = normalizeDateString(item.actualDate);
+                    const norm = normalizeDateString(dyeSummaryItemDate(item));
                     return norm ? norm.slice(0, 7) : null;
                 }).filter(Boolean))).sort().reverse();
                 monthSelect.innerHTML = '<option value="">ตามเดือนด้านบน</option>' +
@@ -22223,6 +22242,9 @@
             const damagedRows = filtered.filter(r => !!r.item.isDamaged);
             const damagedKg = damagedRows.reduce((s, r) => s + (Number(r.item.actualTransferKg) || 0), 0);
 
+            const surplusRows = filtered.filter(r => r.item.yarnSource === 'surplus');
+            const surplusKgTotal = surplusRows.reduce((s, r) => s + dyeLogItemKg(r.item), 0);
+
             const tile = (label, icon, colorCls, count, kg) => `
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
                     <p class="text-[11px] text-slate-500 font-medium mb-1"><i class="fa-solid ${icon} mr-1.5 ${colorCls}"></i> ${label}</p>
@@ -22235,20 +22257,22 @@
                 statusCardsEl.innerHTML =
                     tile('ย้อมเพิ่ม', 'fa-droplet-slash', 'text-violet-600', extraRows.length, extraKg) +
                     tile('ย้อมขาด (โอนจริง &lt; เบิก)', 'fa-triangle-exclamation', 'text-amber-600', shortageRows.length, shortageKg) +
-                    tile('ย้อมเสีย', 'fa-xmark', 'text-rose-600', damagedRows.length, damagedKg);
+                    tile('ย้อมเสีย', 'fa-xmark', 'text-rose-600', damagedRows.length, damagedKg) +
+                    tile('ไหม Surplus ที่นำมาใช้', 'fa-recycle', 'text-emerald-600', surplusRows.length, surplusKgTotal);
             }
 
             // --- สรุปไหมแต่ละชนิดที่เบิกใช้ต่อเดือน (grouped by month + yarnType) ---------------------
             const groups = {};
             filtered.forEach(({ item }) => {
-                const monthKey = bucketKeyForDate(item.actualDate, 'month');
+                const monthKey = bucketKeyForDate(dyeSummaryItemDate(item), 'month');
                 if (!monthKey) return;
                 const yarnType = yarnGroupLabel(item.yarnType); // รวมชนิดไหมที่ขึ้นต้นเหมือนกัน (เช่น WOOL 380 …)
                 const gKey = `${monthKey}|${yarnType}`;
-                if (!groups[gKey]) groups[gKey] = { monthKey, yarnType, count: 0, requisitionKg: 0, actualTransferKg: 0 };
+                if (!groups[gKey]) groups[gKey] = { monthKey, yarnType, count: 0, requisitionKg: 0, actualTransferKg: 0, surplusKg: 0 };
                 groups[gKey].count += 1;
                 groups[gKey].requisitionKg += Number(item.requisitionKg) || 0;
                 groups[gKey].actualTransferKg += Number(item.actualTransferKg) || 0;
+                if (item.yarnSource === 'surplus') groups[gKey].surplusKg += dyeLogItemKg(item);
             });
             const rows = Object.values(groups).sort((a, b) => b.monthKey.localeCompare(a.monthKey) || a.yarnType.localeCompare(b.yarnType));
 
@@ -22268,6 +22292,7 @@
                                         <th class="px-3 py-2 text-right">นน.โอนจากใบเบิกรวม (Kg.)</th>
                                         <th class="px-3 py-2 text-right">นน.โอนจริงรวม (Kg.)</th>
                                         <th class="px-3 py-2 text-right">ส่วนต่าง (Kg.)</th>
+                                        <th class="px-3 py-2 text-right text-emerald-700">ไหม Surplus ที่ใช้ (Kg.)</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100">
@@ -22281,12 +22306,51 @@
                                             <td class="px-3 py-1.5 text-right">${r.requisitionKg.toFixed(2)}</td>
                                             <td class="px-3 py-1.5 text-right">${r.actualTransferKg.toFixed(2)}</td>
                                             <td class="px-3 py-1.5 text-right font-medium ${diff < 0 ? 'text-rose-600' : 'text-slate-600'}">${diff.toFixed(2)}</td>
+                                            <td class="px-3 py-1.5 text-right font-medium ${r.surplusKg > 0 ? 'text-emerald-700' : 'text-slate-300'}">${r.surplusKg > 0 ? r.surplusKg.toFixed(2) : '-'}</td>
                                         </tr>
                                     `;}).join('')}
                                 </tbody>
                             </table>
                         </div>
                     `;
+                }
+            }
+
+            // --- ไหม Surplus ที่นำมาใช้ต่อเดือน ---------------------------------------------------------
+            const surplusEl = document.getElementById('dyeingSummarySurplusTable');
+            if (surplusEl) {
+                const byMonth = {};
+                surplusRows.forEach(({ item }) => {
+                    const mk = bucketKeyForDate(dyeSummaryItemDate(item), 'month') || 'none';
+                    const m = byMonth[mk] || (byMonth[mk] = { monthKey: mk, count: 0, kg: 0, types: {} });
+                    const kg = dyeLogItemKg(item), t = yarnGroupLabel(item.yarnType) || '-';
+                    m.count += 1; m.kg += kg; m.types[t] = (m.types[t] || 0) + kg;
+                });
+                const mrows = Object.values(byMonth).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+                if (mrows.length === 0) {
+                    surplusEl.innerHTML = '<p class="text-[11px] text-slate-400 py-6 text-center">ไม่มีรายการไหม Surplus ในตัวกรองนี้ — ตั้งประเภทไหมของแถวเป็น Surplus ในบันทึกสั่งย้อม หรือนำเข้า Dye Order</p>';
+                } else {
+                    const typesText = (types) => Object.entries(types).sort((a, b) => b[1] - a[1]).map(([t, kg]) => `${escapeHtml(t)} ${kg.toFixed(2)}`).join(' • ');
+                    surplusEl.innerHTML = `
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs" id="dyeingSummarySurplusMonthTable">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]"><tr>
+                                    <th class="px-3 py-2 text-left">เดือน</th>
+                                    <th class="px-3 py-2 text-right">จำนวนรายการ</th>
+                                    <th class="px-3 py-2 text-right text-emerald-700">Surplus ที่ใช้ (Kg.)</th>
+                                    <th class="px-3 py-2 text-left">แยกตามชนิดไหม (Kg.)</th>
+                                </tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    ${mrows.map(m => `<tr class="hover:bg-slate-50/80" data-surplus-month="${escapeHtml(m.monthKey)}">
+                                        <td class="px-3 py-1.5 font-semibold text-indigo-700 whitespace-nowrap">${m.monthKey === 'none' ? 'ไม่ระบุวันที่' : escapeHtml(formatBucketLabel(m.monthKey, 'month'))}</td>
+                                        <td class="px-3 py-1.5 text-right">${m.count}</td>
+                                        <td class="px-3 py-1.5 text-right font-bold text-emerald-700">${m.kg.toFixed(2)}</td>
+                                        <td class="px-3 py-1.5 text-slate-500">${typesText(m.types)}</td>
+                                    </tr>`).join('')}
+                                </tbody>
+                                ${mrows.length > 1 ? `<tfoot><tr class="border-t-2 border-slate-300 bg-slate-50 font-semibold"><td class="px-3 py-1.5">รวม</td><td class="px-3 py-1.5 text-right">${surplusRows.length}</td><td class="px-3 py-1.5 text-right text-emerald-700">${surplusKgTotal.toFixed(2)}</td><td></td></tr></tfoot>` : ''}
+                            </table>
+                        </div>`;
                 }
             }
         }
