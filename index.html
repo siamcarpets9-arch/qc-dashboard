@@ -1253,6 +1253,10 @@
                         </div>
                     </div>
 
+                    <!-- NEW (2026-11-13): สรุปยอดตามลูกค้า (เฉพาะแท็บ M/O — แท็บ S/O ซ่อน) ตามคำขอ "เพิ่มสรุปยอดของลูกค้าแต่ละเจ้า ในสรุปรายการ M/O เฉพาะ M/O S/O ไม่ต้อง"
+                         รวมทุกตลาดของ M/O ในเดือน/คำค้นหาที่เลือก — see renderSalesReportCustomerSummary() -->
+                    <div id="salesReportCustomerSummary" class="hidden"></div>
+
                     <div id="salesReportMarketSections">
                         <!-- injected via JS: renderSalesReportTables() — ตารางเดียวของตลาดที่เลือกอยู่ -->
                     </div>
@@ -4181,7 +4185,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-112';
+        const APP_BUILD = 'QCDashboard-114';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -16800,13 +16804,17 @@
         // (boardMonthFilter: '' = เดือนปัจจุบัน, 'all' = ทุกเดือน, 'YYYY-MM' = เลือกเอง) เกณฑ์เดือน = "วันที่ของแถวนั้น" ถ้าไม่มีใช้วันที่เปิด M/O
         // (order.openDate → createdAt); แถวที่ไม่ทราบเดือนเลยยังแสดง (ไม่ซ่อนข้อมูลทิ้ง). รายงานไม่แสดง "งานค้างจากเดือนก่อน" — เฉพาะเดือนที่เลือกจริง
         function reportMonthSelection() { return boardMonthFilter === 'all' ? '' : getBoardMonthSelection(); }
+        // CHANGED (2026-11-13): "KPI แผนกวางแผนปี 2000 ให้ซ่อน / ทุกแผนก ให้เห็นแค่ปี 2026 เฉพาะเดือนปัจจุบัน" — แถวที่เดือนเป็นปี 2000 (วันที่เปิด M/O ค่าตั้งต้น
+        // 2000-01-01 = ไม่ทราบวันที่เปิด) หรือไม่ทราบเดือนเลย จะไม่แสดงในรายงาน/KPI ทุกแผนก ไม่ว่าจะเลือกเดือนใด (รวม "ทุกเดือน") — ยังเห็นได้ที่บอร์ดและหน้ารายละเอียด M/O
+        // แถวที่มีวันที่ของตัวเองใช้วันที่นั้น; ไม่มีวันที่ใช้เดือนเปิด M/O; แถวที่ไม่มีทั้งวันที่และ M/O (เช่น งานดีไซน์ที่เพิ่งเพิ่มและยังไม่กรอกวันที่) ยังแสดงเพื่อไม่ให้หายตอนเพิ่ม
         function reportMonthMatchDate(dateStr, order) {
             const sel = reportMonthSelection();
-            if (!sel) return true;
             const norm = normalizeDateString(dateStr);
             let k = norm ? String(norm).slice(0, 7) : '';
-            if (!/^\d{4}-\d{2}$/.test(k)) k = order ? boardOrderMonthKey(order) : '';
-            return !k || k === sel;
+            if (!/^\d{4}-\d{2}$/.test(k)) k = order ? boardOrderMonthKey(order) : null;
+            if (k === null) return true;
+            if (k === '' || k.slice(0, 4) === '2000') return false;
+            return !sel || k === sel;
         }
         function reportMonthMatchOrder(order) { return reportMonthMatchDate('', order); }
         // เดือนที่มีข้อมูลอยู่ในตารางรายงาน (นอกเหนือจากเดือนที่เปิด M/O) — ให้เลือกดูได้ด้วย
@@ -18659,9 +18667,68 @@
             const sectionsContainer = document.getElementById('salesReportMarketSections');
             if (sectionsContainer) sectionsContainer.innerHTML = sectionsHtml;
 
+            renderSalesReportCustomerSummary(salesReportActiveOrderType === 'MO' ? ofType : []);
+
             // NEW (2026-09-12): ยอดตร.ม. รับเข้า/ส่งออกทั้งหมด — ใช้ตัวกรองค้นหาเดียวกับตารางด้านล่าง
             // (matchesSearch) ทั้งหมด (ไม่แยก M/O, S/O) ตามที่แผนกขายขอมาว่า "แสดงในแท็บแผนกขาย".
             renderSalesReportTotals(matchesSearch);
+        }
+
+        // NEW (2026-11-13): สรุปยอดตามลูกค้า — เฉพาะ M/O (แท็บ S/O ซ่อน). รับรายการ M/O ที่ผ่านตัวกรองเดือน/คำค้นหาแล้ว (ทุกตลาด)
+        // รวมต่อลูกค้า: จำนวน M/O, ตร.ม. รวม, ส่งแล้ว, รอส่ง, อยู่ระหว่างผลิต. จัดกลุ่มชื่อลูกค้าแบบไม่สนตัวพิมพ์/ช่องว่างซ้ำ
+        function computeSalesCustomerSummary(orders) {
+            const map = new Map();
+            (orders || []).forEach(o => {
+                const label = String(o.customerName || '').replace(/\s+/g, ' ').trim() || '(ไม่ระบุลูกค้า)';
+                const key = label.toUpperCase();
+                let c = map.get(key);
+                if (!c) { c = { label, count: 0, sqm: 0, shipped: 0, ready: 0, wip: 0 }; map.set(key, c); }
+                const sqm = Number(o.totalSqm) || 0, st = getEffectiveStage(o);
+                c.count += 1; c.sqm += sqm;
+                if (st === 'shipped') c.shipped += sqm; else if (st === 'ready_to_ship') c.ready += sqm; else c.wip += sqm;
+            });
+            return [...map.values()].sort((a, b) => b.sqm - a.sqm || a.label.localeCompare(b.label));
+        }
+        function renderSalesReportCustomerSummary(moOrders) {
+            const el = document.getElementById('salesReportCustomerSummary');
+            if (!el) return;
+            if (salesReportActiveOrderType !== 'MO') { el.classList.add('hidden'); el.innerHTML = ''; return; }
+            const rows = computeSalesCustomerSummary(moOrders);
+            el.classList.remove('hidden');
+            if (rows.length === 0) { el.innerHTML = ''; el.classList.add('hidden'); return; }
+            const f = n => (Math.round(n * 100) / 100).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const dash = n => n > 0 ? f(n) : '<span class="text-slate-300">-</span>';
+            const tot = rows.reduce((t, r) => ({ count: t.count + r.count, sqm: t.sqm + r.sqm, shipped: t.shipped + r.shipped, ready: t.ready + r.ready, wip: t.wip + r.wip }), { count: 0, sqm: 0, shipped: 0, ready: 0, wip: 0 });
+            el.innerHTML = `
+                <details open class="border border-slate-200 rounded-xl overflow-hidden">
+                    <summary class="cursor-pointer select-none px-4 py-2.5 bg-indigo-50/60 text-sm font-bold text-indigo-900 flex items-center gap-2"><i class="fa-solid fa-users text-indigo-600"></i> สรุปยอดตามลูกค้า (M/O) <span class="text-[11px] font-medium text-slate-500">${rows.length} ลูกค้า • ${tot.count} M/O • ${f(tot.sqm)} ตร.ม.</span></summary>
+                    <div class="overflow-auto max-h-80">
+                        <table class="w-full text-xs" id="salesReportCustomerSummaryTable">
+                            <thead class="bg-slate-50 text-slate-500 text-[11px] sticky top-0"><tr>
+                                <th class="px-3 py-2 text-left">ลูกค้า</th>
+                                <th class="px-3 py-2 text-right">จำนวน M/O</th>
+                                <th class="px-3 py-2 text-right">ยอดรวม (ตร.ม.)</th>
+                                <th class="px-3 py-2 text-right text-emerald-700">ส่งแล้ว (ตร.ม.)</th>
+                                <th class="px-3 py-2 text-right text-amber-700">รอส่ง (ตร.ม.)</th>
+                                <th class="px-3 py-2 text-right text-indigo-700">อยู่ระหว่างผลิต (ตร.ม.)</th>
+                            </tr></thead>
+                            <tbody class="divide-y divide-slate-100">
+                                ${rows.map(r => `<tr class="hover:bg-slate-50/80" data-cust="${escapeHtml(r.label)}">
+                                    <td class="px-3 py-1.5 font-semibold text-slate-700">${escapeHtml(r.label)}</td>
+                                    <td class="px-3 py-1.5 text-right">${r.count}</td>
+                                    <td class="px-3 py-1.5 text-right font-bold text-slate-800">${f(r.sqm)}</td>
+                                    <td class="px-3 py-1.5 text-right text-emerald-700">${dash(r.shipped)}</td>
+                                    <td class="px-3 py-1.5 text-right text-amber-700">${dash(r.ready)}</td>
+                                    <td class="px-3 py-1.5 text-right text-indigo-700">${dash(r.wip)}</td>
+                                </tr>`).join('')}
+                            </tbody>
+                            <tfoot><tr class="border-t-2 border-slate-300 bg-slate-50 font-bold">
+                                <td class="px-3 py-1.5">รวมทุกลูกค้า</td><td class="px-3 py-1.5 text-right">${tot.count}</td><td class="px-3 py-1.5 text-right">${f(tot.sqm)}</td>
+                                <td class="px-3 py-1.5 text-right text-emerald-700">${f(tot.shipped)}</td><td class="px-3 py-1.5 text-right text-amber-700">${f(tot.ready)}</td><td class="px-3 py-1.5 text-right text-indigo-700">${f(tot.wip)}</td>
+                            </tr></tfoot>
+                        </table>
+                    </div>
+                </details>`;
         }
 
         // "ยอดตารางเมตรที่รับเข้าทั้งหมด" = ผลรวม ตร.ม. ของทุก M/O, S/O ที่เคยเปิดเข้าสายการผลิต (นับทุก
