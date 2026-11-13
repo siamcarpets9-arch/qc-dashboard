@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -1924,7 +1922,7 @@
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" id="dyeingSummarySurplusCard">
                         <div class="p-4 bg-emerald-50/50 border-b border-slate-100">
                             <h3 class="font-bold text-emerald-900 text-sm"><i class="fa-solid fa-recycle mr-2 text-emerald-600"></i> ไหม Surplus ที่นำมาใช้ต่อเดือน</h3>
-                            <p class="text-[11px] text-slate-400 mt-0.5">รวมจากแถวบันทึกสั่งย้อมที่ตั้งประเภทไหมเป็น Surplus (กก. = นน.ในใบสั่งย้อม) — จัดเดือนตามวันที่ย้อมเสร็จ หรือถ้าไม่มี ใช้วันที่ต้องการ/วันที่รับ order</p>
+                            <p class="text-[11px] text-slate-400 mt-0.5">รวมจากแถวบันทึกสั่งย้อมที่ช่อง LOT ไหม เป็น "Surplus" หรือตั้งประเภทไหมเป็น Surplus (กก. = นน.โอนจริง) — จัดเดือนตามวันที่ย้อมเสร็จ หรือถ้าไม่มี ใช้วันที่ต้องการ/วันที่รับ order</p>
                         </div>
                         <div id="dyeingSummarySurplusTable"></div>
                     </div>
@@ -4183,7 +4181,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-111';
+        const APP_BUILD = 'QCDashboard-112';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -22172,10 +22170,17 @@
         // ใช้วันที่ต้องการ → วันที่รับ order แทน เพื่อให้นับเข้าเดือนที่นำ Surplus มาใช้
         function dyeSummaryItemDate(item) {
             if (item.actualDate) return item.actualDate;
-            return item.yarnSource === 'surplus' ? (item.plannedDate || item.orderDate || '') : '';
+            return isSurplusDyeRow(item) ? (item.plannedDate || item.orderDate || '') : '';
         }
-        // กก. ของแถวบันทึกสั่งย้อม (ลำดับเดียวกับ getOrderRawYarnFraction): นน.ในใบสั่งย้อม → นน.โอนจากใบเบิก → นน.โอนจริง
-        function dyeLogItemKg(item) { return Number(item.orderKg) || Number(item.requisitionKg) || Number(item.actualTransferKg) || 0; }
+        // แถวที่เป็นการนำไหม Surplus มาใช้: ตั้งประเภทไหมเป็น Surplus (yarnSource) หรือพิมพ์ "Surplus" ในช่อง LOT ไหม (กรณีบันทึก/นำเข้าจากรายงานย้อม
+        // ที่ยังไม่ได้ตั้งประเภทไหม) — ถ้าตั้งประเภทไหมไว้เป็นอย่างอื่น (ย้อมทับ) ให้ยึดตามประเภทไหมนั้น
+        function isSurplusDyeRow(item) {
+            if (!item || typeof item !== 'object') return false;
+            if (item.yarnSource) return item.yarnSource === 'surplus';
+            return /surplus/i.test(String(item.lotNo || ''));
+        }
+        // กก. Surplus ที่นำมาใช้ของแถว = นน.โอนจริง → นน.โอนจากใบเบิก → นน.ในใบสั่งย้อม (ช่อง "นน.ในใบสั่งย้อม" ของรายงานย้อมบางแถวเป็นเลขอื่น เช่น 1 จึงให้เป็นลำดับสุดท้าย)
+        function dyeLogItemKg(item) { return Number(item.actualTransferKg) || Number(item.requisitionKg) || Number(item.orderKg) || 0; }
 
         function dyeingSummaryFilteredRows() {
             const moSoFilter = (document.getElementById('dyeingSummaryMoSoFilter') || {}).value || '';
@@ -22242,7 +22247,7 @@
             const damagedRows = filtered.filter(r => !!r.item.isDamaged);
             const damagedKg = damagedRows.reduce((s, r) => s + (Number(r.item.actualTransferKg) || 0), 0);
 
-            const surplusRows = filtered.filter(r => r.item.yarnSource === 'surplus');
+            const surplusRows = filtered.filter(r => isSurplusDyeRow(r.item));
             const surplusKgTotal = surplusRows.reduce((s, r) => s + dyeLogItemKg(r.item), 0);
 
             const tile = (label, icon, colorCls, count, kg) => `
@@ -22272,7 +22277,7 @@
                 groups[gKey].count += 1;
                 groups[gKey].requisitionKg += Number(item.requisitionKg) || 0;
                 groups[gKey].actualTransferKg += Number(item.actualTransferKg) || 0;
-                if (item.yarnSource === 'surplus') groups[gKey].surplusKg += dyeLogItemKg(item);
+                if (isSurplusDyeRow(item)) groups[gKey].surplusKg += dyeLogItemKg(item);
             });
             const rows = Object.values(groups).sort((a, b) => b.monthKey.localeCompare(a.monthKey) || a.yarnType.localeCompare(b.yarnType));
 
@@ -22328,7 +22333,7 @@
                 });
                 const mrows = Object.values(byMonth).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
                 if (mrows.length === 0) {
-                    surplusEl.innerHTML = '<p class="text-[11px] text-slate-400 py-6 text-center">ไม่มีรายการไหม Surplus ในตัวกรองนี้ — ตั้งประเภทไหมของแถวเป็น Surplus ในบันทึกสั่งย้อม หรือนำเข้า Dye Order</p>';
+                    surplusEl.innerHTML = '<p class="text-[11px] text-slate-400 py-6 text-center">ไม่มีรายการไหม Surplus ในตัวกรองนี้ — พิมพ์ Surplus ในช่อง LOT ไหม หรือตั้งประเภทไหมของแถวเป็น Surplus ในบันทึกสั่งย้อม</p>';
                 } else {
                     const typesText = (types) => Object.entries(types).sort((a, b) => b[1] - a[1]).map(([t, kg]) => `${escapeHtml(t)} ${kg.toFixed(2)}`).join(' • ');
                     surplusEl.innerHTML = `
