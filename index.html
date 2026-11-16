@@ -4219,7 +4219,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-118';
+        const APP_BUILD = 'QCDashboard-119';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -15623,12 +15623,13 @@
                 gradeOverride: { weaving: ov.weaving || '', design: ov.design || '', finishing: ov.finishing || '' },
                 colorRows: (Array.isArray(raw.colorRows) ? raw.colorRows : []).map(r => ({
                     id: r.id || ('pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)),
-                    code: r.code || '', stipple: !!r.stipple,
+                    code: r.code || '', yarn: r.yarn || '', stipple: !!r.stipple,
                     technique: PLANNING_WS_TECHNIQUES.some(t => t.key === r.technique) ? r.technique : PLANNING_WS_TECHNIQUES[0].key,
                     areaMode: r.areaMode === 'sqm' ? 'sqm' : 'pct',
                     value: Number(r.value) || 0,
                     quality: r.quality || ''
                 })),
+                blankPct: Math.max(0, Number(raw.blankPct) || 0),
                 allowancePct: (raw.allowancePct === undefined || raw.allowancePct === '' || isNaN(Number(raw.allowancePct))) ? 5 : Number(raw.allowancePct),
                 manpower: { hoursPerDay: numOrBlank(mp.hoursPerDay), tuftingStaff: numOrBlank(mp.tuftingStaff), designStaff: numOrBlank(mp.designStaff), finishingStaff: numOrBlank(mp.finishingStaff), dyeLeadDays: numOrBlank(mp.dyeLeadDays) }
             };
@@ -15989,7 +15990,8 @@
         function planningWsSection2Html(order, orderIndex) {
             const ws = planningWsGet(order);
             const c = planningWsComputeColors(order);
-            const pctOk = Math.abs(c.pctSum - 100) < 0.01;
+            const blankPct = Number(ws.blankPct) || 0;
+            const pctOk = Math.abs(c.pctSum + blankPct - 100) < 0.05;
             const rowsHtml = c.rows.map((x, i) => {
                 const r = x.row;
                 return `
@@ -15998,6 +16000,7 @@
                         <td class="py-2 pr-2 min-w-[150px]">
                             <label class="flex items-center gap-1 text-[10px] text-slate-500 mb-0.5"><input type="checkbox" ${r.stipple ? 'checked' : ''} onchange="planningWsRowField(${orderIndex}, '${r.id}', 'stipple', this.checked)"> ผสมสี (Stipple)</label>
                             <input type="text" value="${escapeHtml(r.code)}" placeholder="รหัสสี / ชื่อสี" onchange="planningWsRowField(${orderIndex}, '${r.id}', 'code', this.value)" class="w-full p-1.5 border border-slate-300 rounded bg-white text-xs">
+                            <input type="text" value="${escapeHtml(r.yarn || '')}" placeholder="ชนิดไหม (WOOL/VISCOSE)" onchange="planningWsRowField(${orderIndex}, '${r.id}', 'yarn', this.value)" class="w-full mt-1 p-1 border border-slate-200 rounded bg-white text-[10px] text-slate-600">
                         </td>
                         <td class="py-2 pr-2 min-w-[120px]">
                             <select onchange="planningWsRowField(${orderIndex}, '${r.id}', 'technique', this.value)" class="w-full p-1.5 border border-slate-300 rounded bg-white text-xs">
@@ -16033,6 +16036,7 @@
                         </div>
                         <button type="button" onclick="planningWsAddRow(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50">+ เพิ่มแถวสี</button>
                     </div>
+                    ${planningWsLegendPanelHtml(order, orderIndex)}
                     <div class="flex flex-wrap items-end gap-2">
                         <div><label class="block text-[10px] text-slate-500">จำนวนสี</label>
                             <input id="pwColorCount" type="number" min="0" step="1" value="${order.colorsCount || ''}" onchange="planningWsSetColorCount(${orderIndex}, this.value)" class="w-28 p-2 text-sm border border-slate-300 rounded bg-white"></div>
@@ -16050,7 +16054,7 @@
                         </table>
                     </div>`}
                     <div class="flex flex-wrap gap-2 items-stretch">
-                        <div class="border-t-4 ${pctOk ? 'border-emerald-500' : 'border-rose-500'} border-x border-b border-slate-200 rounded-md px-3 py-2 min-w-[120px]"><p class="text-[10px] text-slate-500">รวม % ที่กรอก</p><p id="pwPctSum" class="text-lg font-bold ${pctOk ? 'text-emerald-600' : 'text-rose-600'}">${planningWsFmt(c.pctSum, 2)}%</p></div>
+                        <div class="border-t-4 ${pctOk ? 'border-emerald-500' : 'border-rose-500'} border-x border-b border-slate-200 rounded-md px-3 py-2 min-w-[120px]"><p class="text-[10px] text-slate-500">รวม % ที่กรอก</p><p id="pwPctSum" class="text-lg font-bold ${pctOk ? 'text-emerald-600' : 'text-rose-600'}">${planningWsFmt(c.pctSum, 2)}%</p>${blankPct > 0 ? `<p class="text-[10px] text-slate-500" data-pw-blank>+ พื้นที่ว่าง (X) ${planningWsFmt(blankPct, 2)}% ไม่คำนวณ</p>` : ''}</div>
                         <div class="min-w-[110px]"><label class="block text-[10px] text-slate-500">บวกเผื่อ (%)</label>
                             <input id="pwAllowance" type="number" min="0" step="0.5" value="${ws.allowancePct}" onchange="planningWsSetAllowance(${orderIndex}, this.value)" class="w-full p-2 text-sm font-semibold border border-slate-300 rounded bg-white"></div>
                         <div class="border border-slate-200 bg-slate-50 rounded-md px-3 py-2 min-w-[150px]"><p class="text-[10px] text-slate-500">น้ำหนักไหมฐานรวม</p><p id="pwBaseKg" class="text-lg font-bold text-slate-900">${planningWsFmt(c.baseKg, 3)} กก.</p></div>
@@ -16232,7 +16236,7 @@
             const tech = technique || PLANNING_WS_TECHNIQUES[0].key;
             let quality = guess;
             if (quality && planningWsFindQuality(quality).type !== planningWsTechniqueType(tech) && planningWsFindQuality(quality).type !== 'manual') quality = '';
-            return { id: 'pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), code: '', stipple: false, technique: tech, areaMode: 'pct', value: 0, quality };
+            return { id: 'pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), code: '', yarn: '', stipple: false, technique: tech, areaMode: 'pct', value: 0, quality };
         }
         // จำนวนสีเปลี่ยน -> เกรดทอใช้ "จำนวนสีสูงสุด" ด้วย จึงยกให้ไม่ต่ำกว่าจำนวนสี (ไม่เคยลดค่าที่กรอก/นำเข้าไว้)
         function planningWsSyncColorCount(order, ws) {
@@ -16252,6 +16256,7 @@
                 while (ws.colorRows.length < n) ws.colorRows.push(planningWsNewRow(order, ws.colorRows.length ? ws.colorRows[ws.colorRows.length - 1].technique : ''));
                 if (ws.colorRows.length > n) ws.colorRows.length = n;
                 const each = planningWsRound(100 / n, 2);
+                ws.blankPct = 0;
                 ws.colorRows.forEach((r, i) => { r.areaMode = 'pct'; r.value = i === n - 1 ? planningWsRound(100 - each * (n - 1), 2) : each; });
                 planningWsSyncColorCount(order, ws);
             });
@@ -16290,6 +16295,223 @@
             planningWsMutate(orderIndex, (ws) => { ws.allowancePct = Math.max(0, Number(raw) || 0); });
         }
 
+
+        // =====================================================================================
+        // NEW (2026-11-16): สร้างแถวสีอัตโนมัติจากรูปแบบ — อ่าน "ตารางสี" (รหัสสี + % พื้นที่) จากรูปแบบ/artwork ด้วย OCR ในเบราว์เซอร์ (Tesseract.js, ไม่ส่งรูปไปที่ใด)
+        //   กติกา: ช่องที่เป็น X = พื้นที่ว่าง ไม่คำนวณ (เก็บเป็น ws.blankPct) · รหัสสีเดียวกัน + ชนิดไหมเดียวกัน + เทคนิคเดียวกัน → รวมเป็น 1 แถว (รวม %)
+        //         Cut / Loop ของรหัสเดียวกันแยกแถว (ความสูง mm ไม่นับ) · ชนิดไหมต่างกัน (WOOL / VISCOSE ...) แยกแถว
+        //   รูปแบบบรรทัดที่รองรับ: "97.42% DK.BLUE / CUT (S/O D-199/24)" · "4806 Cut 11mm  1 [■] 3.96%" · "1 [■] 0.72% CC153 16C / WOOL"
+        //   OCR อ่านผิดได้ (โดยเฉพาะรหัสสีตัวอักษรคล้ายกัน) → แถวที่สร้างแก้ไขได้ทั้งหมด และกล่อง "รวม %" ช่วยเช็กว่าครบ 100% (รวมพื้นที่ว่าง) ไหม
+        //   ทางสำรอง: "วางข้อความ" จากตารางสี (พิมพ์/คัดลอกจากไฟล์แบบ) แล้วแปลงด้วยกติกาเดียวกัน
+        // =====================================================================================
+        const PW_YARN_RE = /(wool|viscose|silk|bamboo|polyester|nylon|cotton|acrylic|linen|jute|tencel|lyocell|poly)/i;
+        function planningWsParseLegend(text) {
+            const merged = new Map(); let blank = 0, lines = 0;
+            String(text || '').split(/\n/).forEach(raw => {
+                let line = raw.replace(/\r/g, ' ').trim(); if (!line) return;
+                const m = line.match(/(\d{1,3}(?:[.,]\d{1,3})?)\s*%/); if (!m) return;
+                let numTxt = m[1].replace(',', '.'), pct;
+                if (/^\d{3,5}$/.test(numTxt)) pct = Number(numTxt) === 100 ? 100 : Number(numTxt.slice(0, -2) + '.' + numTxt.slice(-2)); // OCR ทำจุดทศนิยมหาย "362%" → 3.62
+                else if (/^\d{1,2}$/.test(numTxt)) return;                                                                                  // "50%" โดดๆ = ขยะจากลวดลาย ไม่ใช่ตารางสี
+                else pct = Number(numTxt);
+                if (!(pct >= 0 && pct <= 100)) return;
+                const L = line.slice(0, m.index), R = line.slice(m.index + m[0].length);
+                const clean = s => s.replace(/\([^)]*\)?/g, ' ').replace(/[\[\]|¦{}_~=<>■□]+/g, ' ').replace(/\s+/g, ' ').trim();
+                // เลือกข้างที่เป็นรหัสสี: ข้างที่มีคำว่า cut/loop/ชนิดไหม หรือข้อความยาวกว่า (OCR มักมีขยะจากช่องสี/ลวดลายอีกข้าง)
+                const toksL = clean(L).split(' ').filter(Boolean);
+                let idx = -1; for (let i = toksL.length - 1; i > 0; i--) if (/^\d{1,2}$/.test(toksL[i])) { idx = i; break; }   // เลขลำดับ + ช่องสี อยู่ท้ายฝั่งซ้าย → ตัดทิ้ง
+                if (idx > 0) toksL.length = idx; else while (toksL.length && /^\d{1,2}$/.test(toksL[toksL.length - 1])) toksL.pop();
+                const tL = toksL.join(' '), tR = clean(R).replace(/^[^A-Za-z0-9]+/, '');
+                const sc = x => (/(special\s*loop|loop|cut)/i.test(x) || PW_YARN_RE.test(x) ? 100 : 0) + x.split(' ').filter(w => w.replace(/[^A-Za-z0-9]/g, '').length >= 3).reduce((n, w) => n + w.length, 0);
+                let t = (sc(tR) >= sc(tL) && sc(tR) > 0) ? tR : tL;
+                { const core = t.split(' ').filter(w => w && !/^\d{1,2}$/.test(w)); if (core.length === 1 && /^\d{0,2}[xX×]$/.test(core[0])) t = ''; }   // ช่อง X = พื้นที่ว่าง (OCR อาจติดเลขลำดับเป็น "2X")
+                lines++;
+                let technique = '', yarn = '';
+                const tm = t.match(/(?<![A-Za-z])(special\s*loop|loop|cut)/i), ym = t.match(PW_YARN_RE);
+                if (tm) technique = /special/i.test(tm[1]) ? 'Special Loop' : (/loop/i.test(tm[1]) ? 'Loop' : 'Cut');
+                if (ym) yarn = ym[1].toUpperCase();
+                // รหัสสีอยู่ก่อนคำบอกเทคนิค/ชนิดไหม — ข้อความหลังจากนั้นเป็นความสูง mm / ขยะ OCR
+                const kw = [tm ? tm.index : -1, ym ? ym.index : -1].filter(i => i > 0);
+                if (kw.length) t = t.slice(0, Math.min.apply(null, kw));
+                else { if (tm) t = t.replace(tm[0], ' '); if (ym) t = t.replace(ym[0], ' '); }
+                t = t.replace(/\b\d+(?:\.\d+)?\s*mm\b/gi, ' ').replace(/\s*[A-Za-z]?\s*mm\b/gi, ' ');
+                const code = t.replace(/[\/\\]+/g, ' ').replace(/^[\s\-–:.,]+|[\s\-–:.,]+$/g, '').replace(/\s+/g, ' ').trim();
+                if (!code || /^x$/i.test(code)) { blank += pct; return; }       // ช่อง X / ไม่มีรหัส = พื้นที่ว่าง
+                const key = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '|' + yarn + '|' + technique;
+                const ex = merged.get(key);
+                if (ex) { ex.pct += pct; if (code.length > ex.code.length) ex.code = code; }
+                else merged.set(key, { code, yarn, technique, pct });
+            });
+            const rows = [...merged.values()].map(r => Object.assign(r, { pct: planningWsRound(r.pct, 2) }));
+            return { rows, blankPct: planningWsRound(blank, 2), lines };
+        }
+        let planningWsLegendUi = { busy: false, status: '', tone: '', textOpen: false, text: '' };
+        function planningWsLegendSetStatus(msg, tone) {
+            planningWsLegendUi.status = msg; planningWsLegendUi.tone = tone || '';
+            const el = document.getElementById('pwLegendStatus');
+            if (el) { el.textContent = msg; el.className = 'text-[11px] ' + (tone === 'bad' ? 'text-rose-600' : (tone === 'ok' ? 'text-emerald-700' : 'text-slate-600')); }
+        }
+        function planningWsLegendToggleText() { planningWsLegendUi.textOpen = !planningWsLegendUi.textOpen; const o = productionOrders.find(x => x.moSo === planningWsUi.currentMo); if (o) rerenderOrderViews(productionOrders.indexOf(o)); }
+        function planningWsApplyLegend(orderIndex, parsed, sourceLabel) {
+            const order = productionOrders[orderIndex]; if (!order) return false;
+            if (!parsed.rows.length) { planningWsLegendSetStatus('อ่านตารางสี (รหัสสี + %) จากแบบไม่ได้ — ลองเลือกไฟล์รูปที่ชัดขึ้น หรือใช้ "วางข้อความ"', 'bad'); return false; }
+            const ws = planningWsGet(order);
+            if (ws.colorRows.some(r => String(r.code || '').trim() || Number(r.value) > 0) && !window.confirm(`มีแถวสีอยู่แล้ว ${ws.colorRows.length} แถว — แทนที่ด้วยแถวสีที่อ่านได้จากแบบ ${parsed.rows.length} แถวหรือไม่?`)) { planningWsLegendSetStatus('ยกเลิก — ยังใช้แถวสีเดิม', ''); return false; }
+            const guess = planningWsGuessQuality(order.quality), gq = guess ? planningWsFindQuality(guess) : null;
+            const defTech = gq && gq.type === 'loop' ? 'Loop' : 'Cut';
+            ws.colorRows = parsed.rows.map(p => {
+                const r = planningWsNewRow(order, p.technique || defTech);
+                r.code = p.code; r.yarn = p.yarn || ''; r.areaMode = 'pct'; r.value = p.pct;
+                return r;
+            });
+            ws.blankPct = parsed.blankPct || 0;
+            planningWsSyncColorCount(order, ws);
+            const sum = parsed.rows.reduce((s, r) => s + r.pct, 0), total = planningWsRound(sum + ws.blankPct, 2);
+            const warn = Math.abs(total - 100) > 0.6;
+            planningWsLegendUi.status = `อ่านได้ ${parsed.rows.length} แถวสี${ws.blankPct ? ` • พื้นที่ว่าง (X) ${ws.blankPct}% ไม่คำนวณ` : ''} • รวม ${total}%${warn ? ' — ยังไม่ครบ 100% ตรวจเทียบกับแบบ (OCR อาจอ่านรหัส/% ผิด)' : ' ✓'}${sourceLabel ? ' • จาก ' + sourceLabel : ''}`;
+            planningWsLegendUi.tone = warn ? 'bad' : 'ok';
+            persistOrderChange(order); rerenderOrderViews(orderIndex);
+            showToast(`สร้างแถวสี ${parsed.rows.length} แถวจากแบบแล้ว`, 'fa-wand-magic-sparkles', 'text-teal-400');
+            return true;
+        }
+        function planningWsLegendFromText(orderIndex) {
+            const ta = document.getElementById('pwLegendText'); const txt = ta ? ta.value : planningWsLegendUi.text;
+            planningWsLegendUi.text = txt;
+            planningWsApplyLegend(orderIndex, planningWsParseLegend(txt), 'ข้อความที่วาง');
+        }
+        // ---- OCR (Tesseract.js จาก CDN เมื่อกดใช้ครั้งแรก) ----
+        const PW_TESS_VER = '4.1.4', PW_TESS_CORE = '4.0.4';
+        let planningWsOcrWorkerPromise = null;
+        function planningWsLoadTesseract() {
+            if (window.Tesseract) return Promise.resolve(window.Tesseract);
+            return new Promise((resolve, reject) => {
+                const sc = document.createElement('script');
+                sc.src = `https://cdn.jsdelivr.net/npm/tesseract.js@${PW_TESS_VER}/dist/tesseract.min.js`;
+                sc.onload = () => resolve(window.Tesseract);
+                sc.onerror = () => reject(new Error('โหลดตัวอ่านภาพ (OCR) ไม่ได้ — ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'));
+                document.head.appendChild(sc);
+            });
+        }
+        function planningWsGetOcrWorker() {
+            if (!planningWsOcrWorkerPromise) {
+                planningWsOcrWorkerPromise = (async () => {
+                    const T = await planningWsLoadTesseract();
+                    const w = await T.createWorker({
+                        workerPath: `https://cdn.jsdelivr.net/npm/tesseract.js@${PW_TESS_VER}/dist/worker.min.js`,
+                        corePath: `https://cdn.jsdelivr.net/npm/tesseract.js-core@${PW_TESS_CORE}`,
+                        langPath: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int',
+                        logger: m => { if (m && m.status && planningWsLegendUi.busy) { const p = Math.round((m.progress || 0) * 100); planningWsLegendSetStatus(`กำลังอ่านรูป... ${m.status}${p ? ' ' + p + '%' : ''}`, ''); } }
+                    });
+                    await w.loadLanguage('eng'); await w.initialize('eng');
+                    return w;
+                })().catch(e => { planningWsOcrWorkerPromise = null; throw e; });
+            }
+            return planningWsOcrWorkerPromise;
+        }
+        function planningWsLoadImage(src) {
+            return new Promise((resolve, reject) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => resolve(im); im.onerror = () => reject(new Error('โหลดรูปไม่ได้')); im.src = src; });
+        }
+        // วาดส่วนของรูป (x,y,w,h ในพิกัดรูปจริง) ขยาย scale เท่า เป็นขาวดำ + ยืดคอนทราสต์ เพื่อให้ OCR อ่านตัวหนังสือเล็กๆ ได้
+        function planningWsPrepCanvas(img, x, y, w, h, scale) {
+            const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(w * scale)); cv.height = Math.max(1, Math.round(h * scale));
+            const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.imageSmoothingQuality = 'high'; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+            ctx.drawImage(img, x, y, w, h, 0, 0, cv.width, cv.height);
+            const d = ctx.getImageData(0, 0, cv.width, cv.height), px = d.data, hist = new Uint32Array(256);
+            for (let i = 0; i < px.length; i += 4) { const g = Math.round(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]); px[i] = px[i + 1] = px[i + 2] = g; hist[g]++; }
+            const tot = cv.width * cv.height; let acc = 0, lo = 0, hi = 255;
+            for (let g = 0; g < 256; g++) { acc += hist[g]; if (acc >= tot * 0.02) { lo = g; break; } }
+            acc = 0; for (let g = 255; g >= 0; g--) { acc += hist[g]; if (acc >= tot * 0.02) { hi = g; break; } }
+            const span = Math.max(1, hi - lo);
+            for (let i = 0; i < px.length; i += 4) { const v = Math.max(0, Math.min(255, Math.round((px[i] - lo) * 255 / span))); px[i] = px[i + 1] = px[i + 2] = v; }
+            ctx.putImageData(d, 0, 0);
+            return cv;
+        }
+        // หาแถว "% พื้นที่" ของตารางสี: อ่านทั้งรูปแบบ sparse แล้วหาคอลัมน์ของคำที่เป็น "xx.xx%" → ตัดเฉพาะบริเวณตารางสีมาอ่านซ้ำแบบเป็นบรรทัด
+        async function planningWsOcrLegend(img) {
+            const worker = await planningWsGetOcrWorker();
+            const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+            const s1 = Math.min(3, 4200 / Math.max(W, H));
+            planningWsLegendSetStatus('กำลังหาตารางสีในรูป...', '');
+            await worker.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1' });
+            const r1 = await worker.recognize(planningWsPrepCanvas(img, 0, 0, W, H, s1));
+            const pw = (r1.data.words || []).filter(w => /\d[.,]?\d*\s*%/.test(w.text)).map(w => ({ x: w.bbox.x0 / s1, y0: w.bbox.y0 / s1, y1: w.bbox.y1 / s1 }));
+            let best = [];
+            pw.forEach(a => { const g = pw.filter(b => Math.abs(b.x - a.x) <= W * 0.02); if (g.length > best.length) best = g; });
+            const attempts = [];
+            if (best.length >= 2) {
+                const cx = best.map(b => b.x).sort((a, b) => a - b)[Math.floor(best.length / 2)];
+                const x0 = Math.max(0, cx - W * 0.22), x1 = Math.min(W, cx + W * 0.25);
+                // ตัดเป็นแถบตามแนวตั้งเต็มความสูง (ตารางสียาวกว่าที่เจอใน pass แรก) ลองหลายขนาดขยาย แล้วเลือกผลที่รวม % ใกล้ 100 ที่สุด
+                [3, 2, 4].forEach(k => attempts.push({ r: [x0, 0, x1 - x0, H], scale: k }));
+            }
+            [[0, 0, W * 0.4, H], [W * 0.6, 0, W * 0.4, H]].forEach(r => attempts.push({ r, scale: 3 }));   // สำรอง: แถบซ้าย/ขวาของรูป
+            await worker.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
+            let bestParsed = { rows: [], blankPct: 0, lines: 0 }, bestScore = Infinity;
+            const totalOf = p => p.rows.reduce((s, r) => s + r.pct, 0) + p.blankPct;
+            for (let i = 0; i < attempts.length; i++) {
+                const { r: [x, y, w, h], scale } = attempts[i];
+                planningWsLegendSetStatus(`กำลังอ่านรหัสสีและ % ... (${i + 1}/${attempts.length})`, '');
+                const rr = await worker.recognize(planningWsPrepCanvas(img, x, y, w, h, Math.min(scale, 4200 / Math.max(w, h))));
+                const p = planningWsParseLegend(rr.data.text);
+                if (!p.rows.length) continue;
+                const score = Math.abs(totalOf(p) - 100) - p.rows.length * 0.001;
+                if (score < bestScore) { bestScore = score; bestParsed = p; }
+                if (Math.abs(totalOf(p) - 100) <= 0.6) break;      // รวมครบ 100% แล้ว พอ
+            }
+            return bestParsed;
+        }
+        async function planningWsReadLegendFromImage(orderIndex, src, label) {
+            if (planningWsLegendUi.busy) return;
+            planningWsLegendUi.busy = true;
+            try {
+                planningWsLegendSetStatus('กำลังโหลดรูป...', '');
+                const img = await planningWsLoadImage(src);
+                const parsed = await planningWsOcrLegend(img);
+                planningWsLegendUi.busy = false;
+                planningWsApplyLegend(orderIndex, parsed, label);
+            } catch (e) {
+                console.error('Legend OCR failed:', e);
+                planningWsLegendUi.busy = false;
+                planningWsLegendSetStatus('อ่านจากรูปไม่สำเร็จ: ' + (e.message || e), 'bad');
+            }
+        }
+        async function planningWsReadLegendFromDesign(orderIndex) {
+            const order = productionOrders[orderIndex]; if (!order || !order.designImageUrl) return;
+            if (planningWsLegendUi.busy) return;
+            // รูปจาก Google Drive อาจโหลดเข้า canvas ไม่ได้ (CORS) → ลอง fetch เป็น blob ก่อน ถ้าไม่ได้ให้เลือกไฟล์จากเครื่องแทน
+            try {
+                planningWsLegendSetStatus('กำลังโหลดรูปแบบจากระบบ...', '');
+                const resp = await fetch(order.designImageUrl); if (!resp.ok) throw new Error('http ' + resp.status);
+                const blob = await resp.blob(); const url = URL.createObjectURL(blob);
+                await planningWsReadLegendFromImage(orderIndex, url, 'รูปแบบของ Design');
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (e) {
+                console.warn('design image fetch blocked:', e);
+                planningWsLegendSetStatus('ดึงรูปแบบจากระบบมาอ่านไม่ได้ (เบราว์เซอร์บล็อกรูปจาก Google Drive) — กด "เลือกไฟล์รูปแบบจากเครื่อง" แล้วเลือกไฟล์แบบเดียวกันแทน', 'bad');
+            }
+        }
+        function planningWsReadLegendFromFile(orderIndex, input) {
+            const f = input.files && input.files[0]; if (!f) return;
+            const url = URL.createObjectURL(f);
+            planningWsReadLegendFromImage(orderIndex, url, f.name).finally(() => { setTimeout(() => URL.revokeObjectURL(url), 60000); input.value = ''; });
+        }
+        function planningWsLegendPanelHtml(order, orderIndex) {
+            const ui = planningWsLegendUi;
+            const tone = ui.tone === 'bad' ? 'text-rose-600' : (ui.tone === 'ok' ? 'text-emerald-700' : 'text-slate-600');
+            return `
+                    <div class="border border-dashed border-teal-300 bg-teal-50/40 rounded-md p-3 space-y-2" data-pw-legend>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <p class="text-xs font-bold text-teal-900 mr-1"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> สร้างแถวสีอัตโนมัติจากรูปแบบ</p>
+                            ${order.designImageUrl ? `<button type="button" onclick="planningWsReadLegendFromDesign(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded">อ่านจากรูปแบบของ Design นี้</button>` : ''}
+                            <label class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50 cursor-pointer">เลือกไฟล์รูปแบบจากเครื่อง<input type="file" accept="image/*" class="hidden" data-pw-legend-file onchange="planningWsReadLegendFromFile(${orderIndex}, this)"></label>
+                            <button type="button" onclick="planningWsLegendToggleText()" class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50">${ui.textOpen ? 'ซ่อนช่องวางข้อความ' : 'วางข้อความตารางสี'}</button>
+                        </div>
+                        <p class="text-[10px] text-slate-500">อ่านรหัสสี + % จากตารางสีของแบบ แล้วสร้างแถวสีให้ — ช่อง X = พื้นที่ว่าง (ไม่คำนวณ) • รหัสสี+ชนิดไหมเดียวกันรวมเป็น 1 แถว • Cut / Loop แยกแถว (ความสูง mm ไม่นับ) • ชนิดไหมต่างกัน (WOOL/VISCOSE) แยกแถว • ตรวจรหัสสีที่อ่านได้อีกครั้งก่อนสั่งย้อม</p>
+                        ${ui.textOpen ? `<div class="space-y-1"><textarea id="pwLegendText" rows="6" placeholder="วางตารางสีทีละบรรทัด เช่น&#10;0.72% CC153 16C / WOOL&#10;4806 Cut 11mm 3.96%&#10;97.42% DK.BLUE / CUT&#10;2.58% X" class="w-full p-2 text-xs font-mono border border-slate-300 rounded bg-white">${escapeHtml(ui.text)}</textarea><button type="button" onclick="planningWsLegendFromText(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded">แปลงเป็นแถวสี</button></div>` : ''}
+                        <p id="pwLegendStatus" class="text-[11px] ${tone}">${escapeHtml(ui.status)}</p>
+                    </div>`;
+        }
+
         // นำยอดสั่งย้อม (รวมเผื่อ) ต่อรหัสสี ไปใส่ order.dyeing.colorOrders — อัปเดตตามรหัสสี ไม่ลบแถวที่ใช้ Surplus
         function planningWsBuildDyePlanRows(order) {
             const c = planningWsComputeColors(order);
@@ -16297,7 +16519,9 @@
             const order_ = [];
             c.rows.forEach((x, i) => {
                 if (!(x.netKg > 0)) return;
-                const code = String(x.row.code || '').trim() || `สี ${i + 1}`;
+                const code0 = String(x.row.code || '').trim() || `สี ${i + 1}`;
+                const yarn0 = String(x.row.yarn || '').trim();
+                const code = yarn0 ? `${code0} / ${yarn0}` : code0;   // รหัสสีเดียวกันแต่ชนิดไหมต่างกัน = คนละแถวในแผนสั่งย้อม
                 const key = code.toLowerCase();
                 if (!byCode[key]) { byCode[key] = { code, kg: 0 }; order_.push(key); }
                 byCode[key].kg += x.netKg;
