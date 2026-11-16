@@ -4219,7 +4219,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-120';
+        const APP_BUILD = 'QCDashboard-121';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6771,6 +6771,15 @@
             const isExport = order.market === 'export', isDomestic = order.market === 'domestic';
 
             const totalSqmText = kgText(order.totalSqm);
+            // 2026-11-16: ช่องรายละเอียด/Details ใต้ "จำนวนชิ้น" — ใส่ขนาดจาก "รายการขนาด (Size)" ของใบ (กว้าง × ยาว × จำนวนชิ้น = ตร.ม.)
+            const poSizeItems = (Array.isArray(order.sizeItems) ? order.sizeItems : []).filter(it => it && ((Number(it.width) || 0) > 0 || (Number(it.length) || 0) > 0));
+            const nf2 = (n, max) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: max });
+            const sizeLinesHtml = poSizeItems.map((it, i) => {
+                const vd = Number(it.voidPercent) || 0;
+                return `<div>${poSizeItems.length > 1 ? (i + 1) + '.&nbsp;' : ''}${nf2(it.width, 3)}&nbsp;×&nbsp;${nf2(it.length, 3)}&nbsp;ม.&nbsp;×&nbsp;${Number(it.qty) || 0}&nbsp;ชิ้น${(Number(it.sqm) || 0) > 0 ? `&nbsp;=&nbsp;${(Number(it.sqm) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;ตร.ม.` : ''}${vd > 0 ? `&nbsp;(ว่าง&nbsp;${nf2(vd, 2)}%)` : ''}</div>`;
+            }).join('');
+            const pcsTotal = order.totalPieces ? Number(order.totalPieces) : poSizeItems.reduce((a, it) => a + (Number(it.qty) || 0), 0);
+            const pcsText = pcsTotal > 0 ? pcsTotal + ' ชิ้น' : '';
             const sizeLines = String(order.carpetSizeNote || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
             const sizeShort = sizeLines.length ? sizeLines[0].replace(/^\d+\)\s*/, '').split(/\s+[-–·]\s+/)[0] : '';
 
@@ -6853,8 +6862,8 @@
                                     <div class="mo-r" style="height:6mm;"><div class="mo-c" style="flex:1;">จำนวนสี/No.of Colors:&nbsp;<span class="mo-fill">${v(order.colorsCount ? String(order.colorsCount) + (order.colorsRef ? ' (อ้างถึง: ' + order.colorsRef + ')' : '') : '')}</span></div></div>
                                 </div>
                                 <div style="flex:1; padding:1mm 1.6mm;">
-                                    <div>จำนวนชิ้น/No.of Pcs.&nbsp;<span class="mo-fill" style="font-size:14px;">${v(order.totalPieces ? order.totalPieces + ' ชิ้น' : '')}</span>&nbsp;&nbsp;&nbsp;&nbsp;รายละเอียด/Details:</div>
-                                    <div class="mo-fill" style="margin-top:1mm; white-space:pre-wrap; font-size:11px;">${v(order.carpetSizeNote)}</div>
+                                    <div>จำนวนชิ้น/No.of Pcs.&nbsp;<span class="mo-fill" style="font-size:14px;">${v(pcsText)}</span>&nbsp;&nbsp;&nbsp;&nbsp;รายละเอียด/Details:</div>
+                                    <div class="mo-fill" style="margin-top:1mm; font-size:11px; line-height:1.35;">${sizeLinesHtml}${order.carpetSizeNote ? `<div style="white-space:pre-wrap;${sizeLinesHtml ? ' margin-top:0.8mm;' : ''}">${v(order.carpetSizeNote)}</div>` : ''}</div>
                                 </div>
                             </div>
                             <table class="mo-t" style="width:100%; flex:none;">
@@ -15677,10 +15686,15 @@
                     technique: PLANNING_WS_TECHNIQUES.some(t => t.key === r.technique) ? r.technique : PLANNING_WS_TECHNIQUES[0].key,
                     areaMode: r.areaMode === 'sqm' ? 'sqm' : 'pct',
                     value: Number(r.value) || 0,
-                    quality: r.quality || ''
+                    quality: r.quality || '',
+                    lot: r.lot || '',   // 2026-11-16: LOT ไหมของแถวสี (ส่งต่อไปแผนสั่งย้อม)
+                    allowancePct: planningWsNormAllowance(r.allowancePct),   // '' = ใช้ค่า "บวกเผื่อ (%)" รวมของใบ
+                    roundDec: planningWsNormDec(r.roundDec, true)           // '' = ใช้ค่า "ปัดทศนิยม" ของใบ
                 })),
                 blankPct: Math.max(0, Number(raw.blankPct) || 0),
                 allowancePct: (raw.allowancePct === undefined || raw.allowancePct === '' || isNaN(Number(raw.allowancePct))) ? 5 : Number(raw.allowancePct),
+                roundDec: planningWsNormDec(raw.roundDec, false),
+                roundMode: raw.roundMode === 'up' ? 'up' : 'round',
                 manpower: { hoursPerDay: numOrBlank(mp.hoursPerDay), tuftingStaff: numOrBlank(mp.tuftingStaff), designStaff: numOrBlank(mp.designStaff), finishingStaff: numOrBlank(mp.finishingStaff), dyeLeadDays: numOrBlank(mp.dyeLeadDays) }
             };
         }
@@ -15744,6 +15758,22 @@
             return Number(calc.totalArea) || Number(order.totalSqm) || 0;
         }
         function planningWsRound(n, d) { const f = Math.pow(10, d); return Math.round((Number(n) || 0) * f) / f; }
+        // 2026-11-16: เผื่อ % / ปัดทศนิยม ต่อแถวสี — ว่าง = ใช้ค่ารวมของใบ
+        const PLANNING_WS_DEC_OPTIONS = [{ v: 'none', t: 'ไม่ปัด' }, { v: 0, t: '0 ตำแหน่ง (เต็ม กก.)' }, { v: 1, t: '1 ตำแหน่ง' }, { v: 2, t: '2 ตำแหน่ง' }, { v: 3, t: '3 ตำแหน่ง' }];
+        function planningWsDecLabel(d) { return d === 'none' ? 'ไม่ปัด' : (d === 0 ? '0 ตำแหน่ง' : d + ' ตำแหน่ง'); }
+        function planningWsNormAllowance(v) { return (v === undefined || v === null || v === '' || isNaN(Number(v))) ? '' : Math.max(0, Number(v)); }
+        // dec: 'none' (ไม่ปัด) | 0..3 (จำนวนตำแหน่งทศนิยมของ กก.) ; allowBlank = แถวสีใช้ '' เพื่อตามค่าของใบ ; ค่าเริ่มต้นของใบ = 2
+        function planningWsNormDec(v, allowBlank) {
+            if (v === 'none') return 'none';
+            if (v === undefined || v === null || v === '' || isNaN(Number(v))) return allowBlank ? '' : 2;
+            return Math.min(3, Math.max(0, Math.round(Number(v))));
+        }
+        function planningWsRoundBy(n, dec, mode) {
+            const v = Number(n) || 0;
+            if (dec === 'none') return v;
+            const f = Math.pow(10, dec);
+            return (mode === 'up' ? Math.ceil(v * f - 1e-9) : Math.round(v * f)) / f;
+        }
         function planningWsFmt(n, d) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 
         // เกรด 3 แผนก (ค่าที่ระบบคำนวณ หรือค่าที่ปรับเอง)
@@ -15789,17 +15819,22 @@
                 const kgPerSqm = gsm / 1000;
                 const area = r.areaMode === 'sqm' ? (Number(r.value) || 0) : total * (Number(r.value) || 0) / 100;
                 const kg = area * kgPerSqm;
-                return { row: r, index: i, quality: q, kgPerSqm, area, kg, netKg: kg * (1 + allowance / 100) };
+                const rowAllow = (r.allowancePct === '' || r.allowancePct === undefined) ? allowance : (Number(r.allowancePct) || 0);
+                const dec = (r.roundDec === '' || r.roundDec === undefined) ? ws.roundDec : r.roundDec;
+                const rawNetKg = kg * (1 + rowAllow / 100);
+                // netKg = ยอดสั่งย้อมของแถวนี้ (รวมเผื่อ และปัดทศนิยมตามที่ตั้ง) — ผลรวมของใบใช้ค่านี้ ไม่ใช่ค่าก่อนปัด
+                return { row: r, index: i, quality: q, kgPerSqm, area, kg, allowance: rowAllow, dec, rawNetKg, netKg: planningWsRoundBy(rawNetKg, dec, ws.roundMode) };
             });
             const baseKg = rows.reduce((s, x) => s + x.kg, 0);
             const areaSum = rows.reduce((s, x) => s + x.area, 0);
             const pctSum = total > 0 ? areaSum / total * 100 : rows.filter(x => x.row.areaMode === 'pct').reduce((s, x) => s + (Number(x.row.value) || 0), 0);
             const groups = {};
             rows.forEach(x => {
-                const g = groups[x.row.technique] || (groups[x.row.technique] = { technique: x.row.technique, count: 0, kg: 0 });
-                g.count++; g.kg += x.kg;
+                const g = groups[x.row.technique] || (groups[x.row.technique] = { technique: x.row.technique, count: 0, kg: 0, netKg: 0 });
+                g.count++; g.kg += x.kg; g.netKg += x.netKg;
             });
-            return { rows, total, allowance, baseKg, netKg: baseKg * (1 + allowance / 100), areaSum, pctSum, groups: Object.keys(groups).map(k => groups[k]) };
+            const netKg = rows.reduce((s, x) => s + x.netKg, 0);
+            return { rows, total, allowance, defaultDec: ws.roundDec, roundMode: ws.roundMode, baseKg, netKg, areaSum, pctSum, groups: Object.keys(groups).map(k => groups[k]) };
         }
 
         // ---- state ของหน้า (เลขที่ M/O ที่เปิดอยู่ — ว่าง = หน้ากริด) ----
@@ -16050,7 +16085,10 @@
                         <td class="py-2 pr-2 min-w-[150px]">
                             <label class="flex items-center gap-1 text-[10px] text-slate-500 mb-0.5"><input type="checkbox" ${r.stipple ? 'checked' : ''} onchange="planningWsRowField(${orderIndex}, '${r.id}', 'stipple', this.checked)"> ผสมสี (Stipple)</label>
                             <input type="text" value="${escapeHtml(r.code)}" placeholder="รหัสสี / ชื่อสี" onchange="planningWsRowField(${orderIndex}, '${r.id}', 'code', this.value)" class="w-full p-1.5 border border-slate-300 rounded bg-white text-xs">
-                            <input type="text" value="${escapeHtml(r.yarn || '')}" placeholder="ชนิดไหม (WOOL/VISCOSE)" onchange="planningWsRowField(${orderIndex}, '${r.id}', 'yarn', this.value)" class="w-full mt-1 p-1 border border-slate-200 rounded bg-white text-[10px] text-slate-600">
+                            <div class="flex gap-1 mt-1">
+                                <input type="text" value="${escapeHtml(r.yarn || '')}" placeholder="ชนิดไหม (WOOL/VISCOSE)" onchange="planningWsRowField(${orderIndex}, '${r.id}', 'yarn', this.value)" class="flex-1 min-w-0 p-1 border border-slate-200 rounded bg-white text-[10px] text-slate-600">
+                                <input type="text" value="${escapeHtml(r.lot || '')}" placeholder="LOT" data-pw-lot onchange="planningWsRowField(${orderIndex}, '${r.id}', 'lot', this.value)" class="w-20 p-1 border border-slate-200 rounded bg-white text-[10px] text-slate-600">
+                            </div>
                         </td>
                         <td class="py-2 pr-2 min-w-[120px]">
                             <select onchange="planningWsRowField(${orderIndex}, '${r.id}', 'technique', this.value)" class="w-full p-1.5 border border-slate-300 rounded bg-white text-xs">
@@ -16071,11 +16109,21 @@
                         <td class="py-2 pr-2 text-right whitespace-nowrap font-medium text-slate-700">${x.kgPerSqm > 0 ? planningWsFmt(x.kgPerSqm, 3) : '-'}</td>
                         <td class="py-2 pr-2 text-right whitespace-nowrap text-slate-700">${x.area > 0 ? planningWsFmt(x.area, 2) : '-'}</td>
                         <td class="py-2 pr-2 text-right whitespace-nowrap font-semibold text-slate-900" data-pw-row-kg>${x.kg > 0 ? planningWsFmt(x.kg, 3) : '-'}</td>
+                        <td class="py-2 pr-2 whitespace-nowrap">
+                            <div class="flex items-center gap-1"><input type="number" min="0" step="0.5" data-pw-row-allow value="${r.allowancePct === '' ? '' : r.allowancePct}" placeholder="${planningWsFmt(c.allowance, 1)}" title="เผื่อ % ของสีนี้ (เว้นว่าง = ใช้ค่ารวม ${planningWsFmt(c.allowance, 1)}%)" onchange="planningWsRowField(${orderIndex}, '${r.id}', 'allowancePct', this.value)" class="w-16 p-1.5 border ${r.allowancePct === '' ? 'border-slate-300' : 'border-teal-400 bg-teal-50/40'} rounded bg-white text-xs"><span class="text-[10px] text-slate-500">%</span></div>
+                        </td>
+                        <td class="py-2 pr-2 whitespace-nowrap">
+                            <select data-pw-row-dec onchange="planningWsRowField(${orderIndex}, '${r.id}', 'roundDec', this.value)" title="ปัดทศนิยมของยอดสั่งย้อมสีนี้" class="p-1.5 border ${r.roundDec === '' ? 'border-slate-300' : 'border-teal-400 bg-teal-50/40'} rounded bg-white text-xs">
+                                <option value="" ${r.roundDec === '' ? 'selected' : ''}>ตามใบ (${planningWsDecLabel(c.defaultDec)})</option>
+                                ${PLANNING_WS_DEC_OPTIONS.map(o => `<option value="${o.v}" ${String(r.roundDec) === String(o.v) ? 'selected' : ''}>${o.t}</option>`).join('')}
+                            </select>
+                        </td>
+                        <td class="py-2 pr-2 text-right whitespace-nowrap font-bold text-teal-800" data-pw-row-net>${x.netKg > 0 ? planningWsFmt(x.netKg, x.dec === 'none' ? 3 : x.dec) : '-'}</td>
                         <td class="py-2 text-right"><button type="button" onclick="planningWsRemoveRow(${orderIndex}, '${r.id}')" class="text-slate-500 hover:text-rose-600 border border-slate-300 rounded px-2 py-0.5" title="ลบแถวนี้">✕</button></td>
                     </tr>`;
             }).join('');
             const groupHtml = c.groups.map(g => `
-                <tr class="border-t border-slate-100"><td class="py-2">${escapeHtml(g.technique)}</td><td class="py-2 text-center">${g.count}</td><td class="py-2 text-right">${planningWsFmt(g.kg, 3)}</td><td class="py-2 text-right font-bold">${planningWsFmt(g.kg * (1 + c.allowance / 100), 3)}</td></tr>`).join('');
+                <tr class="border-t border-slate-100"><td class="py-2">${escapeHtml(g.technique)}</td><td class="py-2 text-center">${g.count}</td><td class="py-2 text-right">${planningWsFmt(g.kg, 3)}</td><td class="py-2 text-right font-bold">${planningWsFmt(g.netKg, 3)}</td></tr>`).join('');
             const existingPlan = ((order.dyeing && order.dyeing.colorOrders) || []).filter(r => r.colorCode || Number(r.kg) > 0);
             return `
                 <section class="bg-white border border-slate-200 rounded-lg p-4 space-y-3" data-pw-section="2">
@@ -16098,7 +16146,7 @@
                         <table class="w-full text-xs" data-pw-color-table>
                             <thead><tr class="text-[10px] text-slate-500 text-left">
                                 <th class="pb-1">#</th><th class="pb-1">รหัสสี</th><th class="pb-1">เทคนิคทอ</th><th class="pb-1">ตัดส่วน</th><th class="pb-1">คุณภาพ</th>
-                                <th class="pb-1 text-right">น้ำหนัก (กก./ตร.ม.)</th><th class="pb-1 text-right">พื้นที่ (ตร.ม.)</th><th class="pb-1 text-right">น้ำหนักไหม (กก.)</th><th></th>
+                                <th class="pb-1 text-right">น้ำหนัก (กก./ตร.ม.)</th><th class="pb-1 text-right">พื้นที่ (ตร.ม.)</th><th class="pb-1 text-right">น้ำหนักไหม (กก.)</th><th class="pb-1">เผื่อ (%)</th><th class="pb-1">ปัดทศนิยม</th><th class="pb-1 text-right">สั่งย้อม (กก.)</th><th></th>
                             </tr></thead>
                             <tbody>${rowsHtml}</tbody>
                         </table>
@@ -16106,12 +16154,16 @@
                     <div class="flex flex-wrap gap-2 items-stretch">
                         <div class="border-t-4 ${pctOk ? 'border-emerald-500' : 'border-rose-500'} border-x border-b border-slate-200 rounded-md px-3 py-2 min-w-[120px]"><p class="text-[10px] text-slate-500">รวม % ที่กรอก</p><p id="pwPctSum" class="text-lg font-bold ${pctOk ? 'text-emerald-600' : 'text-rose-600'}">${planningWsFmt(c.pctSum, 2)}%</p>${blankPct > 0 ? `<p class="text-[10px] text-slate-500" data-pw-blank>+ พื้นที่ว่าง (X) ${planningWsFmt(blankPct, 2)}% ไม่คำนวณ</p>` : ''}</div>
                         <div class="min-w-[110px]"><label class="block text-[10px] text-slate-500">บวกเผื่อ (%)</label>
-                            <input id="pwAllowance" type="number" min="0" step="0.5" value="${ws.allowancePct}" onchange="planningWsSetAllowance(${orderIndex}, this.value)" class="w-full p-2 text-sm font-semibold border border-slate-300 rounded bg-white"></div>
+                            <input id="pwAllowance" type="number" min="0" step="0.5" value="${ws.allowancePct}" onchange="planningWsSetAllowance(${orderIndex}, this.value)" class="w-full p-2 text-sm font-semibold border border-slate-300 rounded bg-white"><p class="text-[9px] text-slate-400 mt-0.5">ค่าตั้งต้นทุกสี (แก้รายสีได้ในตาราง)</p></div>
+                        <div class="min-w-[150px]"><label class="block text-[10px] text-slate-500">ปัดทศนิยมยอดสั่งย้อม</label>
+                            <div class="flex gap-1"><select id="pwRoundDec" onchange="planningWsSetRound(${orderIndex}, 'roundDec', this.value)" class="flex-1 p-2 text-sm font-semibold border border-slate-300 rounded bg-white">${PLANNING_WS_DEC_OPTIONS.map(o => `<option value="${o.v}" ${String(ws.roundDec) === String(o.v) ? 'selected' : ''}>${o.t}</option>`).join('')}</select>
+                            <select id="pwRoundMode" onchange="planningWsSetRound(${orderIndex}, 'roundMode', this.value)" class="p-2 text-sm font-semibold border border-slate-300 rounded bg-white"><option value="round" ${ws.roundMode === 'round' ? 'selected' : ''}>ปัดปกติ</option><option value="up" ${ws.roundMode === 'up' ? 'selected' : ''}>ปัดขึ้น</option></select></div>
+                            <p class="text-[9px] text-slate-400 mt-0.5">ค่าตั้งต้นทุกสี (แก้รายสีได้ในตาราง)</p></div>
                         <div class="border border-slate-200 bg-slate-50 rounded-md px-3 py-2 min-w-[150px]"><p class="text-[10px] text-slate-500">น้ำหนักไหมฐานรวม</p><p id="pwBaseKg" class="text-lg font-bold text-slate-900">${planningWsFmt(c.baseKg, 3)} กก.</p></div>
                         <div class="border-t-4 border-teal-600 border-x border-b border-slate-200 bg-teal-50/40 rounded-md px-3 py-2 min-w-[190px]"><p class="text-[10px] text-slate-500">ยอดสั่งย้อมสุทธิ (รวมเผื่อ)</p><p id="pwNetKg" class="text-lg font-bold text-teal-800">${planningWsFmt(c.netKg, 3)} กก.</p></div>
                     </div>
                     <table class="w-full text-xs">
-                        <thead><tr class="text-[10px] text-slate-500 text-left border-b border-slate-200"><th class="py-1.5">หมวดเทคนิค</th><th class="text-center">จำนวนสี</th><th class="text-right">น้ำหนักฐาน (กก.)</th><th class="text-right">สั่งย้อมสุทธิ +${planningWsFmt(c.allowance, 0)}% (กก.)</th></tr></thead>
+                        <thead><tr class="text-[10px] text-slate-500 text-left border-b border-slate-200"><th class="py-1.5">หมวดเทคนิค</th><th class="text-center">จำนวนสี</th><th class="text-right">น้ำหนักฐาน (กก.)</th><th class="text-right">สั่งย้อมสุทธิ (รวมเผื่อ/ปัดแล้ว) (กก.)</th></tr></thead>
                         <tbody>${groupHtml || '<tr><td colspan="4" class="py-3 text-center text-slate-400">-</td></tr>'}</tbody>
                     </table>
                     <div class="flex flex-wrap items-center gap-2 pt-1">
@@ -16286,7 +16338,7 @@
             const tech = technique || PLANNING_WS_TECHNIQUES[0].key;
             let quality = guess;
             if (quality && planningWsFindQuality(quality).type !== planningWsTechniqueType(tech) && planningWsFindQuality(quality).type !== 'manual') quality = '';
-            return { id: 'pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), code: '', yarn: '', stipple: false, technique: tech, areaMode: 'pct', value: 0, quality };
+            return { id: 'pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), code: '', yarn: '', stipple: false, technique: tech, areaMode: 'pct', value: 0, quality, lot: '', allowancePct: '', roundDec: '' };
         }
         // จำนวนสีเปลี่ยน -> เกรดทอใช้ "จำนวนสีสูงสุด" ด้วย จึงยกให้ไม่ต่ำกว่าจำนวนสี (ไม่เคยลดค่าที่กรอก/นำเข้าไว้)
         function planningWsSyncColorCount(order, ws) {
@@ -16328,6 +16380,8 @@
                 const row = ws.colorRows.find(r => r.id === rowId);
                 if (!row) return;
                 if (field === 'value') row.value = Math.max(0, Number(value) || 0);
+                else if (field === 'allowancePct') row.allowancePct = planningWsNormAllowance(value);
+                else if (field === 'roundDec') row.roundDec = planningWsNormDec(value, true);
                 else if (field === 'stipple') row.stipple = !!value;
                 else if (field === 'technique') {
                     row.technique = value;
@@ -16339,6 +16393,12 @@
                     }
                 }
                 else row[field] = value;
+            });
+        }
+        function planningWsSetRound(orderIndex, field, raw) {
+            planningWsMutate(orderIndex, (ws) => {
+                if (field === 'roundMode') ws.roundMode = raw === 'up' ? 'up' : 'round';
+                else ws.roundDec = planningWsNormDec(raw, false);
             });
         }
         function planningWsSetAllowance(orderIndex, raw) {
@@ -16573,10 +16633,12 @@
                 const yarn0 = String(x.row.yarn || '').trim();
                 const code = yarn0 ? `${code0} / ${yarn0}` : code0;   // รหัสสีเดียวกันแต่ชนิดไหมต่างกัน = คนละแถวในแผนสั่งย้อม
                 const key = code.toLowerCase();
-                if (!byCode[key]) { byCode[key] = { code, kg: 0 }; order_.push(key); }
+                if (!byCode[key]) { byCode[key] = { code, kg: 0, lots: [] }; order_.push(key); }
                 byCode[key].kg += x.netKg;
+                // LOT ไหม: รหัสสี+ชนิดไหมเดียวกันแต่ LOT ต่างกัน → ยังเป็นแถวเดียว แสดง LOT รวมกัน (ไม่แตกแถวเพื่อไม่ให้รหัสสีซ้ำในแผนสั่งย้อม)
+                String(x.row.lot || '').split(/[,;\n]+/).map(t => t.trim()).filter(Boolean).forEach(t => { if (!byCode[key].lots.includes(t)) byCode[key].lots.push(t); });
             });
-            return order_.map(k => ({ code: byCode[k].code, kg: planningWsRound(byCode[k].kg, 2) }));
+            return order_.map(k => ({ code: byCode[k].code, kg: planningWsRound(byCode[k].kg, 3), lot: byCode[k].lots.join(', ') }));
         }
         function planningWsApplyDyePlanToOrder(order) {
             const plan = planningWsBuildDyePlanRows(order);
@@ -16587,8 +16649,8 @@
             order.dyeing.colorOrders = order.dyeing.colorOrders.filter(r => r.colorCode || Number(r.kg) > 0 || r.useSurplus);
             plan.forEach(p => {
                 const existing = order.dyeing.colorOrders.find(r => String(r.colorCode || '').trim().toLowerCase() === p.code.toLowerCase());
-                if (existing) existing.kg = p.kg;
-                else { const row = newDyeingColorOrderRow(); row.colorCode = p.code; row.kg = p.kg; order.dyeing.colorOrders.push(row); }
+                if (existing) { existing.kg = p.kg; if (p.lot) existing.lotNo = p.lot; }
+                else { const row = newDyeingColorOrderRow(); row.colorCode = p.code; row.kg = p.kg; if (p.lot) row.lotNo = p.lot; order.dyeing.colorOrders.push(row); }
             });
             return plan.length;
         }
@@ -17596,6 +17658,7 @@
                         <input type="text" placeholder="Code สี" value="${escapeHtml(row.colorCode || '')}" onchange="updateDyeingColorOrderField(${orderIndex}, '${row.id}', 'colorCode', this.value)" class="${codeCls}">
                         <input type="number" min="0" step="0.01" placeholder="กก." value="${row.kg || ''}" onchange="updateDyeingColorOrderField(${orderIndex}, '${row.id}', 'kg', Number(this.value)||0)" class="${inputCls}">
                         <span class="text-[10px] text-slate-400">กก.</span>
+                        <input type="text" data-dye-plan-lot placeholder="LOT" title="LOT ไหม" value="${escapeHtml(row.lotNo || '')}" onchange="updateDyeingColorOrderField(${orderIndex}, '${row.id}', 'lotNo', this.value.trim())" class="${compact ? 'w-14' : 'w-24'} p-1 bg-white border border-slate-200 rounded-md text-[11px]">
                         <select data-dye-where onchange="updateDyeingColorOrderField(${orderIndex}, '${row.id}', 'dyeWhere', this.value)" class="${compact ? 'w-20' : 'w-28'} p-1 bg-white border ${getDyeRowWhere(order, row) === 'external' ? 'border-amber-300 text-amber-700' : 'border-slate-200'} rounded-md text-[11px]" title="ย้อมที่ไหน (ว่าง = ตามโหมดของ M/O)">
                             <option value="" ${!row.dyeWhere ? 'selected' : ''}>ตาม M/O (${(order.dyeing || {}).mode === 'external' ? 'นอก' : 'ใน'})</option>
                             <option value="internal" ${row.dyeWhere === 'internal' ? 'selected' : ''}>ย้อมใน</option>
