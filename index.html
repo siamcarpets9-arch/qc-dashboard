@@ -4219,7 +4219,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-119';
+        const APP_BUILD = 'QCDashboard-120';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -11552,25 +11552,38 @@
             try { localStorage.setItem('qc_pending_order_sync_v1', JSON.stringify(orderPendingSync)); } catch (e) {}
         }
 
-        async function syncOrderToSheet(order) {
-            if (!gasWebAppUrl) return;
+        // UPDATED (2026-11-16): ส่ง order ขึ้น Sheet "ทีละตัว" (คิว) แทนยิงพร้อมกัน — ตอนนำเข้าข้อมูลทอหลายสิบ M/O เคยยิง POST พร้อมกันจน Apps Script
+        // (lock) ทำบางตัวหลุด → Sheet ไม่ได้ข้อมูลวันใหม่ → เปิดใหม่แล้วข้อมูลหาย. ตัวแรกที่ไม่มีคิวค้างยังส่งทันทีเหมือนเดิม (keepalive ใช้ได้)
+        let orderSyncInFlight = 0, orderSyncChain = Promise.resolve();
+        const ORDER_SHEET_CELL_WARN_CHARS = 45000;   // เซลล์ Google Sheet เก็บได้ไม่เกิน 50,000 ตัวอักษร
+        const orderSizeWarned = new Set();
+        function syncOrderToSheet(order) {
+            if (!gasWebAppUrl) return Promise.resolve();
             markOrderPendingSync(order);
-            try {
-                const postUrl = gasWebAppUrl.includes('?') ? gasWebAppUrl + '&type=order' : gasWebAppUrl + '?type=order';
-                const body = JSON.stringify(order);
-                const opts = {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body
-                };
-                // keepalive lets the request survive a reload/close right after the click (the usual way a
-                // "ผ่าน" got lost) — browsers cap a keepalive body at 64KB, so only use it when it fits.
-                try { if (new TextEncoder().encode(body).length < 60000) opts.keepalive = true; } catch (e) {}
-                await fetch(postUrl, opts);
-            } catch(err) {
-                console.error("Error syncing production order to Google Sheet:", err);
+            let body;
+            try { body = JSON.stringify(order); } catch (e) { console.error('Cannot serialize order for sync', e); return Promise.resolve(); }
+            if (body.length > ORDER_SHEET_CELL_WARN_CHARS && !orderSizeWarned.has(order.moSo)) {
+                orderSizeWarned.add(order.moSo);
+                console.warn(`Order ${order.moSo} JSON is ${body.length} chars — Google Sheet cells hold at most 50,000`);
+                showToast(`ข้อมูลของ ${order.moSo} ใหญ่มาก (${body.length.toLocaleString()} ตัวอักษร) ใกล้/เกินขีดจำกัดเซลล์ Google Sheet 50,000 — อาจบันทึกขึ้น Sheet ไม่ครบ แจ้งผู้ดูแลระบบ`, 'fa-triangle-exclamation', 'text-amber-400');
             }
+            const send = async () => {
+                try {
+                    const postUrl = gasWebAppUrl.includes('?') ? gasWebAppUrl + '&type=order' : gasWebAppUrl + '?type=order';
+                    const opts = { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body };
+                    // keepalive lets the request survive a reload/close right after the click (the usual way a
+                    // "ผ่าน" got lost) — browsers cap a keepalive body at 64KB, so only use it when it fits.
+                    try { if (new TextEncoder().encode(body).length < 60000) opts.keepalive = true; } catch (e) {}
+                    await fetch(postUrl, opts);
+                } catch (err) {
+                    console.error("Error syncing production order to Google Sheet:", err);
+                }
+            };
+            let p;
+            if (orderSyncInFlight === 0) { orderSyncInFlight++; p = send(); }
+            else { orderSyncInFlight++; p = orderSyncChain.then(send); }
+            orderSyncChain = p.catch(() => {});
+            return p.finally(() => { orderSyncInFlight--; });
         }
 
         // How far along the production flow an order is (higher = further). Stages only move forward in
@@ -11580,6 +11593,30 @@
             if (order.readyToShip) return 4;
             const idx = ORDER_STAGES.indexOf(order.currentStage);
             return idx < 0 ? 0 : idx;
+        }
+
+        const weavingLogKey = l => `${l.date}|${String((l && l.loom) || '')}`;
+        // รายการทอรายวันในเครื่องที่ Sheet ยังไม่มี (หรือมีแต่ตร.ม./พนักงานต่างกัน) — ใช้ตัดสินว่า Sheet ยังไม่ได้รับข้อมูลทอล่าสุด
+        function weavingLogEntriesNewerThanRemote(local, remote) {
+            const lLog = (local && local.weaving && Array.isArray(local.weaving.dailyLog)) ? local.weaving.dailyLog : [];
+            const rLog = (remote && remote.weaving && Array.isArray(remote.weaving.dailyLog)) ? remote.weaving.dailyLog : [];
+            const rMap = new Map(rLog.filter(Boolean).map(l => [weavingLogKey(l), l]));
+            return lLog.filter(l => {
+                if (!l || !l.date) return false;
+                const r = rMap.get(weavingLogKey(l));
+                if (!r) return true;
+                return Math.abs((Number(r.sqm) || 0) - (Number(l.sqm) || 0)) > 0.0005 || (Array.isArray(l.staff) ? l.staff.length : 0) !== (Array.isArray(r.staff) ? r.staff.length : 0);
+            });
+        }
+        function mergeWeavingLogIntoRemote(remote, local) {
+            const merged = remote;
+            if (!merged.weaving) merged.weaving = {};
+            const byKey = new Map();
+            (Array.isArray(merged.weaving.dailyLog) ? merged.weaving.dailyLog : []).filter(Boolean).forEach(l => byKey.set(weavingLogKey(l), l));
+            ((local.weaving && local.weaving.dailyLog) || []).filter(l => l && l.date).forEach(l => byKey.set(weavingLogKey(l), l));   // ค่าในเครื่อง (ใหม่กว่า) ชนะ
+            merged.weaving.dailyLog = [...byKey.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.loom || '').localeCompare(String(b.loom || '')));
+            try { recomputeWeavingSqmFromLog(merged); } catch (e) { console.warn('recompute weaving after merge failed', e); }
+            return merged;
         }
 
         // Merges a fresh Sheet read (already normalized) with local orders that were sent but not yet
@@ -11604,7 +11641,20 @@
                 const ts = orderPendingSync[key];
                 if (ts === undefined) return remote;
                 const local = localByKey.get(key);
-                if (!local || now - ts > ORDER_PENDING_SYNC_MAX_AGE_MS || orderProgressRank(local) <= orderProgressRank(remote)) {
+                if (!local || now - ts > ORDER_PENDING_SYNC_MAX_AGE_MS) {
+                    delete orderPendingSync[key];
+                    changedPending = true;
+                    return remote;
+                }
+                if (orderProgressRank(local) <= orderProgressRank(remote)) {
+                    // FIX (2026-11-16): Sheet ไม่ได้ "ตามหลัง" ที่ขั้นตอน แต่อาจยังขาด "ข้อมูลทอรายวัน" ที่นำเข้า/กรอกไว้ในเครื่อง (POST ไม่ถึง/ถูกตัด)
+                    // — ข้อมูลวัน 10–12/11 เคยหายตอนเปิดใหม่เพราะตรงนี้ทิ้งค่าในเครื่อง. รวม dailyLog (ค่าในเครื่องชนะเมื่อ วัน+จอ เดียวกัน) แล้วส่งซ้ำ
+                    const missing = weavingLogEntriesNewerThanRemote(local, remote);
+                    if (missing.length > 0) {
+                        const mergedOrder = mergeWeavingLogIntoRemote(remote, local);
+                        resend.push(mergedOrder);
+                        return mergedOrder;
+                    }
                     delete orderPendingSync[key];
                     changedPending = true;
                     return remote;
