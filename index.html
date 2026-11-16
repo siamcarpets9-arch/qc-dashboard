@@ -4219,7 +4219,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-121';
+        const APP_BUILD = 'QCDashboard-122';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6771,6 +6771,8 @@
             const isExport = order.market === 'export', isDomestic = order.market === 'domestic';
 
             const totalSqmText = kgText(order.totalSqm);
+            // 2026-11-16: Yarn Spec — ใส่ "ชนิดไหม (Yarn Type)" ของใบ (เช่น WOOL 380/1TEX) ที่ช่อง อื่นๆ /Other...; ถ้ามีข้อความ Other ที่กรอกเองในสเปคและไม่ซ้ำกัน พิมพ์ต่อท้าย
+            const yarnSpecText = [String(order.yarnType || '').trim(), String((specs.material && specs.material.otherText) || '').trim()].filter((t, i, a) => t && a.findIndex(x => x.toLowerCase() === t.toLowerCase()) === i).join(' / ');
             // 2026-11-16: ช่องรายละเอียด/Details ใต้ "จำนวนชิ้น" — ใส่ขนาดจาก "รายการขนาด (Size)" ของใบ (กว้าง × ยาว × จำนวนชิ้น = ตร.ม.)
             const poSizeItems = (Array.isArray(order.sizeItems) ? order.sizeItems : []).filter(it => it && ((Number(it.width) || 0) > 0 || (Number(it.length) || 0) > 0));
             const nf2 = (n, max) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: max });
@@ -6876,7 +6878,7 @@
                         <div style="width:55.8%; display:flex; flex-direction:column; box-sizing:border-box;">
                             <div class="mo-r mo-center" style="height:6.5mm; align-items:center; font-weight:700; justify-content:center;">SPECIFICATIONS:</div>
                             <div class="mo-r" style="height:9mm;"><div class="mo-c" style="width:12mm;">TYPE:</div><div class="mo-c mo-opts" style="flex:1;">${opt(sp('tuftMethod', 'handtufted'), 'ทอมือ Handtufted')}${opt(sp('tuftMethod', 'passtufted'), 'ทอจักร Passtufted')}</div></div>
-                            <div class="mo-r" style="height:8mm;"><div class="mo-c" style="width:23mm; white-space:nowrap;">Yarn Spec :</div><div class="mo-c mo-opts" style="flex:1; column-gap:6mm;">${opt(sp('material', 'wo'), 'WO')}${opt(sp('material', 'wn'), 'WN')}${opt(sp('material', 'ab'), 'AB')}${opt(sp('material', 'nylon'), 'NYLON')}${opt(sp('material', 'other'), 'อื่นๆ /Other...' + (specs.material && specs.material.otherText ? ` <span class="mo-fill">${v(specs.material.otherText)}</span>` : ''))}</div></div>
+                            <div class="mo-r" style="height:8mm;"><div class="mo-c" style="width:23mm; white-space:nowrap;">Yarn Spec :</div><div class="mo-c mo-opts" style="flex:1; column-gap:6mm;">${opt(sp('material', 'wo'), 'WO')}${opt(sp('material', 'wn'), 'WN')}${opt(sp('material', 'ab'), 'AB')}${opt(sp('material', 'nylon'), 'NYLON')}${opt(sp('material', 'other'), 'อื่นๆ /Other...' + (yarnSpecText ? `&nbsp;<span class="mo-fill" style="margin-left:1mm;">${v(yarnSpecText)}</span>` : ''))}</div></div>
                             <div class="mo-r" style="height:9.3mm;"><div class="mo-c" style="width:23mm; white-space:nowrap;">Pile Texture:</div><div class="mo-c mo-opts" style="flex:1;">${opt(pileCut, 'ขนตัด/CUT')}${opt(pileLoop, 'ขนห่วง/LOOP')}${opt(pileCutLoop, 'ขนตัด&amp;ขนห่วง/CUT&amp;LOOP')}</div></div>
                             <div class="mo-r" style="height:12mm;"><div class="mo-c" style="width:16mm;">Surface:</div><div class="mo-c" style="flex:1; flex-direction:column; align-items:flex-start; justify-content:center; gap:0.8mm;">
                                 <div class="mo-opts">${opt(carved, 'แกะลาย/Carved')}${opt(sp('carveStyle', 'hairline'), 'A)Hairline')}${opt(sp('carveStyle', 'carving'), 'B)Carving')}${opt(sp('carveStyle', 'carvingBeveling'), 'C)Carving&amp;Beveling')}</div>
