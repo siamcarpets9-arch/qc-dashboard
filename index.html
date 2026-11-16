@@ -1137,6 +1137,7 @@
                                 <div><label class="block text-xs font-semibold text-slate-600 mb-1">Tuft bind</label><input type="text" id="newOrderTuftBind" placeholder="ระบุข้อกำหนด" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
                                 <div><label class="block text-xs font-semibold text-slate-600 mb-1">Sprouting / Label</label><input type="text" id="newOrderSproutingLabel" placeholder="การเก็บปลายไหม / ป้าย" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"></div>
                             </div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">ทิศทางการทอพรม</label><select id="newOrderWeaveDirection" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm"><option value="">ไม่ระบุ</option><option value="length">ทอตามด้านยาว (ตามทิศทางการวางดีไซน์)</option><option value="width">ทอตามด้านกว้าง</option></select></div>
                             <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                                 <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer"><input type="checkbox" id="newOrderAntiSlip" class="w-4 h-4" onchange="updateNewOrderAntiSlipCalc()"> ปะยางกันลื่น (Anti-slip rubber)</label>
                                 <p id="newOrderAntiSlipCalc" class="hidden text-[11px] text-emerald-700 mt-1" data-antislip-calc></p>
@@ -4219,7 +4220,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-122';
+        const APP_BUILD = 'QCDashboard-123';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6449,6 +6450,15 @@
         // Same print-sheet/window.print() convention as buildMarkNosPrintHTML/buildDyeingOrderPrintHTML
         // above — reuses one shared #printArea + print-single-mode + window.print() flow.
         // =========================================================================================
+        const WEAVE_DIRECTION_OPTIONS = [
+            { v: '', t: 'ไม่ระบุ' },
+            { v: 'length', t: 'ทอตามด้านยาว (ตามทิศทางการวางดีไซน์)' },
+            { v: 'width', t: 'ทอตามด้านกว้าง' }
+        ];
+        function weaveDirectionLabel(v) { const o = WEAVE_DIRECTION_OPTIONS.find(x => x.v === v); return o && o.v ? o.t : ''; }
+        function weaveDirectionSelectHtml(selected, attrs) {
+            return `<select ${attrs} class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">${WEAVE_DIRECTION_OPTIONS.map(o => `<option value="${o.v}" ${selected === o.v ? 'selected' : ''}>${o.t}</option>`).join('')}</select>`;
+        }
         function buildProductionWorkOrderPrintHTML(order) {
             const infoRow = (label, value) => value ? `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>` : '';
             const marketLabel = order.market === 'export' ? 'ต่างประเทศ' : (order.market === 'domestic' ? 'ในประเทศ' : '-');
@@ -6473,6 +6483,7 @@
                 ['แผนไหม/สีสำหรับผลิต', order.yarnPlan],
                 ['งานทากาว (Latexing)', order.latexing],
                 ['ยางกันลื่น', order.antiSlip ? (antiSlipCalcText(order) || 'ปะยางกันลื่น') : ''],
+                ['ทิศทางการทอพรม', weaveDirectionLabel(order.weaveDirection)],
                 ['Tuft bind', order.tuftBind],
                 ['Sprouting / Label', order.sproutingLabel],
                 ['คำสั่งพิเศษถึงฝ่ายผลิต / QC', order.productionInstruction]
@@ -9847,6 +9858,7 @@
                 latexing: raw.latexing || '',
                 antiSlip: raw.antiSlip === true || raw.antiSlip === 'true' || raw.antiSlip === 1 || raw.antiSlip === '1',
                 tuftBind: raw.tuftBind || '',
+                weaveDirection: (raw.weaveDirection === 'length' || raw.weaveDirection === 'width') ? raw.weaveDirection : '',   // 2026-11-16: ทิศทางการทอพรม ('' ไม่ระบุ | 'length' ตามด้านยาว | 'width' ตามด้านกว้าง)
                 sproutingLabel: raw.sproutingLabel || '',
                 productionInstruction: raw.productionInstruction || '',
                 // NEW (2026-09c): market (ตลาด) — 'export' (ต่างประเทศ) or 'domestic' (ในประเทศ), plus
@@ -18521,7 +18533,7 @@
             // on the form already but were never actually read/saved anywhere until now (FIX 2026-09).
             ['newOrderYarnType', 'newOrderTuftingSpec', 'newOrderSurface', 'newOrderTexture',
              'newOrderColorPlacement', 'newOrderYarnPlan', 'newOrderLatexing', 'newOrderTuftBind',
-             'newOrderSproutingLabel', 'newOrderProductionInstruction'].forEach(id => {
+             'newOrderSproutingLabel', 'newOrderWeaveDirection', 'newOrderProductionInstruction'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
             });
@@ -19832,6 +19844,7 @@
             const latexing = document.getElementById('newOrderLatexing').value.trim();
             const tuftBind = document.getElementById('newOrderTuftBind').value.trim();
             const sproutingLabel = document.getElementById('newOrderSproutingLabel').value.trim();
+            const weaveDirection = (document.getElementById('newOrderWeaveDirection') || { value: '' }).value;
             const productionInstruction = document.getElementById('newOrderProductionInstruction').value.trim();
             if (!moSo) {
                 showToast('กรุณาระบุเลขที่ M/O, S/O', 'fa-circle-exclamation', 'text-amber-400');
@@ -19895,6 +19908,7 @@
                 antiSlip: !!(document.getElementById('newOrderAntiSlip') || {}).checked,
                 tuftBind: tuftBind,
                 sproutingLabel: sproutingLabel,
+                weaveDirection: weaveDirection,
                 productionInstruction: productionInstruction,
                 currentStage: 'planning',
                 // FIX (2026-09-30): "คีย์ข้อมูลเข้าไปใหม่แล้ว ไม่สามารถกด ปุ่มแก้ไขได้" — this object literal
@@ -20849,6 +20863,10 @@
                             <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Sprouting / Label</label>
                             <input type="text" value="${escapeHtml(order.sproutingLabel || '')}" onchange="${f('sproutingLabel')}" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">ทิศทางการทอพรม</label>
+                        ${weaveDirectionSelectHtml(order.weaveDirection || '', `data-weave-direction onchange="${f('weaveDirection')}"`)}
                     </div>
                     <div class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2" data-antislip-box>
                         <label class="flex items-center gap-2 text-[11px] font-semibold text-slate-700 cursor-pointer"><input type="checkbox" data-antislip-check ${order.antiSlip ? 'checked' : ''} onchange="updateOrderField(${orderIndex}, 'antiSlip', this.checked)" class="w-4 h-4"> ปะยางกันลื่น (Anti-slip rubber)</label>
