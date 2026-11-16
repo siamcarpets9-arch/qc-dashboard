@@ -84,6 +84,7 @@
                these two print landscape while every other print sheet in this file stays portrait. */
             @page dn-landscape { size: A4 landscape; margin: 12mm; }
             @page mn-landscape { size: A4 landscape; margin: 12mm; }
+            @page ds-landscape { size: A4 landscape; margin: 8mm; }
             /* NEW (2026-09-15 rev.3): ใบ S/O ขอบกระดาษแคบลงเหลือ 10mm ทุกด้าน (เดิมใช้ margin ของ
                @page ทั่วไปที่ 12mm ร่วมกับแบบฟอร์มอื่น) — แยกเป็น named page ของตัวเองเพื่อไม่กระทบ
                แบบฟอร์มพิมพ์อื่นๆ ที่ยังใช้ margin 12mm เท่าเดิม */
@@ -285,6 +286,17 @@
            (order.designImageUrl, the same picture the Design department uploads/sees — see
            buildProductionWorkOrderPrintHTML()) directly in the printed/PDF page. break-inside: avoid
            keeps the picture from being split across a page boundary. */
+        /* 2026-11-16: แบบดีไซน์ + กล่องข้อความวางทับรูป (คีย์รายการ/พิมพ์) — ขนาดฟอนต์เป็น % ของความกว้างรูป (คำนวณเป็น px/mm ตอนสร้าง) */
+        .dn-wrap { position: relative; display: inline-block; line-height: 0; max-width: 100%; background: #fff; }
+        .dn-wrap > img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        .dn-note { position: absolute; box-sizing: border-box; line-height: 1.25; color: #1e3a8a; background: rgba(255,255,255,.9); border: .08em solid #1e3a8a; border-radius: .15em; padding: .2em .45em; white-space: pre-wrap; word-break: break-word; -webkit-print-color-adjust: exact; print-color-adjust: exact; text-align: left; }
+        .dn-note .dn-text { outline: none; min-height: 1.25em; }
+        .dn-edit .dn-note { cursor: text; }
+        .dn-edit .dn-note.dn-sel { outline: 2px solid #4f46e5; outline-offset: 2px; }
+        .dn-handle { position: absolute; left: -2px; top: -17px; height: 16px; padding: 0 7px; background: #4f46e5; color: #fff; border-radius: 4px 4px 0 0; font-size: 10px; line-height: 16px; font-weight: 500; cursor: move; white-space: nowrap; user-select: none; touch-action: none; }
+        .ds-print-sheet { page: ds-landscape; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .ds-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1.5px solid #1e293b; margin-bottom: 3mm; padding-bottom: 1mm; font-size: 13px; color: #0f172a; }
+        .ds-head b { font-size: 16px; }
         .print-design-image-wrap { text-align: center; margin: 10px 0 16px; break-inside: avoid; }
         .print-design-image-wrap img { max-width: 100%; max-height: 320px; border: 1px solid #cbd5e1; border-radius: 6px; object-fit: contain; }
         .print-design-image-caption { font-size: 10px; color: #94a3b8; margin-top: 4px; }
@@ -4220,7 +4232,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-123';
+        const APP_BUILD = 'QCDashboard-124';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6517,7 +6529,9 @@
                     ${order.designImageUrl ? `
                         <p class="print-section-title">รูปดีไซน์ (อ้างอิงจากแผนกดีไซน์)</p>
                         <div class="print-design-image-wrap">
-                            <img src="${escapeHtml(order.designImageUrl)}" alt="รูปดีไซน์">
+                            ${(order.designNotes || []).length > 0 && designImageDimsCache[order.designImageUrl]
+                                ? designNotesImageHtml(order, designImageDimsCache[order.designImageUrl], 170, 100, 'mm', false)
+                                : `<img src="${escapeHtml(order.designImageUrl)}" alt="รูปดีไซน์">`}
                             <p class="print-design-image-caption">รูปนี้เป็นรูปเดียวกับที่แผนกดีไซน์อัปโหลด/เห็นในระบบ</p>
                         </div>
                     ` : ''}
@@ -6552,9 +6566,10 @@
             `;
         }
 
-        function printProductionWorkOrder(orderIndex) {
+        async function printProductionWorkOrder(orderIndex) {
             const order = productionOrders[orderIndex];
             if (!order) return;
+            if (order.designImageUrl && (order.designNotes || []).length > 0) await designImageDims(order.designImageUrl);   // ต้องรู้สัดส่วนรูปก่อน เพื่อวางกล่องข้อความทับรูปตอนพิมพ์
             const printArea = document.getElementById('printArea');
             printArea.innerHTML = buildProductionWorkOrderPrintHTML(order);
             document.body.classList.add('print-single-mode');
@@ -9353,6 +9368,170 @@
         // same M/O=indigo / S/O=amber color coding as the Overview and Board views.
         // NEW (2026-10-15): "รูปภาพดีไซน์ ถ้ามี ให้ขึ้นโชว์ที่รายงาน QC และที่รายการรอส่งด้วย" — ภาพย่อรูปดีไซน์ของ M/O, S/O
         // (order.designImageUrl เดียวกับที่แผนกออกแบบอัปโหลด) ไว้ข้างเลข M/O ในตารางที่มีแต่ข้อความเลข M/O; ไม่มีรูป → ไม่แสดงอะไร. คลิกเพื่อดูภาพใหญ่
+
+        // =========================================================================================
+        // NEW (2026-11-16): แบบดีไซน์ — คีย์รายการ (กล่องข้อความวางทับรูป ลากย้ายได้) + พิมพ์
+        //   order.designNotes = [{ id, text, x, y, w, size, bold }]  — x,y = ตำแหน่งมุมซ้ายบนเป็น % ของรูป,
+        //   w = ความกว้างกล่อง % ของรูป, size = ขนาดตัวอักษรเป็น % ของความกว้างรูป (ย่อ/ขยายตามรูปเสมอ ทั้งบนจอและตอนพิมพ์)
+        //   แผนกขายเป็นผู้คีย์ (เปิดจากรายละเอียดใบ → "รูปดีไซน์ของ M/O นี้" → "คีย์รายการบนแบบ")
+        // =========================================================================================
+        const designImageDimsCache = {};
+        function designImageDims(url) {
+            if (!url) return Promise.resolve(null);
+            if (designImageDimsCache[url]) return Promise.resolve(designImageDimsCache[url]);
+            return new Promise(resolve => {
+                const im = new Image();
+                im.onload = () => { const d = { w: im.naturalWidth || 4, h: im.naturalHeight || 3 }; designImageDimsCache[url] = d; resolve(d); };
+                im.onerror = () => resolve(null);
+                im.src = url;
+            });
+        }
+        function normalizeDesignNotes(arr) {
+            if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch (e) { arr = []; } }
+            if (!Array.isArray(arr)) return [];
+            const num = (v, d, lo, hi) => { const n = Number(v); return (v === '' || v === null || v === undefined || !isFinite(n)) ? d : Math.min(hi, Math.max(lo, n)); };
+            return arr.filter(n => n && typeof n === 'object').slice(0, 60).map((n, i) => ({
+                id: String(n.id || ('dn_' + Date.now() + '_' + i + Math.random().toString(36).slice(2, 5))),
+                text: String(n.text || ''),
+                x: num(n.x, 60, 0, 100), y: num(n.y, 3, 0, 100), w: num(n.w, 36, 8, 100), size: num(n.size, 1.5, 0.5, 8),
+                bold: n.bold === false ? false : true
+            }));
+        }
+        // สร้าง HTML รูป + กล่องข้อความ ขนาดพอดีกรอบ maxW × maxH (หน่วย unit = 'px' | 'mm') — ใช้ทั้งหน้าจอ/พิมพ์/ตัวแก้ไข
+        function designNotesImageHtml(order, dims, maxW, maxH, unit, editable) {
+            const url = order && order.designImageUrl;
+            if (!url) return '';
+            const d = dims || { w: 4, h: 3 };
+            const scale = Math.min(maxW / d.w, maxH / d.h);
+            const W = d.w * scale, H = d.h * scale;
+            const r2 = n => Math.round(n * 100) / 100;
+            const notes = Array.isArray(order.designNotes) ? order.designNotes : [];
+            const notesHtml = notes.map(n => `<div class="dn-note" data-dn-id="${escapeHtml(n.id)}" style="left:${n.x}%;top:${n.y}%;width:${n.w}%;font-size:${r2(n.size * W / 100)}${unit};${n.bold ? 'font-weight:700;' : ''}">${editable ? '<span class="dn-handle" data-dn-handle>⠿ ย้าย</span>' : ''}<div class="dn-text" data-dn-text${editable ? ' contenteditable="true"' : ''}>${escapeHtml(n.text)}</div></div>`).join('');
+            return `<div class="dn-wrap${editable ? ' dn-edit' : ''}" style="width:${r2(W)}${unit};height:${r2(H)}${unit};"><img src="${escapeHtml(url)}" alt="รูปดีไซน์">${notesHtml}</div>`;
+        }
+
+        let designNotesEd = { orderIndex: -1, selected: '', dims: null };
+        function designNotesEdOrder() { return productionOrders[designNotesEd.orderIndex] || null; }
+        function designNotesEdRender() {
+            const order = designNotesEdOrder(); const stage = document.getElementById('dnStage');
+            if (!order || !stage) return;
+            stage.innerHTML = designNotesImageHtml(order, designNotesEd.dims, window.innerWidth * 0.94, window.innerHeight - 120, 'px', true);
+            const sel = stage.querySelector(`[data-dn-id="${designNotesEd.selected}"]`);
+            if (sel) sel.classList.add('dn-sel');
+            const cnt = document.getElementById('dnCount'); if (cnt) cnt.textContent = (order.designNotes || []).length + ' กล่อง';
+        }
+        function designNotesEdSave() { const order = designNotesEdOrder(); if (order) persistOrderChange(order); }
+        function designNotesEdSelect(id) {
+            designNotesEd.selected = id;
+            document.querySelectorAll('#dnStage .dn-note').forEach(el => el.classList.toggle('dn-sel', el.dataset.dnId === id));
+        }
+        function designNotesEdAdd(text) {
+            const order = designNotesEdOrder(); if (!order) return;
+            if (!Array.isArray(order.designNotes)) order.designNotes = [];
+            const k = order.designNotes.length;
+            const n = normalizeDesignNotes([{ id: 'dn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), text: text || '', x: 60, y: Math.min(3 + k * 9, 90), w: 36, size: 1.5, bold: true }])[0];
+            order.designNotes.push(n);
+            designNotesEd.selected = n.id;
+            designNotesEdRender(); designNotesEdSave();
+            const t = document.querySelector(`#dnStage [data-dn-id="${n.id}"] [data-dn-text]`);
+            if (t) { t.focus(); const range = document.createRange(); range.selectNodeContents(t); range.collapse(false); const sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(range); }
+        }
+        function designNotesEdAddQuality() {
+            const order = designNotesEdOrder(); if (!order) return;
+            if (!String(order.quality || '').trim()) { showToast('ใบนี้ยังไม่มีข้อความ "คุณภาพ" — พิมพ์ในกล่องข้อความเองได้', 'fa-circle-info', 'text-amber-400'); return; }
+            designNotesEdAdd(String(order.quality).trim());
+        }
+        function designNotesEdAction(act) {
+            const order = designNotesEdOrder(); if (!order) return;
+            const n = (order.designNotes || []).find(x => x.id === designNotesEd.selected);
+            if (!n) { showToast('คลิกเลือกกล่องข้อความก่อน', 'fa-circle-info', 'text-amber-400'); return; }
+            if (act === 'size+') n.size = Math.min(8, Math.round((n.size + 0.2) * 10) / 10);
+            else if (act === 'size-') n.size = Math.max(0.5, Math.round((n.size - 0.2) * 10) / 10);
+            else if (act === 'w+') n.w = Math.min(100, n.w + 4);
+            else if (act === 'w-') n.w = Math.max(8, n.w - 4);
+            else if (act === 'bold') n.bold = !n.bold;
+            else if (act === 'del') { order.designNotes = order.designNotes.filter(x => x.id !== n.id); designNotesEd.selected = ''; }
+            designNotesEdRender(); designNotesEdSave();
+        }
+        function closeDesignNotesEditor() {
+            const ov = document.getElementById('designNotesEditor'); if (ov) ov.remove();
+            const idx = designNotesEd.orderIndex; designNotesEd.orderIndex = -1;
+            if (idx >= 0 && typeof rerenderOrderViews === 'function') rerenderOrderViews(idx);
+        }
+        async function openDesignNotesEditor(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order || !order.designImageUrl) { showToast('ยังไม่มีรูปแบบดีไซน์ — อัปโหลดรูปก่อน', 'fa-circle-info', 'text-amber-400'); return; }
+            if (!Array.isArray(order.designNotes)) order.designNotes = [];
+            const dims = await designImageDims(order.designImageUrl);
+            designNotesEd = { orderIndex, selected: '', dims };
+            const old = document.getElementById('designNotesEditor'); if (old) old.remove();
+            const ov = document.createElement('div');
+            ov.id = 'designNotesEditor';
+            ov.className = 'fixed inset-0 z-[210] bg-slate-900/85 flex flex-col no-print';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:210;background:rgba(15,23,42,.88);display:flex;flex-direction:column;';   // ไม่พึ่ง Tailwind สำหรับโครงหลัก
+            const btn = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold transition';
+            ov.innerHTML = `
+                <div class="flex flex-wrap items-center gap-2 px-4 py-2 bg-white border-b border-slate-200" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 16px;background:#fff;">
+                    <p class="text-sm font-bold text-slate-800"><i class="fa-solid fa-pen-to-square text-emerald-600 mr-1.5"></i>แบบดีไซน์ ${escapeHtml(order.moSo || '')} — คีย์รายการบนรูป <span id="dnCount" class="text-[11px] font-normal text-slate-400"></span></p>
+                    <button type="button" onclick="designNotesEdAdd('')" class="${btn} bg-emerald-600 text-white hover:bg-emerald-700" data-dn-add>+ เพิ่มกล่องข้อความ</button>
+                    <button type="button" onclick="designNotesEdAddQuality()" class="${btn} bg-emerald-50 text-emerald-700 hover:bg-emerald-100" data-dn-add-quality title="ใส่ข้อความ คุณภาพ (เบอร์ไหม/ลาย TUFTING) ของใบนี้">+ ใส่ข้อความ "คุณภาพ"</button>
+                    <span class="mx-1 h-5 w-px bg-slate-200"></span>
+                    <span class="text-[11px] text-slate-500">กล่องที่เลือก:</span>
+                    <button type="button" onclick="designNotesEdAction('size-')" class="${btn} bg-slate-100 hover:bg-slate-200" title="ลดขนาดตัวอักษร">A−</button>
+                    <button type="button" onclick="designNotesEdAction('size+')" class="${btn} bg-slate-100 hover:bg-slate-200" title="เพิ่มขนาดตัวอักษร">A+</button>
+                    <button type="button" onclick="designNotesEdAction('w-')" class="${btn} bg-slate-100 hover:bg-slate-200" title="ลดความกว้างกล่อง">◀ แคบ</button>
+                    <button type="button" onclick="designNotesEdAction('w+')" class="${btn} bg-slate-100 hover:bg-slate-200" title="เพิ่มความกว้างกล่อง">กว้าง ▶</button>
+                    <button type="button" onclick="designNotesEdAction('bold')" class="${btn} bg-slate-100 hover:bg-slate-200 font-black">B</button>
+                    <button type="button" onclick="designNotesEdAction('del')" class="${btn} bg-rose-50 text-rose-600 hover:bg-rose-100"><i class="fa-solid fa-trash"></i> ลบกล่อง</button>
+                    <span class="flex-1"></span>
+                    <button type="button" onclick="printDesignSheet(${orderIndex})" class="${btn} bg-sky-600 text-white hover:bg-sky-700" data-dn-print-btn><i class="fa-solid fa-print mr-1"></i>พิมพ์</button>
+                    <button type="button" onclick="closeDesignNotesEditor()" class="${btn} bg-indigo-600 text-white hover:bg-indigo-700">เสร็จสิ้น</button>
+                </div>
+                <p class="px-4 py-1 text-[11px] text-slate-300">คลิกในกล่องเพื่อพิมพ์ข้อความ · ลากแถบ "⠿ ย้าย" เหนือกล่องเพื่อย้ายตำแหน่ง · บันทึกอัตโนมัติ · ขนาดตัวอักษรย่อ/ขยายตามรูปเสมอ</p>
+                <div class="flex-1 min-h-0 overflow-auto flex items-start justify-center pb-4" style="flex:1;min-height:0;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding-bottom:16px;"><div id="dnStage"></div></div>`;
+            document.body.appendChild(ov);
+            const stage = ov.querySelector('#dnStage');
+            // แก้ข้อความ
+            stage.addEventListener('focusin', (e) => { const note = e.target.closest && e.target.closest('.dn-note'); if (note) designNotesEdSelect(note.dataset.dnId); });
+            stage.addEventListener('pointerdown', (e) => { const note = e.target.closest && e.target.closest('.dn-note'); if (note) designNotesEdSelect(note.dataset.dnId); });
+            stage.addEventListener('input', (e) => {
+                const t = e.target.closest && e.target.closest('[data-dn-text]'); if (!t) return;
+                const o = designNotesEdOrder(); const n = o && o.designNotes.find(x => x.id === t.parentElement.dataset.dnId);
+                if (n) n.text = t.innerText.replace(/ /g, ' ').replace(/\n$/, '');
+            });
+            stage.addEventListener('focusout', () => designNotesEdSave());
+            stage.addEventListener('paste', (e) => { const t = e.target.closest && e.target.closest('[data-dn-text]'); if (!t) return; e.preventDefault(); const txt = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, txt); });
+            // ลากย้าย
+            stage.addEventListener('pointerdown', (e) => {
+                const h = e.target.closest && e.target.closest('[data-dn-handle]'); if (!h) return;
+                e.preventDefault();
+                const noteEl = h.parentElement, wrap = stage.querySelector('.dn-wrap'); const o = designNotesEdOrder();
+                const n = o && o.designNotes.find(x => x.id === noteEl.dataset.dnId); if (!n || !wrap) return;
+                const rect = wrap.getBoundingClientRect(); const sx = e.clientX, sy = e.clientY, ox = n.x, oy = n.y;
+                designNotesEdSelect(n.id);
+                const move = (ev) => {
+                    n.x = Math.max(0, Math.min(100 - Math.min(n.w, 100), Math.round((ox + (ev.clientX - sx) / rect.width * 100) * 10) / 10));
+                    n.y = Math.max(0, Math.min(97, Math.round((oy + (ev.clientY - sy) / rect.height * 100) * 10) / 10));
+                    noteEl.style.left = n.x + '%'; noteEl.style.top = n.y + '%';
+                };
+                const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); designNotesEdSave(); };
+                document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+            });
+            designNotesEdRender();
+        }
+        // พิมพ์/บันทึก PDF แบบดีไซน์พร้อมรายการที่คีย์ (A4 แนวนอน)
+        async function printDesignSheet(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order || !order.designImageUrl) { showToast('ยังไม่มีรูปแบบดีไซน์ — อัปโหลดรูปก่อน', 'fa-circle-info', 'text-amber-400'); return; }
+            const dims = await designImageDims(order.designImageUrl);
+            const sqm = Number(order.totalSqm) || 0;
+            const head = `<div class="ds-head"><span><b>${escapeHtml(order.moSo || '')}</b>&nbsp;&nbsp;${escapeHtml(order.customerName || '')}${order.designRef ? '&nbsp;&nbsp;Design: ' + escapeHtml(order.designRef) : ''}</span><span>${order.quality ? escapeHtml(order.quality) + '&nbsp;&nbsp;' : ''}${sqm > 0 ? sqm.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ตร.ม.' : ''}</span></div>`;
+            document.getElementById('printArea').innerHTML = `<div class="ds-print-sheet">${head}<div style="text-align:center;">${designNotesImageHtml(order, dims, 281, 165, 'mm', false)}</div></div>`;
+            document.body.classList.add('print-single-mode');
+            showToast('กำลังเปิดหน้าต่างพิมพ์แบบดีไซน์... เลือก "Save as PDF" เพื่อบันทึกเป็นไฟล์ PDF', 'fa-print', 'text-sky-400');
+            setTimeout(() => window.print(), 300);
+        }
+
         function designThumbHtml(moSo, sizeCls) {
             const order = findOrderByMoSo(moSo);
             const url = order && order.designImageUrl;
@@ -9372,6 +9551,9 @@
             img.className = 'max-w-full max-h-full rounded-lg shadow-2xl bg-white';
             ov.appendChild(img);
             document.body.appendChild(ov);
+            // 2026-11-16: ถ้ารูปนี้มีกล่องข้อความที่คีย์ไว้ (designNotes) แสดงทับรูปด้วย
+            const owner = productionOrders.find(o => o.designImageUrl === url && Array.isArray(o.designNotes) && o.designNotes.length > 0);
+            if (owner) designImageDims(url).then(d => { if (d && document.body.contains(ov)) ov.innerHTML = designNotesImageHtml(owner, d, window.innerWidth * 0.94, window.innerHeight * 0.92, 'px', false); });
         }
         function findOrderByMoSo(moSo) {
             const key = String(moSo || '').trim();
@@ -9858,6 +10040,7 @@
                 latexing: raw.latexing || '',
                 antiSlip: raw.antiSlip === true || raw.antiSlip === 'true' || raw.antiSlip === 1 || raw.antiSlip === '1',
                 tuftBind: raw.tuftBind || '',
+                designNotes: normalizeDesignNotes(raw.designNotes),   // 2026-11-16: กล่องข้อความบนรูปแบบดีไซน์ [{id,text,x,y,w,size,bold}] (x,y,w = % ของรูป; size = % ของความกว้างรูป)
                 weaveDirection: (raw.weaveDirection === 'length' || raw.weaveDirection === 'width') ? raw.weaveDirection : '',   // 2026-11-16: ทิศทางการทอพรม ('' ไม่ระบุ | 'length' ตามด้านยาว | 'width' ตามด้านกว้าง)
                 sproutingLabel: raw.sproutingLabel || '',
                 productionInstruction: raw.productionInstruction || '',
@@ -12355,6 +12538,9 @@
                                 <i class="fa-solid fa-upload"></i> ${url ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}
                                 <input type="file" accept="image/*,.heic,.heif" class="hidden" onchange="handleDesignImageInputChange(event, ${orderIndex}, '${target}', ${itemIndexArg})">
                             </label>
+                            ${url && target === 'order' ? `
+                                <button type="button" data-dn-open onclick="openDesignNotesEditor(${orderIndex})" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-medium px-2.5 py-1 rounded-lg transition inline-flex items-center gap-1" title="พิมพ์ข้อความ/รายการวางทับบนรูปแบบ ลากย้ายตำแหน่งได้"><i class="fa-solid fa-pen-to-square"></i> คีย์รายการบนแบบ${(order.designNotes || []).length ? ' (' + order.designNotes.length + ')' : ''}</button>
+                                <button type="button" data-dn-print onclick="printDesignSheet(${orderIndex})" class="bg-sky-50 hover:bg-sky-100 text-sky-700 text-[11px] font-medium px-2.5 py-1 rounded-lg transition inline-flex items-center gap-1" title="พิมพ์/บันทึก PDF แบบดีไซน์พร้อมรายการที่คีย์"><i class="fa-solid fa-print"></i> พิมพ์แบบ</button>` : ''}
                             ${url ? `<button type="button" onclick="removeDesignImage(${orderIndex}, '${target}', ${itemIndexArg})" class="text-rose-500 hover:text-rose-700 text-[11px] px-2 py-1 rounded transition"><i class="fa-solid fa-trash"></i> ลบรูป</button>` : ''}
                         </div>
                     </div>
