@@ -4219,7 +4219,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-117';
+        const APP_BUILD = 'QCDashboard-118';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -18714,18 +18714,48 @@
 
         // NEW (2026-11-13): สรุปยอดตามลูกค้า — เฉพาะ M/O (แท็บ S/O ซ่อน). รับรายการ M/O ที่ผ่านตัวกรองเดือน/คำค้นหาแล้ว (ทุกตลาด)
         // รวมต่อลูกค้า: จำนวน M/O, ตร.ม. รวม, ส่งแล้ว, รอส่ง, อยู่ระหว่างผลิต. จัดกลุ่มชื่อลูกค้าแบบไม่สนตัวพิมพ์/ช่องว่างซ้ำ
+        // UPDATED (2026-11-16): รวมลูกค้าที่ "ชื่อนำหน้าเหมือนกัน" เป็นกลุ่มเดียว — เช่น "ART RUGS", "ART RUGS LTD.", "Art Rugs Limited" → ART RUGS;
+        // "ROLLS SUPPLY" กับ "ROLLS SUPPLY CO., LTD - USA" → ROLLS SUPPLY. กฎ: ตัดเครื่องหมาย/คำบริษัท (LTD, LIMITED, CO, INC, LLC, CORP, บริษัท, จำกัด ...) แล้วถ้าชื่อหนึ่งเป็น
+        // "คำนำหน้าทั้งคำ" ของอีกชื่อ ให้รวมเข้ากับชื่อสั้นสุด (ชื่อที่ต่างกันที่คำแรกอย่าง "ART RUGS" กับ "ART SPACE" ไม่รวมกัน ยกเว้นมีลูกค้าชื่อ "ART" เดี่ยวๆ)
+        const CUST_SUFFIX_WORDS = new Set(['LTD', 'LIMITED', 'CO', 'COMPANY', 'INC', 'INCORPORATED', 'LLC', 'LLP', 'CORP', 'CORPORATION', 'PTE', 'PLC', 'GMBH', 'PVT', 'THE', 'AND', 'บริษัท', 'จำกัด', 'มหาชน', 'หจก']);
+        function custNameWords(name) {
+            return String(name || '').toUpperCase().replace(/[^0-9A-Z\u0E00-\u0E7F]+/g, ' ').trim().split(' ').filter(w => w && !CUST_SUFFIX_WORDS.has(w));
+        }
         function computeSalesCustomerSummary(orders) {
-            const map = new Map();
+            // 1) รวมตามชื่อที่ทำความสะอาดแล้ว
+            const byNorm = new Map();
             (orders || []).forEach(o => {
                 const label = String(o.customerName || '').replace(/\s+/g, ' ').trim() || '(ไม่ระบุลูกค้า)';
-                const key = label.toUpperCase();
-                let c = map.get(key);
-                if (!c) { c = { label, count: 0, sqm: 0, shipped: 0, ready: 0, wip: 0 }; map.set(key, c); }
+                const words = label === '(ไม่ระบุลูกค้า)' ? [label] : custNameWords(label);
+                const norm = words.length ? words.join(' ') : label.toUpperCase();
+                let g = byNorm.get(norm);
+                if (!g) { g = { norm, words: words.length ? words : [norm], labels: new Map(), count: 0, sqm: 0, shipped: 0, ready: 0, wip: 0 }; byNorm.set(norm, g); }
+                g.labels.set(label, (g.labels.get(label) || 0) + 1);
                 const sqm = Number(o.totalSqm) || 0, st = getEffectiveStage(o);
-                c.count += 1; c.sqm += sqm;
-                if (st === 'shipped') c.shipped += sqm; else if (st === 'ready_to_ship') c.ready += sqm; else c.wip += sqm;
+                g.count += 1; g.sqm += sqm;
+                if (st === 'shipped') g.shipped += sqm; else if (st === 'ready_to_ship') g.ready += sqm; else g.wip += sqm;
             });
-            return [...map.values()].sort((a, b) => b.sqm - a.sqm || a.label.localeCompare(b.label));
+            // 2) ชื่อที่เป็นคำนำหน้าทั้งคำของชื่ออื่น → รวมเข้ากับชื่อสั้นสุดที่เป็นคำนำหน้า
+            const groups = [...byNorm.values()].sort((a, b) => a.words.length - b.words.length || a.norm.localeCompare(b.norm));
+            const roots = [];
+            groups.forEach(g => {
+                const root = roots.find(r => r.words.length < g.words.length && r.words.every((w, i) => g.words[i] === w) && r.norm !== '(ไม่ระบุลูกค้า)');
+                if (root) { root.members.push(g); } else roots.push({ words: g.words, norm: g.norm, members: [g] });
+            });
+            // 3) รวมตัวเลข ตั้งชื่อกลุ่ม = ชื่อเดิมที่มี M/O มากสุดของชื่อราก (ถ้าเท่ากันเลือกสั้นกว่า)
+            const rows = roots.map(r => {
+                const t = { label: '', count: 0, sqm: 0, shipped: 0, ready: 0, wip: 0, variants: [] };
+                const labelCount = new Map();
+                r.members.forEach(g => {
+                    t.count += g.count; t.sqm += g.sqm; t.shipped += g.shipped; t.ready += g.ready; t.wip += g.wip;
+                    g.labels.forEach((n, l) => { labelCount.set(l, (labelCount.get(l) || 0) + n); });
+                });
+                const rootLabels = [...r.members[0].labels.entries()].sort((a, b) => b[1] - a[1] || a[0].length - b[0].length);
+                t.label = rootLabels[0][0];
+                t.variants = [...labelCount.keys()].filter(l => l !== t.label).sort();
+                return t;
+            });
+            return rows.sort((a, b) => b.sqm - a.sqm || a.label.localeCompare(b.label));
         }
         // NEW (2026-11-16): "สรุปยอด ตร.ม. ตามลูกค้า ขอสรุปทั้งปี" — ตัวเลือกช่วงของการ์ด: ทั้งปี (เลือกปีได้ ค่าเริ่มต้น = ปีปัจจุบัน) หรือ "ตามเดือนที่เลือก"
         // ปีของ M/O = ปีของวันที่เปิด (M/O ที่ไม่มีวันที่เปิด/ปี 2000 ไม่นับ — ซ่อนเหมือนรายงานอื่น)
@@ -18766,7 +18796,7 @@
                             </tr></thead>
                             <tbody class="divide-y divide-slate-100">
                                 ${rows.map(r => `<tr class="hover:bg-slate-50/80" data-cust="${escapeHtml(r.label)}">
-                                    <td class="px-3 py-1.5 font-semibold text-slate-700">${escapeHtml(r.label)}</td>
+                                    <td class="px-3 py-1.5 font-semibold text-slate-700"${r.variants && r.variants.length ? ` title="รวมชื่อ: ${escapeHtml([r.label].concat(r.variants).join(' | '))}"` : ''}>${escapeHtml(r.label)}${r.variants && r.variants.length ? `<div class="text-[10px] font-normal text-slate-400 leading-tight">รวม: ${escapeHtml(r.variants.join(', '))}</div>` : ''}</td>
                                     <td class="px-3 py-1.5 text-right">${r.count}</td>
                                     <td class="px-3 py-1.5 text-right font-bold text-slate-800">${f(r.sqm)}</td>
                                     <td class="px-3 py-1.5 text-right text-emerald-700">${dash(r.shipped)}</td>
