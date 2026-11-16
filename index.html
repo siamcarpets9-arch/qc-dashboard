@@ -924,6 +924,9 @@
                     <button onclick="setSalesSubTab('report')" id="salesSubTabBtn-report" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                         <i class="fa-solid fa-table"></i> รายการทั้งหมด (M/O, S/O)
                     </button>
+                    <button onclick="setSalesSubTab('po')" id="salesSubTabBtn-po" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                        <i class="fa-solid fa-file-circle-check"></i> ตรวจ PO ลูกค้า
+                    </button>
                 </div>
 
                 <div id="salesSubTab-add">
@@ -1259,6 +1262,37 @@
 
                     <div id="salesReportMarketSections">
                         <!-- injected via JS: renderSalesReportTables() — ตารางเดียวของตลาดที่เลือกอยู่ -->
+                    </div>
+                </div>
+
+                <!-- NEW (2026-11-16): แท็บ "ตรวจ PO ลูกค้า" — อัปโหลด PO ลูกค้า (PDF) แล้วตรวจว่า M/O, S/O ที่เปิดไปตรงกับ PO ไหม
+                     อ่านข้อความจาก PDF ในเบราว์เซอร์ (pdf.js) → เทียบกับข้อมูล M/O,S/O (เลข PO, ชื่อลูกค้า, ขนาด+จำนวน, ตร.ม., วันส่ง)
+                     ไม่อัปโหลดไฟล์ขึ้นเซิร์ฟเวอร์/ไม่บันทึกลงระบบ; ปุ่ม "คัดลอกคำสั่งให้ AI" สร้าง prompt (ข้อความ PO + ข้อมูล M/O) ไปวางใน Claude -->
+                <div id="salesSubTab-po" class="hidden bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i class="fa-solid fa-file-circle-check text-indigo-600"></i> ตรวจ PO ลูกค้ากับ M/O, S/O</h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5">เลือกไฟล์ PO ลูกค้า (PDF / Word .docx, .doc) — ระบบอ่านข้อความจากไฟล์ในเครื่องคุณ (ไม่อัปโหลดไฟล์ไปที่ใด) แล้วเทียบกับ M/O, S/O ที่เปิดไว้: เลขที่ PO, ชื่อลูกค้า, ขนาด/จำนวน, ตร.ม. รวม และวันที่ส่ง</p>
+                    </div>
+                    <div class="flex flex-wrap items-end gap-3">
+                        <label class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3.5 py-2 rounded-lg shadow transition text-xs flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-file-circle-plus"></i> เลือกไฟล์ PO (PDF / Word)
+                            <input type="file" id="poCheckFileInput" accept="application/pdf,.pdf,.docx,.doc,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword" class="hidden" onchange="handlePoCheckFile(this)">
+                        </label>
+                        <div class="flex-1 min-w-[16rem]">
+                            <label class="block text-[10px] text-slate-500 font-medium mb-1">เพิ่ม M/O, S/O ที่ต้องการตรวจ (ถ้าระบบหาไม่เจอเอง)</label>
+                            <div class="flex gap-1.5">
+                                <input type="text" id="poCheckAddInput" list="poCheckOrderList" placeholder="พิมพ์เลขที่ M/O, S/O เช่น 0196/26" class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <datalist id="poCheckOrderList"></datalist>
+                                <button type="button" onclick="poCheckAddOrder()" class="px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 transition"><i class="fa-solid fa-plus mr-1"></i>เพิ่ม</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="poCheckStatus" class="text-xs text-slate-500"></div>
+                    <div id="poCheckResults" class="space-y-3"></div>
+                    <div id="poCheckAiBox" class="hidden bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 space-y-2">
+                        <p class="text-xs font-semibold text-indigo-900"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> ให้ AI (Claude) ตรวจซ้ำ</p>
+                        <p class="text-[11px] text-slate-500">ระบบข้างบนตรวจด้วยกฎเทียบข้อความ — ถ้า PO มีรูปแบบซับซ้อนหรือเป็นไฟล์สแกน กดคัดลอกคำสั่ง (มีข้อความจาก PO + ข้อมูล M/O,S/O ครบ) แล้วนำไปวางที่ Claude ให้ช่วยตรวจ/สรุปข้อผิดพลาดได้</p>
+                        <button type="button" onclick="poCheckCopyPrompt()" class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition"><i class="fa-regular fa-copy mr-1"></i>คัดลอกคำสั่งให้ AI ตรวจ</button>
                     </div>
                 </div>
             </div>
@@ -4185,7 +4219,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-114';
+        const APP_BUILD = 'QCDashboard-117';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -18183,12 +18217,13 @@
         // display toggle within the already-selected แผนกขาย department tab.
         let salesActiveSubTab = 'add';
         function setSalesSubTab(tab) {
-            salesActiveSubTab = (tab === 'report') ? 'report' : 'add';
+            salesActiveSubTab = (tab === 'report' || tab === 'po') ? tab : 'add';
             const activeClasses = ['bg-indigo-600', 'text-white', 'shadow-sm'];
             const inactiveClasses = ['bg-slate-100', 'text-slate-600', 'hover:bg-slate-200'];
             [
                 { el: document.getElementById('salesSubTabBtn-add'), isActive: salesActiveSubTab === 'add' },
-                { el: document.getElementById('salesSubTabBtn-report'), isActive: salesActiveSubTab === 'report' }
+                { el: document.getElementById('salesSubTabBtn-report'), isActive: salesActiveSubTab === 'report' },
+                { el: document.getElementById('salesSubTabBtn-po'), isActive: salesActiveSubTab === 'po' }
             ].forEach(({ el, isActive }) => {
                 if (!el) return;
                 if (isActive) { el.classList.remove(...inactiveClasses); el.classList.add(...activeClasses); }
@@ -18198,7 +18233,10 @@
             const reportPane = document.getElementById('salesSubTab-report');
             if (addPane) addPane.classList.toggle('hidden', salesActiveSubTab !== 'add');
             if (reportPane) reportPane.classList.toggle('hidden', salesActiveSubTab !== 'report');
+            const poPane = document.getElementById('salesSubTab-po');
+            if (poPane) poPane.classList.toggle('hidden', salesActiveSubTab !== 'po');
             if (salesActiveSubTab === 'report') renderSalesReportTables();
+            if (salesActiveSubTab === 'po') poCheckRefreshOrderList();
         }
 
         // NEW (2026-09-12): "แผนกทอ" local sub-tab switcher — "บอร์ดงานทอ" (the pre-existing Kanban
@@ -18667,7 +18705,7 @@
             const sectionsContainer = document.getElementById('salesReportMarketSections');
             if (sectionsContainer) sectionsContainer.innerHTML = sectionsHtml;
 
-            renderSalesReportCustomerSummary(salesReportActiveOrderType === 'MO' ? ofType : []);
+            renderSalesReportCustomerSummary(matchesSearch, matchesMonth, sortByOpenDateThenMoSo);
 
             // NEW (2026-09-12): ยอดตร.ม. รับเข้า/ส่งออกทั้งหมด — ใช้ตัวกรองค้นหาเดียวกับตารางด้านล่าง
             // (matchesSearch) ทั้งหมด (ไม่แยก M/O, S/O) ตามที่แผนกขายขอมาว่า "แสดงในแท็บแผนกขาย".
@@ -18689,19 +18727,33 @@
             });
             return [...map.values()].sort((a, b) => b.sqm - a.sqm || a.label.localeCompare(b.label));
         }
-        function renderSalesReportCustomerSummary(moOrders) {
+        // NEW (2026-11-16): "สรุปยอด ตร.ม. ตามลูกค้า ขอสรุปทั้งปี" — ตัวเลือกช่วงของการ์ด: ทั้งปี (เลือกปีได้ ค่าเริ่มต้น = ปีปัจจุบัน) หรือ "ตามเดือนที่เลือก"
+        // ปีของ M/O = ปีของวันที่เปิด (M/O ที่ไม่มีวันที่เปิด/ปี 2000 ไม่นับ — ซ่อนเหมือนรายงานอื่น)
+        let salesCustSummaryScope = '';
+        function setSalesCustomerSummaryScope(v) { salesCustSummaryScope = v; renderSalesReportTables(); }
+        function renderSalesReportCustomerSummary(matchesSearch, matchesMonth) {
             const el = document.getElementById('salesReportCustomerSummary');
             if (!el) return;
             if (salesReportActiveOrderType !== 'MO') { el.classList.add('hidden'); el.innerHTML = ''; return; }
+            const isMO = o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === 'MO';
+            const yearOf = o => boardOrderMonthKey(o).slice(0, 4);
+            const curYear = boardCurrentMonthKey().slice(0, 4);
+            const years = Array.from(new Set(productionOrders.filter(isMO).map(yearOf).filter(y => /^\d{4}$/.test(y) && y !== '2000').concat([curYear]))).sort().reverse();
+            if (!salesCustSummaryScope || (salesCustSummaryScope !== 'month' && !years.includes(salesCustSummaryScope.replace('year:', '')))) salesCustSummaryScope = 'year:' + curYear;
+            const scopeYear = salesCustSummaryScope === 'month' ? '' : salesCustSummaryScope.replace('year:', '');
+            const moOrders = productionOrders.filter(o => isMO(o) && matchesSearch(o) && (scopeYear ? yearOf(o) === scopeYear : matchesMonth(o)));
+            const scopeLabel = scopeYear ? `ทั้งปี ${scopeYear}` : 'ตามเดือนที่เลือก';
             const rows = computeSalesCustomerSummary(moOrders);
             el.classList.remove('hidden');
-            if (rows.length === 0) { el.innerHTML = ''; el.classList.add('hidden'); return; }
+            const scopeSelect = `<select id="salesCustSummaryScopeSelect" onchange="setSalesCustomerSummaryScope(this.value)" class="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-700">${years.map(y => `<option value="year:${y}"${scopeYear === y ? ' selected' : ''}>ทั้งปี ${y}</option>`).join('')}<option value="month"${scopeYear ? '' : ' selected'}>ตามเดือนที่เลือกด้านบน</option></select>`;
+            if (rows.length === 0) { el.innerHTML = `<div class="border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-400 flex items-center gap-2"><i class="fa-solid fa-users text-indigo-400"></i> สรุปยอดตามลูกค้า (M/O) — ไม่มี M/O ใน${scopeLabel} ${scopeSelect}</div>`; return; }
             const f = n => (Math.round(n * 100) / 100).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const dash = n => n > 0 ? f(n) : '<span class="text-slate-300">-</span>';
             const tot = rows.reduce((t, r) => ({ count: t.count + r.count, sqm: t.sqm + r.sqm, shipped: t.shipped + r.shipped, ready: t.ready + r.ready, wip: t.wip + r.wip }), { count: 0, sqm: 0, shipped: 0, ready: 0, wip: 0 });
             el.innerHTML = `
                 <details open class="border border-slate-200 rounded-xl overflow-hidden">
-                    <summary class="cursor-pointer select-none px-4 py-2.5 bg-indigo-50/60 text-sm font-bold text-indigo-900 flex items-center gap-2"><i class="fa-solid fa-users text-indigo-600"></i> สรุปยอดตามลูกค้า (M/O) <span class="text-[11px] font-medium text-slate-500">${rows.length} ลูกค้า • ${tot.count} M/O • ${f(tot.sqm)} ตร.ม.</span></summary>
+                    <summary class="cursor-pointer select-none px-4 py-2.5 bg-indigo-50/60 text-sm font-bold text-indigo-900 flex items-center gap-2"><i class="fa-solid fa-users text-indigo-600"></i> สรุปยอดตามลูกค้า (M/O) — ${scopeLabel} <span class="text-[11px] font-medium text-slate-500">${rows.length} ลูกค้า • ${tot.count} M/O • ${f(tot.sqm)} ตร.ม.</span></summary>
+                    <div class="px-4 py-2 bg-white border-b border-slate-100 flex items-center gap-2 text-[11px] text-slate-500"><span>ช่วงที่สรุป:</span>${scopeSelect}</div>
                     <div class="overflow-auto max-h-80">
                         <table class="w-full text-xs" id="salesReportCustomerSummaryTable">
                             <thead class="bg-slate-50 text-slate-500 text-[11px] sticky top-0"><tr>
@@ -18729,6 +18781,428 @@
                         </table>
                     </div>
                 </details>`;
+        }
+
+        // =========================================================================================
+        // NEW (2026-11-16): ตรวจ PO ลูกค้า (PDF) กับ M/O, S/O — อ่านข้อความด้วย pdf.js ในเบราว์เซอร์ แล้วเทียบกับข้อมูลที่เปิดไว้
+        // ตรวจ 6 อย่าง: เลขที่ PO ลูกค้า · ชื่อลูกค้า · ขนาด (ทุกรายการ; รองรับ เมตร/ซม./ฟุต-นิ้ว (8ft 8” x 14ft 6”, 8'6\" x 13'6\")/มม. และสลับกว้าง-ยาว) · รับไฟล์ PDF / Word (.docx .doc) · จำนวนชิ้นใกล้ขนาดนั้น ·
+        // ตร.ม. รวม · วันที่ส่ง. ผลเป็น ตรง/ตรวจดู/ไม่ตรง/ข้อมูล — เป็นการเทียบข้อความ (ไม่ใช่ AI) PO ที่เป็นภาพสแกนอ่านข้อความไม่ได้
+        // ปุ่ม "คัดลอกคำสั่งให้ AI ตรวจ" สร้าง prompt ให้นำไปวางที่ Claude เพื่อตรวจซ้ำ. ไม่บันทึกอะไรลงระบบ.
+        // =========================================================================================
+        let poCheckState = { fileName: '', text: '', pages: 0, kind: 'PDF', orderIdx: [] };
+        function loadPdfJs() {
+            if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+            return new Promise((resolve, reject) => {
+                const sc = document.createElement('script');
+                sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                sc.onload = () => { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; resolve(window.pdfjsLib); } catch (e) { reject(e); } };
+                sc.onerror = () => reject(new Error('โหลดตัวอ่าน PDF ไม่ได้ — ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'));
+                document.head.appendChild(sc);
+            });
+        }
+        async function extractPdfText(arrayBuffer) {
+            const lib = await loadPdfJs();
+            const pdf = await lib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+            let out = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const tc = await page.getTextContent();
+                // ต่อชิ้นข้อความตามระยะห่างจริง (PDF บางไฟล์ตัดตัวอักษรเป็นชิ้นเล็กๆ/ตัวยก "th" "nd") → ไม่ใส่ช่องว่างถ้าชิดกัน, ขึ้นบรรทัดใหม่เมื่อ y ต่างเกินครึ่งความสูงตัวอักษร
+                let last = null, line = '';
+                tc.items.forEach(it => {
+                    if (!it.transform) return;
+                    const x = it.transform[4], y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10, w = it.width || 0;
+                    if (last) {
+                        const H = Math.max(h, last.h);
+                        if (Math.abs(y - last.y) > 0.55 * H) { if (line.trim()) out += line.trim() + '\n'; line = ''; }
+                        else { const gap = x - (last.x + last.w); if (gap > 0.12 * H || gap < -H) line += ' '; }
+                    }
+                    line += it.str;
+                    if (it.hasEOL) { if (line.trim()) out += line.trim() + '\n'; line = ''; last = null; return; }
+                    last = { x, y, h, w };
+                });
+                out += line.trim() + '\n\n';
+            }
+            return { text: out, pages: pdf.numPages };
+        }
+        // ----- อ่านไฟล์ Word (.docx = zip+XML อ่านด้วย DecompressionStream ในเบราว์เซอร์ / .doc = OLE ดึงข้อความจากสตรีม WordDocument) -----
+        async function poZipEntries(buf, pred) {
+            const dv = new DataView(buf), u8 = new Uint8Array(buf), res = [];
+            let e = -1;
+            for (let i = u8.length - 22; i >= Math.max(0, u8.length - 66000); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+            if (e < 0) throw new Error('ไฟล์ Word ไม่ถูกต้อง (ไม่ใช่ .docx)');
+            const cnt = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+            for (let n = 0; n < cnt; n++) {
+                if (dv.getUint32(p, true) !== 0x02014b50) break;
+                const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true), elen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), lho = dv.getUint32(p + 42, true);
+                const fname = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+                if (pred(fname)) {
+                    const start = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+                    const data = u8.subarray(start, start + csize);
+                    if (method === 0) res.push({ name: fname, data });
+                    else if (method === 8) {
+                        if (typeof DecompressionStream === 'undefined') throw new Error('เบราว์เซอร์นี้อ่านไฟล์ .docx ไม่ได้ — ใช้ Chrome/Edge รุ่นใหม่ หรือบันทึกไฟล์เป็น PDF');
+                        const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+                        res.push({ name: fname, data: new Uint8Array(await new Response(stream).arrayBuffer()) });
+                    }
+                }
+                p += 46 + nlen + elen + clen;
+            }
+            return res;
+        }
+        function poParseNumbering(xml) {
+            const abs = {}, nums = {};
+            (xml.match(/<w:abstractNum\b[\s\S]*?<\/w:abstractNum>/g) || []).forEach(a => {
+                const id = (/w:abstractNumId="(\d+)"/.exec(a) || [])[1]; if (id == null) return; abs[id] = {};
+                (a.match(/<w:lvl\b[\s\S]*?<\/w:lvl>/g) || []).forEach(l => {
+                    const il = (/w:ilvl="(\d+)"/.exec(l) || [])[1], st = /<w:start w:val="(-?\d+)"/.exec(l);
+                    abs[id][il] = { start: st ? Number(st[1]) : 1, fmt: (/<w:numFmt w:val="([^"]*)"/.exec(l) || [])[1] || 'decimal', text: (/<w:lvlText w:val="([^"]*)"/.exec(l) || [])[1] || '' };
+                });
+            });
+            (xml.match(/<w:num\b[\s\S]*?<\/w:num>/g) || []).forEach(n => {
+                const id = (/w:numId="(\d+)"/.exec(n) || [])[1], ab = (/<w:abstractNumId w:val="(\d+)"/.exec(n) || [])[1]; if (id == null || ab == null) return;
+                const ov = {}; (n.match(/<w:lvlOverride\b[\s\S]*?<\/w:lvlOverride>/g) || []).forEach(o => { const il = (/w:ilvl="(\d+)"/.exec(o) || [])[1], so = /<w:startOverride w:val="(-?\d+)"/.exec(o); if (so) ov[il] = Number(so[1]); });
+                nums[id] = { abs: ab, ov };
+            });
+            return { abs, nums };
+        }
+        function poNumLabel(v, fmt) {
+            const rom = ['', 'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+            if (fmt === 'lowerLetter') return String.fromCharCode(96 + ((v - 1) % 26) + 1); if (fmt === 'upperLetter') return String.fromCharCode(64 + ((v - 1) % 26) + 1);
+            if (fmt === 'lowerRoman') return rom[v] || String(v); if (fmt === 'upperRoman') return (rom[v] || String(v)).toUpperCase();
+            return String(v);
+        }
+        // ใส่เลขลำดับของรายการ (list numbering) กลับเข้าไปในข้อความ — เช่นเอกสารที่ "2" ใน "2 pieces @ 170 x 240" เป็นเลขลำดับอัตโนมัติ ไม่ได้อยู่ในตัวอักษร
+        function poApplyDocxNumbering(xml, numXml) {
+            if (!numXml) return xml;
+            const { abs, nums } = poParseNumbering(numXml), counters = {};
+            return xml.replace(/<w:p[ >][\s\S]*?<\/w:p>/g, p => {
+                const nid = (/<w:numId w:val="(\d+)"/.exec(p) || [])[1]; if (!nid || nid === '0' || !nums[nid]) return p;
+                const il = (/<w:ilvl w:val="(\d+)"/.exec(p) || [])[1] || '0', def = abs[nums[nid].abs]; if (!def || !def[il]) return p;
+                const c = counters[nid] || (counters[nid] = {});
+                const startOf = k => (nums[nid].ov[k] != null ? nums[nid].ov[k] : (def[k] ? def[k].start : 1));
+                c[il] = c[il] == null ? startOf(il) : c[il] + 1;
+                Object.keys(c).forEach(k => { if (Number(k) > Number(il)) delete c[k]; });
+                const lv = def[il]; let label;
+                if (lv.fmt === 'bullet') label = '•';
+                else label = lv.text.replace(/%(\d)/g, (m, d) => { const k = String(Number(d) - 1); const val = c[k] != null ? c[k] : startOf(k); return poNumLabel(val, def[k] ? def[k].fmt : 'decimal'); });
+                return p.replace(/^(<w:p[^>]*>)(<w:pPr>[\s\S]*?<\/w:pPr>)?/, (m, a, b) => a + (b || '') + `<w:r><w:t xml:space="preserve">${label} </w:t></w:r>`);
+            });
+        }
+        function poDocxXmlToText(xml) {
+            const ent = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+            return xml.replace(/<w:tab\s*\/>/g, '\t').replace(/<w:(?:br|cr)\b[^>]*\/>/g, '\n').replace(/<\/w:tc>/g, '\t').replace(/<\/w:p>/g, '\n')
+                .replace(/<[^>]+>/g, '')
+                .replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (m, g) => g[0] === '#' ? String.fromCodePoint(g[1].toLowerCase() === 'x' ? parseInt(g.slice(2), 16) : parseInt(g.slice(1), 10)) : ent[g.toLowerCase()]);
+        }
+        async function extractDocxText(buf) {
+            const all = await poZipEntries(buf, n => /^word\/(document|header\d*|footer\d*|numbering)\.xml$/.test(n));
+            const dec = en => new TextDecoder('utf-8').decode(en.data);
+            const numEn = all.find(en => en.name === 'word/numbering.xml'), numXml = numEn ? dec(numEn) : '';
+            const ents = all.filter(en => en.name !== 'word/numbering.xml');
+            if (!ents.length) throw new Error('ไม่พบเนื้อหาในไฟล์ .docx');
+            ents.sort((a, b) => (a.name === 'word/document.xml' ? 0 : 1) - (b.name === 'word/document.xml' ? 0 : 1));
+            return ents.map(en => poDocxXmlToText(poApplyDocxNumbering(dec(en), numXml))).join('\n');
+        }
+        function extractLegacyDocText(buf) {
+            let stream = new Uint8Array(buf);
+            try {
+                if (window.XLSX && XLSX.CFB) {
+                    const cfb = XLSX.CFB.read(stream, { type: 'buffer' });
+                    const i = cfb.FullPaths.findIndex(p => /WordDocument$/.test(p));
+                    if (i >= 0 && cfb.FileIndex[i].content) stream = new Uint8Array(cfb.FileIndex[i].content);
+                }
+            } catch (e) { console.warn('CFB read failed, scanning raw bytes', e); }
+            const runs = []; let run = [];
+            const flush = (min) => { if (run.length >= min) runs.push(String.fromCharCode.apply(null, run)); run = []; };
+            for (let i = 0; i < stream.length; i++) { // ข้อความแบบ 8 บิต (Word เก็บภาษาอังกฤษแบบบีบอัด)
+                const b = stream[i];
+                if ((b >= 32 && b < 127) || b === 13 || b === 9 || b === 11 || b === 7) run.push(b === 11 || b === 7 ? 10 : b);
+                else if (b === 0x91 || b === 0x92) run.push(39); else if (b === 0x93 || b === 0x94) run.push(34); else if (b === 0x96 || b === 0x97) run.push(45);
+                else flush(3);
+            }
+            flush(3);
+            let text = runs.join('\n').replace(/\r/g, '\n');
+            const runs16 = []; run = [];
+            for (let i = 0; i + 1 < stream.length; i += 2) { // ข้อความ Unicode (เช่นภาษาไทย)
+                const c = stream[i] | (stream[i + 1] << 8);
+                if ((c >= 32 && c < 127) || c === 13 || c === 9 || (c >= 0x0E00 && c <= 0x0E7F) || c === 0x2019 || c === 0x201C || c === 0x201D) run.push(c);
+                else { if (run.length >= 6) runs16.push(String.fromCharCode.apply(null, run)); run = []; }
+            }
+            if (run.length >= 6) runs16.push(String.fromCharCode.apply(null, run));
+            if (runs16.length) text += '\n' + runs16.join('\n').replace(/\r/g, '\n');
+            return text;
+        }
+        async function extractPoFileText(file) {
+            const buf = await file.arrayBuffer(); const u8 = new Uint8Array(buf.slice(0, 8)); const name = (file.name || '').toLowerCase();
+            const isZip = u8[0] === 0x50 && u8[1] === 0x4B, isOle = u8[0] === 0xD0 && u8[1] === 0xCF, isPdf = u8[0] === 0x25 && u8[1] === 0x50;
+            if (isPdf || /\.pdf$/.test(name)) { const r = await extractPdfText(buf); return { text: r.text, pages: r.pages, kind: 'PDF' }; }
+            if (isZip || /\.docx$/.test(name)) return { text: await extractDocxText(buf), pages: 0, kind: 'Word' };
+            if (isOle || /\.doc$/.test(name)) return { text: extractLegacyDocText(buf), pages: 0, kind: 'Word' };
+            if (/\.(txt|csv)$/.test(name)) return { text: new TextDecoder().decode(buf), pages: 0, kind: 'ข้อความ' };
+            throw new Error('รองรับไฟล์ .pdf .docx .doc .txt เท่านั้น');
+        }
+        function poNormAlnum(v) { return String(v || '').toUpperCase().replace(/[^0-9A-Z฀-๿]/g, ''); }
+        function poParseNum(v) { return parseFloat(String(v).replace(',', '.')); }
+        const PO_MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+        function poMonthNum(w) { w = String(w || '').toLowerCase(); if (w.length < 3) return 0; if (PO_MONTHS[w]) return PO_MONTHS[w]; const full = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']; const i = full.findIndex(f => f === w || (w.length >= 3 && f.startsWith(w))); return i >= 0 ? i + 1 : 0; }
+        // สแกนวันที่ทุกรูปแบบ พร้อมตำแหน่ง: dd/mm/yyyy · yyyy-mm-dd · "2nd Nov. 2026" · "18th Sept. 26" · "October 9, 2026" · และแบบไม่มีปี "November 20" (เก็บเป็น md)
+        function poScanDates(text) {
+            const out = [], pad = n => String(n).padStart(2, '0');
+            const taken = (a, b) => out.some(o => a < o.end && b > o.idx);
+            const addFull = (idx, end, y, m, d) => { y = Number(y); if (y < 100) y += 2000; m = Number(m); d = Number(d); if (y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) out.push({ idx, end, iso: `${y}-${pad(m)}-${pad(d)}`, md: `${pad(m)}-${pad(d)}` }); };
+            let m;
+            const r1 = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/g; while ((m = r1.exec(text))) addFull(m.index, r1.lastIndex, m[3], m[2], m[1]);
+            const r2 = /\b(20\d{2})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/g; while ((m = r2.exec(text))) if (!taken(m.index, r2.lastIndex)) addFull(m.index, r2.lastIndex, m[1], m[2], m[3]);
+            const r3 = /\b(\d{1,2})[ \t]{0,2}(?:st|nd|rd|th)?[ \t\-]+([A-Za-z]{3,9})\.?,?[ \t\-]+(\d{2,4})\b/g; while ((m = r3.exec(text))) { const mo = poMonthNum(m[2]); if (mo && !taken(m.index, r3.lastIndex)) addFull(m.index, r3.lastIndex, m[3], mo, m[1]); }
+            const r4 = /\b([A-Za-z]{3,9})\.?[ \t]+(\d{1,2})(?:st|nd|rd|th)?,?[ \t]+(\d{4})\b/g; while ((m = r4.exec(text))) { const mo = poMonthNum(m[1]); if (mo && !taken(m.index, r4.lastIndex)) addFull(m.index, r4.lastIndex, m[3], mo, m[2]); }
+            const addMd = (idx, end, mo, d) => { d = Number(d); if (mo && d >= 1 && d <= 31 && !taken(idx, end)) out.push({ idx, end, iso: '', md: `${pad(mo)}-${pad(d)}` }); };
+            const r5 = /\b([A-Za-z]{3,9})\.?[ \t]+(\d{1,2})(?:st|nd|rd|th)?\b/g; while ((m = r5.exec(text))) addMd(m.index, r5.lastIndex, poMonthNum(m[1]), m[2]);
+            const r6 = /\b(\d{1,2})(?:st|nd|rd|th)?[ \t]+([A-Za-z]{3,9})\b/g; while ((m = r6.exec(text))) addMd(m.index, r6.lastIndex, poMonthNum(m[2]), m[1]);
+            return out.sort((a, b) => a.idx - b.idx);
+        }
+        function poExtractDates(text) { return Array.from(new Set(poScanDates(text).filter(d => d.iso).map(d => d.iso))).sort(); }
+        // หาคู่ขนาด "A x B" รองรับ 8ft 8” x 14ft 6” · 8'6" x 13'6" · 8' x 12' · 170 x 240 · 3.00 x 4.00 m · 264x 442cmcm  → cands = [[กว้างม., ยาวม.], ...]
+        function poFindSizePairs(text) {
+            const src = text.replace(/(\d\s*)(cm|mm)(\s*)\2(?![A-Za-z])/gi, (m0, pre, u) => pre + u + ' '.repeat(m0.length - pre.length - u.length)); // "cmcm" พิมพ์ซ้ำ → cm (ความยาวเท่าเดิม)
+            const NUM = '(\\d+(?:[.,]\\d+)?)';
+            const reFt = new RegExp(`${NUM}\\s*(ft|feet|foot|['’′])\\s*(?:${NUM}\\s*(?:inches|inch|in\\b|["”″“]|['’′]{2}))?`, 'y');
+            const rePlain = new RegExp(`${NUM}\\s*(?:(mm|cm|m|inches|inch|in|["”″“])(?![A-Za-z]))?`, 'y');
+            const reX = /\s*[xX×*]\s*/y;
+            const parseDim = (pos) => {
+                reFt.lastIndex = pos; let m = reFt.exec(src);
+                if (m) return { end: reFt.lastIndex, unit: 'ft', m: (poParseNum(m[1]) + (m[3] ? poParseNum(m[3]) / 12 : 0)) * 0.3048, raw: poParseNum(m[1]) };
+                rePlain.lastIndex = pos; m = rePlain.exec(src);
+                if (!m) return null;
+                const u = (m[2] || '').toLowerCase(), v = poParseNum(m[1]);
+                const f = { mm: 0.001, cm: 0.01, m: 1, in: 0.0254, inch: 0.0254, inches: 0.0254, '"': 0.0254, '”': 0.0254, '″': 0.0254, '“': 0.0254 }[u];
+                return { end: rePlain.lastIndex, unit: u || null, m: f ? v * f : null, raw: v };
+            };
+            const pairs = []; const re = /\d+(?:[.,]\d+)?/g; let s;
+            while ((s = re.exec(src))) {
+                if (s.index > 0 && /[A-Za-z0-9.,]/.test(src[s.index - 1])) continue;
+                const a = parseDim(s.index); if (!a) continue;
+                reX.lastIndex = a.end; if (!reX.exec(src)) continue;
+                const b = parseDim(reX.lastIndex); if (!b) continue;
+                let cands = [];
+                if (a.unit || b.unit) {
+                    const ua = a.m != null ? a : null, ub = b.m != null ? b : null;
+                    if (ua && ub) cands = [[ua.m, ub.m]];
+                    else { const ref = ua || ub; const unitScale = ref.m / ref.raw; cands = [[a.raw * unitScale, b.raw * unitScale]]; }
+                } else cands = [1, 0.01, 0.3048, 0.001, 0.0254].map(f => [a.raw * f, b.raw * f]);
+                cands = cands.filter(c => c[0] >= 0.2 && c[0] <= 40 && c[1] >= 0.2 && c[1] <= 40);
+                if (!cands.length) { re.lastIndex = Math.max(re.lastIndex, a.end); continue; }
+                pairs.push({ a: a.raw, b: b.raw, idx: s.index, end: b.end, cands, label: text.slice(s.index, b.end).replace(/\s+/g, ' ').trim() });
+                re.lastIndex = b.end;
+            }
+            return pairs;
+        }
+        function poSizeMatches(pair, w, l) {
+            const close = (x, y) => Math.abs(x - y) <= Math.max(0.02, y * 0.01);
+            return pair.cands.some(([a, b]) => (close(a, w) && close(b, l)) || (close(a, l) && close(b, w)));
+        }
+        // จำนวนชิ้น: "Qty: 1 unit" · "2 pieces @ 170 x 240" · "4 pcs" · "จำนวน 2" (ชัดเจน=strong) · ตัวเลขตามหลังขนาดในตาราง (weak)
+        function poFindQtyNear(text, h, prevEnd) {
+            const before = text.slice(Math.max(prevEnd, h.idx - 200), h.idx), after = text.slice(h.end, h.end + 90).split('\n').slice(0, 2).join(' ');
+            const strong = [], weak = []; let m;
+            const reA = /(?:qty|quantity|จำนวน)\s*[:.=]?\s*(\d+)/ig, reB = /(\d+)\s*(?:pcs?|pieces?|units?|rugs?|carpets?|sets?|ชิ้น|ผืน|แผ่น)(?![A-Za-z])/ig;
+            [before, after].forEach(seg => { reA.lastIndex = 0; reB.lastIndex = 0; while ((m = reA.exec(seg))) strong.push(Number(m[1])); while ((m = reB.exec(seg))) strong.push(Number(m[1])); });
+            (after.match(/\d+(?:[.,]\d+)?/g) || []).forEach(n => weak.push(poParseNum(n)));
+            return { strong, weak };
+        }
+        // เลขที่ PO/Project ในระบบ → โทเคนที่ใช้เทียบ (ขยาย "SC2559A-B" / "SC#2559(A-B)" เป็น A, B)
+        function poPoTokens(poRaw, minLen) {
+            const out = [];
+            String(poRaw || '').split(/[\s,;]+/).map(t => t.replace(/^(PO|P\.O\.?|NO\.?)[.:#]*/i, '')).filter(Boolean).forEach(t => {
+                const s = t.replace(/[()]/g, ''), m = s.match(/^(.*\d)([A-Za-z])[-–]([A-Za-z])$/);
+                const c1 = m ? m[2].toUpperCase().charCodeAt(0) : 0, c2 = m ? m[3].toUpperCase().charCodeAt(0) : 0;
+                if (m && c2 > c1 && c2 - c1 <= 6) for (let c = c1; c <= c2; c++) out.push(m[1] + String.fromCharCode(c)); else out.push(t);
+            });
+            return out.filter(t => /\d/.test(t) && poNormAlnum(t).length >= minLen);
+        }
+        const PO_STOP_WORDS = new Set(['CO', 'LTD', 'LIMITED', 'COMPANY', 'CORP', 'INC', 'THE', 'AND', 'LLC', 'PTE', 'บริษัท', 'จำกัด', 'มหาชน', 'หจก', 'คุณ']);
+        const PO_SHIP_RE = /ship|dispatch|deliver|etd|ex\.?\s*works|latest|sooner|w\/c|week commencing|ready|due\b|วันส่ง|ส่งมอบ/i;
+        function poCheckOrder(text, order) {
+            const checks = []; const up = text.toUpperCase(); const alnum = poNormAlnum(text);
+            // 1) เลขที่ PO
+            const poRaw = String(order.customerPO || '').trim();
+            if (!poRaw) checks.push({ k: 'PO', st: 'info', d: 'ไม่ได้กรอกเลขที่ PO/Project ในระบบ — เทียบเลข PO ไม่ได้' });
+            else {
+                const toks = poPoTokens(poRaw, 3);
+                if (toks.length === 0) checks.push({ k: 'PO', st: 'info', d: `"${poRaw}" ไม่มีเลขที่นำมาเทียบได้` });
+                else {
+                    const found = toks.filter(t => alnum.includes(poNormAlnum(t)));
+                    checks.push({ k: 'PO', st: found.length === toks.length ? 'ok' : (found.length ? 'warn' : 'bad'), d: found.length === toks.length ? `พบเลข ${found.join(', ')} ใน PO` : `${found.length ? 'พบบางส่วน: ' + found.join(', ') + ' • ' : ''}ไม่พบ ${toks.filter(t => !found.includes(t)).join(', ')} ใน PO (ในระบบ: "${poRaw}")` });
+                }
+            }
+            // 2) ชื่อลูกค้า
+            const cust = String(order.customerName || '').trim();
+            if (!cust) checks.push({ k: 'ลูกค้า', st: 'info', d: 'ไม่ได้กรอกชื่อลูกค้า' });
+            else {
+                const words = cust.split(/[\s,.\-–()]+/).filter(w => w.length >= 3 && !PO_STOP_WORDS.has(w.toUpperCase()));
+                const hit = words.filter(w => up.includes(w.toUpperCase()));
+                const ratio = words.length ? hit.length / words.length : 0;
+                checks.push({ k: 'ลูกค้า', st: ratio >= 0.6 ? 'ok' : 'warn', d: ratio >= 0.6 ? `พบชื่อลูกค้า "${cust}" ใน PO` : `ไม่พบชื่อ "${cust}" ใน PO (PO อาจเขียนชื่อต่างกัน เช่น ชื่อบริษัทแม่/คนละภาษา) — ตรวจดู` });
+            }
+            // 3) ขนาด + จำนวน
+            const pairs = poFindSizePairs(text); const items = (order.sizeItems || []).filter(it => it && ((Number(it.width) || 0) > 0 && (Number(it.length) || 0) > 0));
+            if (items.length === 0) checks.push({ k: 'ขนาด', st: 'info', d: 'M/O นี้ไม่มีรายการขนาด (กว้าง × ยาว) ในระบบ' });
+            items.forEach((it, i) => {
+                const w = Number(it.width), l = Number(it.length), q = Number(it.qty) || 0;
+                const label = `ขนาด ${i + 1}: ${w} × ${l} ม. × ${q} ชิ้น`;
+                const hits = pairs.filter(p => poSizeMatches(p, w, l));
+                if (hits.length === 0) { checks.push({ k: 'ขนาด', st: 'bad', d: `${label} — ไม่พบขนาดนี้ใน PO` }); return; }
+                const evals = hits.map(h => { const pi = pairs.indexOf(h); let pe = 0; for (let j = pi - 1; j >= 0; j--) { if (text.slice(pairs[j].end, h.idx).includes('\n')) { pe = pairs[j].end; break; } } return { h, near: poFindQtyNear(text, h, pe) }; }); // ขนาดที่เขียนซ้ำคนละหน่วยในบรรทัดเดียวกัน (ฟุต / ซม.) ถือเป็นรายการเดียวกัน
+                const okStrong = evals.find(e => e.near.strong.includes(q));
+                const okWeak = evals.find(e => e.near.weak.includes(q));
+                const strongVals = Array.from(new Set(evals.flatMap(e => e.near.strong)));
+                const where = hits[0].label;
+                if (q === 0) checks.push({ k: 'ขนาด', st: 'ok', d: `${label} — พบขนาดใน PO ("${where}")` });
+                else if (okStrong) checks.push({ k: 'ขนาด', st: 'ok', d: `${label} — พบขนาดใน PO ("${where}") และ PO ระบุจำนวน ${q}` });
+                else if (strongVals.length) checks.push({ k: 'ขนาด', st: 'warn', d: `${label} — พบขนาดใน PO ("${where}") แต่ PO ระบุจำนวน ${strongVals.join('/')} ไม่ใช่ ${q} (ตรวจจำนวนชิ้น)` });
+                else if (okWeak) checks.push({ k: 'ขนาด', st: 'ok', d: `${label} — พบขนาดใน PO ("${where}") และพบจำนวน ${q} ใกล้ขนาดนั้น` });
+                else if (q === 1) checks.push({ k: 'ขนาด', st: 'ok', d: `${label} — พบขนาดใน PO ("${where}") PO ไม่ได้ระบุจำนวนชัดเจน (ถือเป็น 1 ชิ้น)` });
+                else checks.push({ k: 'ขนาด', st: 'warn', d: `${label} — พบขนาดใน PO ("${where}") แต่ไม่พบจำนวน ${q} ใกล้ขนาดนั้น (ตรวจจำนวนชิ้น)` });
+            });
+            // 4) ตร.ม. รวม (รองรับ s/f → ตร.ม.)
+            const sqm = Number(order.totalSqm) || 0;
+            if (sqm > 0) {
+                const nums = (text.match(/\d+(?:[.,]\d+)?/g) || []).map(poParseNum);
+                const sf = []; let mm; const reSf = /(\d+(?:[.,]\d+)?)\s*(?:s\/f|sf\b|sq\.?\s*ft|sqft|square\s*f(?:ee|oo)t)/ig;
+                while ((mm = reSf.exec(text))) sf.push(poParseNum(mm[1]) * 0.09290304);
+                const f = nums.some(n => Math.abs(n - sqm) <= 0.05) || sf.some(n => Math.abs(n - sqm) <= 0.06 + sqm * 0.002);
+                checks.push({ k: 'ตร.ม.', st: f ? 'ok' : 'info', d: f ? `พบยอด ${sqm} ตร.ม. ใน PO` : `ไม่พบยอด ${sqm} ตร.ม. ในข้อความ PO (PO อาจไม่ระบุยอดตร.ม. — ให้ดูจากขนาด × จำนวน)` });
+            }
+            // 5) วันที่ส่ง
+            const due = normalizeDateString(order.dueDate);
+            const all = poScanDates(text);
+            if (!due) checks.push({ k: 'วันส่ง', st: 'info', d: 'ยังไม่ได้กำหนดวันส่งในระบบ' });
+            else if (all.length === 0) checks.push({ k: 'วันส่ง', st: 'info', d: 'ไม่พบวันที่ใน PO ให้เทียบ' });
+            else {
+                const ctx = d => text.slice(Math.max(0, d.idx - 60), d.idx);
+                const ship = all.filter(d => PO_SHIP_RE.test(ctx(d)) || PO_SHIP_RE.test(text.slice(d.end, d.end + 20)));
+                const cand = ship.length ? ship : all;
+                const dueTime = Date.parse(due + 'T00:00:00Z');
+                const show = d => d.iso || ('--' + d.md);
+                const wcOf = d => /w\/c|w\.c\.|week commencing/i.test(text.slice(Math.max(0, d.idx - 25), d.idx));
+                const sooner = d => /sooner|latest|no later|not later|before|ภายใน/i.test(ctx(d) + ' ' + text.slice(d.end, d.end + 25));
+                const exact = cand.find(d => d.iso === due || (!d.iso && d.md === due.slice(5)));
+                const inWeek = cand.find(d => d.iso && wcOf(d) && dueTime >= Date.parse(d.iso + 'T00:00:00Z') && dueTime <= Date.parse(d.iso + 'T00:00:00Z') + 6 * 86400000);
+                const early = cand.find(d => sooner(d) && (d.iso ? dueTime <= Date.parse(d.iso + 'T00:00:00Z') : due.slice(5) <= d.md));
+                if (exact) checks.push({ k: 'วันส่ง', st: 'ok', d: `วันส่ง ${due} ตรงกับวันที่ใน PO (${text.slice(exact.idx, exact.end).replace(/\s+/g, ' ')})` });
+                else if (inWeek) checks.push({ k: 'วันส่ง', st: 'ok', d: `วันส่ง ${due} อยู่ในสัปดาห์ที่ PO ระบุ (w/c ${inWeek.iso})` });
+                else if (early) checks.push({ k: 'วันส่ง', st: 'ok', d: `วันส่งในระบบ ${due} เร็วกว่า/เท่ากับวันที่ PO กำหนด (${text.slice(early.idx, early.end).replace(/\s+/g, ' ')} — PO ระบุ latest/or sooner)` });
+                else checks.push({ k: 'วันส่ง', st: 'warn', d: `วันส่งในระบบ ${due} ไม่ตรงกับวันที่ใน PO (วันที่ใน PO: ${Array.from(new Set(cand.map(show))).slice(0, 6).join(', ')}) — ตรวจดู` });
+            }
+            return checks;
+        }
+        function poCheckCandidates(text) {
+            const alnum = poNormAlnum(text); const res = [];
+            productionOrders.forEach((o, idx) => {
+                const toks = poPoTokens(o.customerPO, 4);
+                if (toks.length && toks.some(t => alnum.includes(poNormAlnum(t)))) res.push(idx);
+            });
+            return res;
+        }
+        // สรุปสิ่งที่ระบบอ่านได้จาก PO + ขนาดใน PO ที่ไม่ตรงกับ M/O ที่เลือกเลย (อาจยังไม่ได้เปิด M/O)
+        function poSizeSummary(text) {
+            const seen = new Set(), rows = [];
+            poFindSizePairs(text).forEach(p => { const c = p.cands[0], rk = v => Math.round(v / 0.05), k = c.map(rk).join('x'), k2 = c.slice().reverse().map(rk).join('x'); if (seen.has(k) || seen.has(k2)) return; seen.add(k); rows.push({ label: p.label, m: c, pair: p }); });
+            return rows;
+        }
+        function poCheckRefreshOrderList() {
+            const dl = document.getElementById('poCheckOrderList');
+            if (dl) dl.innerHTML = productionOrders.map(o => `<option value="${escapeHtml(o.moSo)}">${escapeHtml(o.customerName || '')} ${escapeHtml(o.customerPO || '')}</option>`).join('');
+        }
+        async function handlePoCheckFile(input) {
+            const file = input.files && input.files[0]; if (!file) return;
+            const st = document.getElementById('poCheckStatus');
+            st.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> กำลังอ่านไฟล์ PO...';
+            try {
+                const { text, pages, kind } = await extractPoFileText(file);
+                poCheckState = { fileName: file.name, text, pages, kind, orderIdx: poCheckCandidates(text) };
+                poCheckRender();
+            } catch (e) {
+                console.error('PO file read failed:', e);
+                st.innerHTML = `<span class="text-rose-600">อ่านไฟล์ไม่สำเร็จ: ${escapeHtml(e.message || String(e))}</span>`;
+            }
+            input.value = '';
+        }
+        function poCheckAddOrder() {
+            const inp = document.getElementById('poCheckAddInput'); const v = (inp.value || '').trim(); if (!v) return;
+            const key = normalizeMoSoKey ? normalizeMoSoKey(v) : v;
+            let idx = productionOrders.findIndex(o => o.moSo === v);
+            if (idx === -1) idx = productionOrders.findIndex(o => normalizeMoSoKey(o.moSo) === key);
+            if (idx === -1) { showToast(`ไม่พบ M/O, S/O "${v}" ในระบบ`, 'fa-triangle-exclamation', 'text-amber-400'); return; }
+            if (!poCheckState.orderIdx.includes(idx)) poCheckState.orderIdx.push(idx);
+            inp.value = ''; poCheckRender();
+        }
+        function poCheckRemoveOrder(idx) { poCheckState.orderIdx = poCheckState.orderIdx.filter(i => i !== idx); poCheckRender(); }
+        function poCheckRender() {
+            const st = document.getElementById('poCheckStatus'), box = document.getElementById('poCheckResults'), ai = document.getElementById('poCheckAiBox');
+            poCheckRefreshOrderList();
+            const { fileName, text, pages, orderIdx } = poCheckState; const fkind = poCheckState.kind || 'PDF';
+            if (!fileName) { st.textContent = ''; box.innerHTML = ''; ai.classList.add('hidden'); return; }
+            const scanned = text.replace(/\s+/g, '').length < 40;
+            if (scanned) {
+                st.innerHTML = `<span class="text-amber-600"><i class="fa-solid fa-triangle-exclamation mr-1"></i> ${escapeHtml(fileName)} (${pages ? pages + ' หน้า' : fkind}) — อ่านข้อความไม่ได้ (น่าจะเป็นไฟล์สแกน/รูป หรือรูปแบบไฟล์ที่อ่านไม่ได้) ระบบเทียบข้อความอัตโนมัติไม่ได้ ลองบันทึกเป็น PDF/.docx ใหม่ หรือใช้ปุ่ม "คัดลอกคำสั่งให้ AI" แล้วแนบไฟล์ PO ที่ Claude แทน</span>`;
+            } else {
+                st.innerHTML = `<i class="fa-solid ${fkind === 'PDF' ? 'fa-file-pdf text-rose-500' : 'fa-file-word text-sky-600'} mr-1"></i> <b>${escapeHtml(fileName)}</b> • ${pages ? pages + ' หน้า' : 'ไฟล์ ' + fkind} • ${text.replace(/\s+/g, ' ').length.toLocaleString()} ตัวอักษร • ${orderIdx.length ? `พบ M/O, S/O ที่อ้างถึง PO นี้ ${orderIdx.length} รายการ` : '<span class="text-amber-600">ไม่พบ M/O, S/O ที่เลขที่ PO ตรงกับไฟล์นี้ — เพิ่ม M/O, S/O ที่จะตรวจจากช่องด้านบน</span>'}`;
+            }
+            ai.classList.remove('hidden');
+            const stCls = { ok: ['bg-emerald-100 text-emerald-800', 'ตรง'], warn: ['bg-amber-100 text-amber-800', 'ตรวจดู'], bad: ['bg-rose-100 text-rose-800', 'ไม่ตรง'], info: ['bg-slate-100 text-slate-600', 'ข้อมูล'] };
+            box.innerHTML = scanned ? '' : orderIdx.map(idx => {
+                const o = productionOrders[idx]; if (!o) return '';
+                const checks = poCheckOrder(text, o);
+                const worst = checks.some(c => c.st === 'bad') ? 'bad' : (checks.some(c => c.st === 'warn') ? 'warn' : 'ok');
+                const head = { ok: 'ผ่านการตรวจเบื้องต้น', warn: 'มีจุดให้ตรวจดู', bad: 'พบจุดที่ไม่ตรง PO' }[worst];
+                return `<div class="border border-slate-200 rounded-xl overflow-hidden" data-po-order="${escapeHtml(o.moSo)}">
+                    <div class="px-4 py-2.5 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+                        <div class="text-sm"><span class="font-bold text-indigo-700 font-mono">${escapeHtml(o.moSo)}</span> <span class="text-slate-500 text-xs">${escapeHtml(o.customerName || '-')} • PO: ${escapeHtml(o.customerPO || '-')} • ${(Number(o.totalSqm) || 0).toLocaleString('th-TH')} ตร.ม.</span></div>
+                        <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${stCls[worst][0]}">${head}</span><button type="button" onclick="poCheckRemoveOrder(${idx})" class="text-slate-400 hover:text-rose-500 text-xs" title="เอาออก"><i class="fa-solid fa-xmark"></i></button></div>
+                    </div>
+                    <table class="w-full text-xs"><tbody class="divide-y divide-slate-100">${checks.map(c => `<tr data-po-check="${c.k}" data-st="${c.st}"><td class="px-3 py-1.5 w-20 font-semibold text-slate-600 whitespace-nowrap">${escapeHtml(c.k)}</td><td class="px-2 py-1.5 w-16"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${stCls[c.st][0]}">${stCls[c.st][1]}</span></td><td class="px-3 py-1.5 text-slate-700">${escapeHtml(c.d)}</td></tr>`).join('')}</tbody></table>
+                </div>`;
+            }).join('');
+            if (!scanned) {
+                const rows = poSizeSummary(text);
+                const selected = orderIdx.map(i => productionOrders[i]).filter(Boolean);
+                const f2 = n => (Math.round(n * 100) / 100).toLocaleString('th-TH');
+                if (selected.length) {
+                    const allPairs = poFindSizePairs(text);
+                    const isMatched = p => selected.some(o => (o.sizeItems || []).some(it => poSizeMatches(p, Number(it.width) || 0, Number(it.length) || 0)));
+                    const sameLine = (p, q) => !text.slice(Math.min(p.end, q.end), Math.max(p.idx, q.idx)).includes('\n');
+                    const bad = allPairs.filter(p => !isMatched(p)), seen = new Set(), incons = [], orphan = [];
+                    bad.forEach(p => {
+                        const k = p.cands[0].map(v => Math.round(v / 0.05)).join('x'); if (seen.has(k)) return; seen.add(k);
+                        const sib = allPairs.find(q => q !== p && sameLine(p, q) && isMatched(q));
+                        if (sib) incons.push({ p, sib }); else orphan.push(p);
+                    });
+                    const dim = p => `${escapeHtml(p.label)} (≈ ${f2(p.cands[0][0])} × ${f2(p.cands[0][1])} ม.)`;
+                    if (orphan.length) box.innerHTML += `<div class="border border-amber-200 bg-amber-50 rounded-xl px-4 py-2.5 text-xs text-amber-900" data-po-unmatched="1"><b><i class="fa-solid fa-triangle-exclamation mr-1"></i> ขนาดใน PO ที่ไม่ตรงกับ M/O, S/O ที่เลือกเลย (${orphan.length} รายการ) — อาจยังไม่ได้เปิดใบ หรือเปิดขนาดผิด:</b> ${orphan.map(dim).join(' • ')}</div>`;
+                    if (incons.length) box.innerHTML += `<div class="border border-rose-200 bg-rose-50 rounded-xl px-4 py-2.5 text-xs text-rose-900" data-po-inconsistent="1"><b><i class="fa-solid fa-triangle-exclamation mr-1"></i> PO เขียนขนาดสองหน่วยไม่ตรงกันเอง (${incons.length} รายการ) — ควรถามลูกค้ายืนยัน:</b> ${incons.map(x => `${dim(x.p)} เทียบกับ ${dim(x.sib)}`).join(' • ')}</div>`;
+                }
+                const dts = poScanDates(text).map(d => d.iso || ('--' + d.md)); const uniqDt = Array.from(new Set(dts));
+                box.innerHTML += `<details class="text-[11px] text-slate-500" data-po-summary="1"><summary class="cursor-pointer hover:text-slate-700">สิ่งที่ระบบอ่านได้จาก PO (ใช้ตรวจว่าอ่านถูกไหม)</summary><div class="mt-1 space-y-0.5 pl-4">
+                    <div><b>ขนาด:</b> ${rows.length ? rows.map(r => `${escapeHtml(r.label)} → ${f2(r.m[0])} × ${f2(r.m[1])} ม.`).join(' • ') : 'ไม่พบ'}</div>
+                    <div><b>วันที่:</b> ${uniqDt.length ? uniqDt.slice(0, 12).join(', ') : 'ไม่พบ'}</div></div></details>`;
+            }
+        }
+        function poCheckBuildPrompt() {
+            const orders = poCheckState.orderIdx.map(i => productionOrders[i]).filter(Boolean).map(o => ({
+                moSo: o.moSo, customerName: o.customerName, customerPO: o.customerPO, dueDate: o.dueDate, totalSqm: o.totalSqm, totalPieces: o.totalPieces,
+                quality: o.quality, carpetSizeNote: o.carpetSizeNote, packaging: o.packaging, colorsCount: o.colorsCount, incoterms: o.incoterms, orderRemark: o.orderRemark,
+                sizeItems: (o.sizeItems || []).map(it => ({ widthM: it.width, lengthM: it.length, qty: it.qty, voidPercent: it.voidPercent, sqm: it.sqm }))
+            }));
+            const t = poCheckState.text.length > 14000 ? poCheckState.text.slice(0, 14000) + '\n…(ตัดข้อความที่เหลือ)' : poCheckState.text;
+            return `ช่วยตรวจสอบว่าใบเปิด M/O, S/O ของโรงงานพรม ตรงกับ PO ลูกค้าหรือไม่ — เทียบเลขที่ PO, ชื่อลูกค้า, คุณภาพ/ขนาด/จำนวนชิ้น/ตร.ม. รวม (ขนาดในระบบเป็นเมตร), วันที่ส่งมอบ, การบรรจุ/Incoterms/หมายเหตุ แล้วสรุปเป็นตาราง: รายการที่ตรง / ไม่ตรง / PO ไม่ได้ระบุ พร้อมบอกค่าใน PO กับค่าในระบบ\n\n=== ข้อมูล M/O, S/O ในระบบ (JSON) ===\n${JSON.stringify(orders, null, 2)}\n\n=== ข้อความจาก PO ลูกค้า (${poCheckState.fileName}) ===\n${t}`;
+        }
+        function poCheckCopyPrompt() {
+            if (!poCheckState.fileName) return;
+            const txt = poCheckBuildPrompt();
+            const done = () => showToast('คัดลอกคำสั่งแล้ว — นำไปวางที่ Claude');
+            const fb = () => { try { const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); } catch (e) { showToast('คัดลอกไม่สำเร็จ', 'fa-triangle-exclamation', 'text-amber-400'); } };
+            try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fb); else fb(); } catch (e) { fb(); }
         }
 
         // "ยอดตารางเมตรที่รับเข้าทั้งหมด" = ผลรวม ตร.ม. ของทุก M/O, S/O ที่เคยเปิดเข้าสายการผลิต (นับทุก
