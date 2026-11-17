@@ -4232,7 +4232,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-124';
+        const APP_BUILD = 'QCDashboard-125';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -15895,6 +15895,7 @@
                 allowancePct: (raw.allowancePct === undefined || raw.allowancePct === '' || isNaN(Number(raw.allowancePct))) ? 5 : Number(raw.allowancePct),
                 roundDec: planningWsNormDec(raw.roundDec, false),
                 roundMode: raw.roundMode === 'up' ? 'up' : 'round',
+                excelSnap: normalizePlanningExcelSnap(raw.excelSnap),   // 2026-11-17: สำเนาข้อมูล Dye Order A จาก Excel ที่นำเข้า (ไว้เทียบกับใบคำนวณ)
                 manpower: { hoursPerDay: numOrBlank(mp.hoursPerDay), tuftingStaff: numOrBlank(mp.tuftingStaff), designStaff: numOrBlank(mp.designStaff), finishingStaff: numOrBlank(mp.finishingStaff), dyeLeadDays: numOrBlank(mp.dyeLeadDays) }
             };
         }
@@ -16035,6 +16036,225 @@
             });
             const netKg = rows.reduce((s, x) => s + x.netKg, 0);
             return { rows, total, allowance, defaultDec: ws.roundDec, roundMode: ws.roundMode, baseKg, netKg, areaSum, pctSum, groups: Object.keys(groups).map(k => groups[k]) };
+        }
+
+
+        // ---- 2026-11-17: เปรียบเทียบ ใบคำนวณระบบ/AI กับ Excel ที่นำเข้า -------------------------------
+        // อ่านบล็อกท้ายใบสั่งย้อม: "คำนวณ <กรัม/ตร.ม.> Kgs/M2 | เผื่อ | พื้นที่จริง | เฉลี่ยหลังเผื่อ" แล้วแถวถัดไป "รวม <กก.> <เผื่อ> <พื้นที่> <เฉลี่ย>"
+        function planningImportParseSpecBlock(aoa) {
+            const t = v => String(v == null ? '' : v).trim();
+            for (let i = 0; i < (aoa || []).length; i++) {
+                const row = aoa[i] || [];
+                const allowIdx = row.findIndex(c => /^เผื่อ$/.test(t(c)));
+                const areaIdx = row.findIndex(c => /^พื้นที่จริง/.test(t(c)));
+                if (allowIdx === -1 || areaIdx === -1) continue;
+                const avgIdx = row.findIndex(c => /^เฉลี่ย/.test(t(c)));
+                const calcIdx = row.findIndex(c => /^คำนวณ$/.test(t(c)));
+                const next = aoa[i + 1] || [];
+                const num = v => { const n = Number(v); return (v === null || v === undefined || v === '' || !isFinite(n)) ? null : n; };
+                let gsm = calcIdx !== -1 ? num(row[calcIdx + 1]) : null;
+                let allow = num(next[allowIdx]);
+                const out = {
+                    kgPerSqm: gsm === null ? null : (gsm > 50 ? gsm / 1000 : gsm),   // ในไฟล์เก็บเป็นกรัม/ตร.ม. (เช่น 2694) → แปลงเป็น กก./ตร.ม.
+                    allowancePct: allow === null ? null : (allow <= 1 ? allow * 100 : allow),
+                    area: num(next[areaIdx]),
+                    avgKgPerSqm: avgIdx !== -1 ? num(next[avgIdx]) : null,
+                    sumKg: calcIdx !== -1 ? num(next[calcIdx + 2]) : null
+                };
+                if (out.kgPerSqm === null && out.allowancePct === null && out.area === null && out.avgKgPerSqm === null) continue;
+                return out;
+            }
+            return null;
+        }
+        function normalizePlanningExcelSnap(raw) {
+            if (!raw || typeof raw !== 'object' || !Array.isArray(raw.colors)) return null;
+            const nOrNull = v => (v === null || v === undefined || v === '' || !isFinite(Number(v))) ? null : Number(v);
+            const sp = (raw.spec && typeof raw.spec === 'object') ? raw.spec : null;
+            return {
+                fileName: String(raw.fileName || ''), importedAt: String(raw.importedAt || ''),
+                area: Number(raw.area) || 0, quality: String(raw.quality || ''), totalKg: Number(raw.totalKg) || 0,
+                spec: sp ? { kgPerSqm: nOrNull(sp.kgPerSqm), allowancePct: nOrNull(sp.allowancePct), area: nOrNull(sp.area), avgKgPerSqm: nOrNull(sp.avgKgPerSqm), sumKg: nOrNull(sp.sumKg) } : null,
+                colors: raw.colors.filter(c => c && typeof c === 'object').map(c => ({ colorCode: String(c.colorCode || ''), kg: Number(c.kg) || 0, yarnType: String(c.yarnType || ''), yarnSource: String(c.yarnSource || ''), surplusKg: Number(c.surplusKg) || 0, where: String(c.where || '') }))
+            };
+        }
+        function planningWsBuildExcelSnap(item) {
+            return normalizePlanningExcelSnap({ fileName: item.fileName || '', importedAt: new Date().toISOString(), area: item.totalSqm || 0, quality: item.quality || '', totalKg: item.totalKg || 0, spec: item.specCalc || null, colors: item.colors || [] });
+        }
+        function planningWsLevenshtein(a, b) {
+            const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+            let prev = Array.from({ length: n + 1 }, (_, j) => j);
+            for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+            return prev[n];
+        }
+        // ค่าสำหรับจับคู่ "รหัสที่น่าจะเป็นตัวเดียวกัน" (OCR อ่านผิด): O↔0, I/L↔1
+        function planningWsLooseCode(k) { return String(k || '').replace(/O/g, '0').replace(/[IL]/g, '1'); }
+
+        let planningWsCmpUi = { tolPct: 1, onlyDiff: false };
+        // เทียบรายสี: ฝั่งระบบ = ใบคำนวณ (ยอดสั่งย้อมรวมเผื่อ) / ฝั่ง Excel = สำเนาที่นำเข้า (ถ้าไม่มี ใช้แผนสั่งย้อมที่อยู่ในระบบตอนนี้)
+        function planningWsCompare(order) {
+            const ws = planningWsGet(order);
+            const c = planningWsComputeColors(order);
+            const snap = ws.excelSnap;
+            let source = 'none', excelColors = [];
+            if (snap) { source = 'snapshot'; excelColors = snap.colors; }
+            else {
+                const plan = ((order.dyeing || {}).colorOrders || []).filter(r => r && typeof r === 'object' && (r.colorCode || Number(r.kg) > 0));
+                if (plan.length) { source = 'plan'; excelColors = plan.map(r => ({ colorCode: r.colorCode || '', kg: Number(r.kg) || 0, yarnType: r.yarnType || '', yarnSource: r.yarnSource || '', surplusKg: Number(r.surplusKg) || 0, where: r.dyeWhere || '' })); }
+            }
+            const map = new Map(); const order_ = [];
+            const slot = (code) => { const k = normalizeDyeColorCodeKey(code) || ('#' + code); if (!map.has(k)) { map.set(k, { key: k, code: code, aiKg: null, aiBase: null, aiPct: null, aiYarn: '', excelKg: null, excelYarn: '', excelNote: '' }); order_.push(k); } return map.get(k); };
+            c.rows.forEach(x => {
+                const code = String(x.row.code || '').trim();
+                if (!code && !(x.netKg > 0)) return;
+                const e = slot(code || '(ไม่มีรหัส)');
+                e.aiKg = (e.aiKg || 0) + x.netKg; e.aiBase = (e.aiBase || 0) + x.kg;
+                if (x.row.areaMode === 'pct') e.aiPct = (e.aiPct || 0) + (Number(x.row.value) || 0);
+                if (!e.aiYarn && x.row.yarn) e.aiYarn = x.row.yarn;
+            });
+            excelColors.forEach(x => {
+                const e = slot(String(x.colorCode || '').trim() || '(ไม่มีรหัส)');
+                e.excelKg = (e.excelKg || 0) + (Number(x.kg) || 0);
+                if (!e.excelYarn && x.yarnType) e.excelYarn = x.yarnType;
+                if (x.yarnSource) e.excelNote = x.yarnSource === 'surplus' ? 'Surplus' : (x.yarnSource === 'overdye' ? 'ย้อมทับ' : '');
+                if (x.where === 'external') e.excelNote = (e.excelNote ? e.excelNote + ' · ' : '') + 'จ้างย้อมนอก';
+            });
+            const rows = order_.map(k => map.get(k));
+            const tol = Math.max(0, Number(planningWsCmpUi.tolPct) || 0);
+            rows.forEach(e => {
+                if (e.aiKg !== null && e.excelKg !== null) {
+                    e.diff = e.aiKg - e.excelKg;
+                    e.diffPct = e.excelKg > 0 ? e.diff / e.excelKg * 100 : null;
+                    e.status = (Math.abs(e.diff) <= 0.05 || (e.excelKg > 0 && Math.abs(e.diffPct) <= tol)) ? 'match' : 'diff';
+                } else { e.diff = null; e.diffPct = null; e.status = e.aiKg !== null ? 'aiOnly' : 'excelOnly'; }
+            });
+            // เดารหัสที่น่าจะเป็นตัวเดียวกันระหว่าง "มีเฉพาะระบบ" กับ "มีเฉพาะ Excel" (ตัวอย่าง OCR อ่าน A40 เป็น Ao)
+            const exOnly = rows.filter(r => r.status === 'excelOnly'); const used = new Set();
+            rows.filter(r => r.status === 'aiOnly').forEach(r => {
+                const a = planningWsLooseCode(r.key); let best = null, bestD = 99;
+                exOnly.forEach(x => { if (used.has(x.key)) return; const d = planningWsLevenshtein(a, planningWsLooseCode(x.key)); if (d < bestD) { bestD = d; best = x; } });
+                if (best && bestD <= Math.min(2, Math.max(1, Math.floor(Math.max(a.length, best.key.length) / 3)))) { r.hint = best; used.add(best.key); }
+            });
+            const sum = (arr, f) => arr.reduce((t, x) => t + (f(x) || 0), 0);
+            const excelTotal = sum(rows, r => r.excelKg);
+            const total = {
+                aiKg: c.netKg, aiBase: c.baseKg, excelKg: excelTotal, diff: c.netKg - excelTotal,
+                counts: { match: rows.filter(r => r.status === 'match').length, diff: rows.filter(r => r.status === 'diff').length, aiOnly: rows.filter(r => r.status === 'aiOnly').length, excelOnly: exOnly.length },
+                aiColors: rows.filter(r => r.aiKg !== null).length, excelColors: rows.filter(r => r.excelKg !== null).length
+            };
+            // เทียบสเปค/ตัวคูณ
+            const area = planningWsTotalArea(order);
+            const spec = snap && snap.spec ? snap.spec : null;
+            const specRows = [];
+            const addSpec = (label, unit, ai, ex, dec) => { specRows.push({ label, unit, ai, ex, dec: dec === undefined ? 2 : dec, diff: (ai !== null && ex !== null) ? ai - ex : null }); };
+            addSpec('พื้นที่รวม', 'ตร.ม.', area > 0 ? area : null, snap && snap.area > 0 ? snap.area : null);
+            addSpec('จำนวนสี', 'สี', total.aiColors, total.excelColors, 0);
+            addSpec('น้ำหนักไหมเฉลี่ย (ก่อนเผื่อ)', 'กก./ตร.ม.', c.areaSum > 0 ? c.baseKg / c.areaSum : null, spec ? spec.kgPerSqm : null, 3);
+            addSpec('เผื่อ', '%', c.allowance, spec ? spec.allowancePct : null);
+            addSpec('น้ำหนักเฉลี่ยหลังเผื่อ', 'กก./ตร.ม.', area > 0 ? c.netKg / area : null, spec ? spec.avgKgPerSqm : null, 3);
+            addSpec('ยอดสั่งย้อมรวม', 'กก.', c.netKg, excelTotal > 0 ? excelTotal : null);
+            return { rows, total, specRows, source, snap, tol };
+        }
+
+        function planningWsCompareHtml(order, orderIndex) {
+            const cmp = planningWsCompare(order);
+            const fmt = (n, d) => (n === null || n === undefined) ? '<span class="text-slate-300">-</span>' : planningWsFmt(n, d === undefined ? 2 : d);
+            const signCls = (d) => d === null ? 'text-slate-400' : (Math.abs(d) < 0.005 ? 'text-slate-500' : (d > 0 ? 'text-amber-700' : 'text-sky-700'));
+            const sgn = (d, dec) => {
+                if (d === null || d === undefined) return '<span class="text-slate-300">-</span>';
+                const dd = dec === undefined ? 2 : dec, z = Math.abs(d) < 0.5 * Math.pow(10, -dd);   // ปัดแล้วเป็น 0 → ไม่แสดงเครื่องหมาย (กัน "-0.000")
+                return `<span class="${z ? 'text-slate-500' : signCls(d)}">${(!z && d > 0) ? '+' : ''}${planningWsFmt(z ? 0 : d, dd)}</span>`;
+            };
+            const t = cmp.total;
+            const srcText = cmp.source === 'snapshot'
+                ? `ฝั่ง Excel = ไฟล์ <b>${escapeHtml(cmp.snap.fileName || '-')}</b>${cmp.snap.importedAt ? ' · นำเข้า ' + escapeHtml(String(cmp.snap.importedAt).slice(0, 10)) : ''}`
+                : (cmp.source === 'plan' ? 'ฝั่ง Excel = <b>แผนสั่งย้อมที่อยู่ในระบบ</b> (ยังไม่มีสำเนาไฟล์ — ถ้าเคยกดส่งยอดจากใบคำนวณไปแผนสั่งย้อมแล้ว ค่าอาจเท่ากันเอง) · เลือกไฟล์ Excel ด้านขวาเพื่อเทียบกับไฟล์จริง' : 'ยังไม่มีข้อมูลฝั่ง Excel — เลือกไฟล์ M/O (Sheet Dye Order A) หรือนำเข้า Excel ที่แผนกวางแผน');
+            const rowsShown = cmp.rows.filter(r => !planningWsCmpUi.onlyDiff || r.status !== 'match');
+            const badge = (r) => {
+                if (r.status === 'match') return '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-semibold">ตรงกัน</span>';
+                if (r.status === 'diff') return '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-semibold">น้ำหนักต่าง</span>';
+                if (r.status === 'aiOnly') return '<span class="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-semibold">มีเฉพาะระบบ</span>';
+                return '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-semibold">มีเฉพาะ Excel</span>';
+            };
+            const colorRowsHtml = rowsShown.map(r => `
+                <tr class="border-t border-slate-100 ${r.status === 'match' ? '' : (r.status === 'diff' ? 'bg-amber-50/50' : (r.status === 'aiOnly' ? 'bg-violet-50/40' : 'bg-rose-50/40'))}" data-pw-cmp-row="${escapeHtml(r.key)}" data-pw-cmp-status="${r.status}">
+                    <td class="py-1.5 pr-2 font-mono font-semibold text-slate-800">${escapeHtml(r.code)}${r.hint ? `<div class="font-sans font-normal text-[10px] text-violet-600" data-pw-cmp-hint>อาจตรงกับ <b>${escapeHtml(r.hint.code)}</b> ใน Excel (${planningWsFmt(r.hint.excelKg, 2)} กก.) — ตรวจรหัสสีที่ OCR อ่านได้</div>` : ''}</td>
+                    <td class="py-1.5 pr-2 text-right tabular-nums">${r.aiPct !== null ? planningWsFmt(r.aiPct, 2) + '%' : '<span class="text-slate-300">-</span>'}</td>
+                    <td class="py-1.5 pr-2 text-right tabular-nums font-semibold">${fmt(r.aiKg)}</td>
+                    <td class="py-1.5 pr-2 text-right tabular-nums font-semibold">${fmt(r.excelKg)}</td>
+                    <td class="py-1.5 pr-2 text-right tabular-nums" data-pw-cmp-diff>${sgn(r.diff)}</td>
+                    <td class="py-1.5 pr-2 text-right tabular-nums">${r.diffPct === null ? '<span class="text-slate-300">-</span>' : `<span class="${signCls(r.diff)}">${r.diffPct > 0 ? '+' : ''}${planningWsFmt(r.diffPct, 1)}%</span>`}</td>
+                    <td class="py-1.5 pr-2 text-[10px] text-slate-500">${(r.aiYarn || r.excelYarn) ? `${escapeHtml(r.aiYarn || '-')} <span class="text-slate-300">|</span> ${escapeHtml(r.excelYarn || '-')}` : '<span class="text-slate-300">-</span>'}${r.excelNote ? `<div class="text-[10px] text-orange-600">${escapeHtml(r.excelNote)}</div>` : ''}</td>
+                    <td class="py-1.5">${badge(r)}</td>
+                </tr>`).join('');
+            const specHtml = cmp.specRows.map(x => `
+                <tr class="border-t border-slate-100" data-pw-cmp-spec>
+                    <td class="py-1.5 pr-2 text-slate-700">${escapeHtml(x.label)} <span class="text-[10px] text-slate-400">(${escapeHtml(x.unit)})</span></td>
+                    <td class="py-1.5 pr-2 text-right tabular-nums font-semibold">${fmt(x.ai, x.dec)}</td>
+                    <td class="py-1.5 pr-2 text-right tabular-nums font-semibold">${fmt(x.ex, x.dec)}</td>
+                    <td class="py-1.5 text-right tabular-nums">${sgn(x.diff, x.dec)}</td>
+                </tr>`).join('');
+            return `
+                <section class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm" data-pw-compare>
+                    <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+                        <div>
+                            <h3 class="font-bold text-slate-900"><i class="fa-solid fa-scale-balanced text-indigo-600 mr-1.5"></i>เปรียบเทียบ: ใบคำนวณระบบ/AI กับ Excel ที่นำเข้า</h3>
+                            <p class="text-[11px] text-slate-500 mt-0.5">ฝั่งระบบ = ยอดสั่งย้อมจากส่วนที่ 2 (รวมเผื่อ + ปัดทศนิยมแล้ว) · ${srcText}</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <label class="px-2.5 py-1.5 text-[11px] font-semibold border border-indigo-300 text-indigo-700 rounded bg-white hover:bg-indigo-50 cursor-pointer"><i class="fa-solid fa-file-excel mr-1"></i>เลือกไฟล์ Excel เพื่อเทียบ
+                                <input type="file" accept=".xlsx,.xls" class="hidden" data-pw-cmp-file onchange="planningWsCmpLoadFile(${orderIndex}, this)"></label>
+                            ${cmp.snap ? `<button type="button" onclick="planningWsCmpClear(${orderIndex})" class="px-2.5 py-1.5 text-[11px] font-semibold border border-slate-300 text-slate-600 rounded bg-white hover:bg-slate-50">ล้างข้อมูล Excel ที่เก็บไว้</button>` : ''}
+                            <button type="button" onclick="planningWsCmpExport(${orderIndex})" class="px-2.5 py-1.5 text-[11px] font-semibold border border-emerald-300 text-emerald-700 rounded bg-white hover:bg-emerald-50"><i class="fa-solid fa-download mr-1"></i>ส่งออก Excel</button>
+                        </div>
+                    </div>
+                    ${cmp.source === 'none' ? '' : `
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3 text-center">
+                        <div class="rounded-lg bg-slate-50 border border-slate-200 p-2"><p class="text-[10px] text-slate-500">ยอดสั่งย้อม (ระบบ)</p><p class="font-bold text-slate-900 tabular-nums" data-pw-cmp-ai>${planningWsFmt(t.aiKg, 2)} กก.</p></div>
+                        <div class="rounded-lg bg-slate-50 border border-slate-200 p-2"><p class="text-[10px] text-slate-500">ยอดรวม (Excel)</p><p class="font-bold text-slate-900 tabular-nums" data-pw-cmp-excel>${planningWsFmt(t.excelKg, 2)} กก.</p></div>
+                        <div class="rounded-lg bg-slate-50 border border-slate-200 p-2"><p class="text-[10px] text-slate-500">ส่วนต่างรวม</p><p class="font-bold tabular-nums" data-pw-cmp-total-diff>${sgn(t.diff)} กก.${t.excelKg > 0 ? ` <span class="text-[10px] font-normal ${signCls(t.diff)}">(${t.diff > 0 ? '+' : ''}${planningWsFmt(t.diff / t.excelKg * 100, 1)}%)</span>` : ''}</p></div>
+                        <div class="rounded-lg bg-slate-50 border border-slate-200 p-2"><p class="text-[10px] text-slate-500">จำนวนสี ระบบ / Excel</p><p class="font-bold text-slate-900 tabular-nums">${t.aiColors} / ${t.excelColors}</p></div>
+                        <div class="rounded-lg bg-slate-50 border border-slate-200 p-2 col-span-2 md:col-span-1"><p class="text-[10px] text-slate-500">ตรง / ต่าง / เฉพาะระบบ / เฉพาะ Excel</p><p class="font-bold text-slate-900 tabular-nums" data-pw-cmp-counts>${t.counts.match} / ${t.counts.diff} / ${t.counts.aiOnly} / ${t.counts.excelOnly}</p></div>
+                    </div>
+                    <p class="text-[11px] font-semibold text-slate-600 mb-1">สเปค / ตัวคูณ</p>
+                    <table class="w-full text-xs mb-3"><thead class="text-[10px] text-slate-500"><tr><th class="text-left font-medium pb-1">รายการ</th><th class="text-right font-medium pb-1">ระบบ/AI</th><th class="text-right font-medium pb-1">Excel</th><th class="text-right font-medium pb-1">ส่วนต่าง</th></tr></thead><tbody>${specHtml}</tbody></table>
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                        <p class="text-[11px] font-semibold text-slate-600">รายสี (เทียบตามรหัสสี)</p>
+                        <div class="flex items-center gap-3 text-[11px] text-slate-600">
+                            <label class="flex items-center gap-1">ถือว่าตรงถ้าต่างไม่เกิน <input type="number" min="0" step="0.5" value="${planningWsCmpUi.tolPct}" data-pw-cmp-tol onchange="planningWsCmpSetTol(${orderIndex}, this.value)" class="w-14 p-1 border border-slate-300 rounded text-right"> %</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" data-pw-cmp-onlydiff ${planningWsCmpUi.onlyDiff ? 'checked' : ''} onchange="planningWsCmpToggleOnlyDiff(${orderIndex}, this.checked)"> แสดงเฉพาะที่ต่าง</label>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto"><table class="w-full text-xs min-w-[720px]">
+                        <thead class="text-[10px] text-slate-500"><tr>
+                            <th class="text-left font-medium pb-1">รหัสสี</th><th class="text-right font-medium pb-1">สัดส่วน (ระบบ)</th><th class="text-right font-medium pb-1">ระบบ/AI (กก.)</th><th class="text-right font-medium pb-1">Excel (กก.)</th><th class="text-right font-medium pb-1">ส่วนต่าง (กก.)</th><th class="text-right font-medium pb-1">ส่วนต่าง %</th><th class="text-left font-medium pb-1">ชนิดไหม ระบบ | Excel</th><th class="text-left font-medium pb-1">สถานะ</th>
+                        </tr></thead>
+                        <tbody>${colorRowsHtml || '<tr><td colspan="8" class="text-center text-slate-400 py-4">ไม่มีรายการที่ต่างกัน</td></tr>'}</tbody>
+                        <tfoot><tr class="border-t-2 border-slate-300 font-bold"><td class="py-1.5">รวม</td><td></td><td class="py-1.5 text-right tabular-nums">${planningWsFmt(t.aiKg, 2)}</td><td class="py-1.5 text-right tabular-nums">${planningWsFmt(t.excelKg, 2)}</td><td class="py-1.5 text-right tabular-nums">${sgn(t.diff)}</td><td colspan="3"></td></tr></tfoot>
+                    </table></div>
+                    <p class="text-[10px] text-slate-400 mt-2">สีที่ระบบอ่านจากรูปแบบ (OCR) อาจสะกดรหัสไม่ตรงกับ Excel เช่น A40 ↔ Ao — ระบบจะแนะนำรหัสที่น่าจะตรงกัน แก้รหัสในส่วนที่ 2 แล้วตารางนี้จะอัปเดตเอง</p>`}
+                </section>`;
+        }
+        function planningWsCmpSetTol(orderIndex, v) { planningWsCmpUi.tolPct = Math.max(0, Number(v) || 0); rerenderOrderViews(orderIndex); }
+        function planningWsCmpToggleOnlyDiff(orderIndex, on) { planningWsCmpUi.onlyDiff = !!on; rerenderOrderViews(orderIndex); }
+        function planningWsCmpClear(orderIndex) { planningWsMutate(orderIndex, ws => { ws.excelSnap = null; }); }
+        async function planningWsCmpLoadFile(orderIndex, input) {
+            const f = input.files && input.files[0]; input.value = '';
+            const order = productionOrders[orderIndex]; if (!f || !order) return;
+            const item = await readPlanningImportFile(f);
+            if (!item.ok) { showToast('อ่านไฟล์ไม่สำเร็จ: ' + (item.error || 'ไม่พบ Sheet Dye Order A'), 'fa-triangle-exclamation', 'text-rose-400'); return; }
+            const same = !item.moSo || String(item.moSo).trim() === String(order.moSo).trim();
+            planningWsMutate(orderIndex, ws => { ws.excelSnap = planningWsBuildExcelSnap(item); });
+            showToast(same ? `เก็บข้อมูลจาก ${f.name} เพื่อเทียบแล้ว (ไม่ได้เปลี่ยนแผนสั่งย้อม)` : `ไฟล์นี้เป็นของ M/O ${item.moSo} แต่กำลังเทียบกับ ${order.moSo} — ตรวจสอบว่าเลือกไฟล์ถูกใบ`, 'fa-scale-balanced', same ? 'text-indigo-400' : 'text-amber-400');
+        }
+        function planningWsCmpExport(orderIndex) {
+            const order = productionOrders[orderIndex]; if (!order) return;
+            const cmp = planningWsCompare(order);
+            const lbl = { match: 'ตรงกัน', diff: 'น้ำหนักต่าง', aiOnly: 'มีเฉพาะระบบ', excelOnly: 'มีเฉพาะ Excel' };
+            const r2 = n => (n === null || n === undefined) ? '' : Math.round(n * 1000) / 1000;
+            const rows = cmp.rows.map(r => ({ code: r.code, aiPct: r2(r.aiPct), aiKg: r2(r.aiKg), excelKg: r2(r.excelKg), diff: r2(r.diff), diffPct: r.diffPct === null ? '' : Math.round(r.diffPct * 10) / 10, aiYarn: r.aiYarn, excelYarn: r.excelYarn, status: lbl[r.status] + (r.hint ? ' (อาจตรงกับ ' + r.hint.code + ')' : '') }));
+            exportFlatRowsToExcel('เปรียบเทียบระบบ-Excel_' + String(order.moSo || '').replace(/[\\/:*?"<>|]/g, '-') + '.xlsx', 'เปรียบเทียบ', [
+                { key: 'code', label: 'รหัสสี' }, { key: 'aiPct', label: 'สัดส่วนระบบ (%)' }, { key: 'aiKg', label: 'ระบบ/AI (กก.)' }, { key: 'excelKg', label: 'Excel (กก.)' }, { key: 'diff', label: 'ส่วนต่าง (กก.)' }, { key: 'diffPct', label: 'ส่วนต่าง (%)' },
+                { key: 'aiYarn', label: 'ชนิดไหม ระบบ' }, { key: 'excelYarn', label: 'ชนิดไหม Excel' }, { key: 'status', label: 'สถานะ' }], rows);
         }
 
         // ---- state ของหน้า (เลขที่ M/O ที่เปิดอยู่ — ว่าง = หน้ากริด) ----
@@ -16473,6 +16693,7 @@
                     </div>
                     ${planningWsSection1Html(order, orderIndex)}
                     ${planningWsSection2Html(order, orderIndex)}
+                    ${planningWsCompareHtml(order, orderIndex)}
                     ${planningWsSection3Html(order, orderIndex)}
                     <div class="flex flex-wrap items-center justify-end gap-2 bg-white border border-slate-200 rounded-lg p-3">
                         <button type="button" onclick="planningWsSave(${orderIndex})" class="px-4 py-2 text-sm font-semibold border border-teal-600 text-teal-700 rounded bg-white hover:bg-teal-50">บันทึกใบวางแผน</button>
@@ -25786,6 +26007,7 @@
             // NEW (2026-10-15): M/O ที่ย้อมรวมกับ M/O อื่น (ข้อความ "M/O 186+187+188/26 สีเดียวกัน ย้อมรวมกัน") → ดูยอดของ M/O นี้จากชีต "ใบสรุปย้อมรวม"
             applyPlanningImportSharedDye(item, aoa, workbook);
             item.totalKg = Math.round(item.colors.reduce((s, c) => s + c.kg, 0) * 100) / 100;
+            item.specCalc = planningImportParseSpecBlock(aoa);   // 2026-11-17: บล็อกคำนวณท้ายใบ (กก./ตร.ม., เผื่อ, พื้นที่จริง) ไว้เทียบกับใบคำนวณระบบ
             if (item.colors.length === 0) item.warnings.push('ไม่พบรายการสี/น้ำหนักไหมในตาราง Dye Order A');
             else if (rawColorRows > item.colors.length) item.warnings.push(`รวมแถวที่ Color Code ซ้ำกัน ${rawColorRows} แถว เป็น ${item.colors.length} สี (รวมน้ำหนักให้)`);
             if (item.colorsCount > 0 && item.colors.length > 0 && item.colorsCount !== item.colors.length) {
@@ -25962,6 +26184,7 @@
                 if (gradeBuilt) raw.productionCalc = gradeBuilt.calc;
                 else if (item.totalSqm > 0) raw.productionCalc = { totalArea: item.totalSqm };
                 const order = normalizeOrder(raw);
+                planningWsGet(order).excelSnap = planningWsBuildExcelSnap(item);   // 2026-11-17: เก็บสำเนา Excel ไว้เทียบกับใบคำนวณ
                 productionOrders.push(order);
                 return { action: 'created', order, orderIndex: productionOrders.length - 1 };
             }
@@ -25997,6 +26220,7 @@
             });
             // NEW (2026-10-19): บันทึกสั่งย้อมเดิมของ M/O นี้ (ส่งจากแผนไปแล้ว) → เติมชนิดไหม/วันที่กำหนดเสร็จตามแผน/ประเภทไหม ตาม Code สี (เติมเฉพาะช่องที่ว่าง)
             const backfilled = backfillDyeLogFromPlanRows(order);
+            planningWsGet(order).excelSnap = planningWsBuildExcelSnap(item);   // 2026-11-17: เก็บสำเนา Excel ไว้เทียบกับใบคำนวณ
             persistOrderChange(order);
             return { action: 'updated', order, orderIndex, backfilled };
         }
