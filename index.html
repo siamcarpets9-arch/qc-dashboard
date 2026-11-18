@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -4234,7 +4232,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-126';
+        const APP_BUILD = 'QCDashboard-127';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -15801,29 +15799,68 @@
         ];
         const PLANNING_WS_QUALITY_TYPE_LABELS = { cut: 'Cut', loop: 'Loop', special: 'Special Loop', manual: 'ระบุ กรัม/ตร.ม. เอง' };
 
+        // 2026-11-18: ตารางสเปคแยกตาม "สเปคไหม" (family) ตามไฟล์ Hand Tufting Specifications — WO 380/1, Bamboo Viscose 360, Nylon 306/2 (จีน), Nylon 333/2 (เดมา), Prism Toray 260/2
+        //   เบอร์ 45 แยก 8 MM / 9 MM (ค่า S/R/FPH/TPH ไม่เหมือนกัน). น้ำหนัก (กรัม/ตร.ม.) คำนวณจากสูตรเดิม ตรงกับตารางในไฟล์
+        const PW_FAMILY_LABELS = {
+            'WO 380/1': 'WOOL · WO 380/1', 'BAMBOO VISCOSE 360': 'BAMBOO VISCOSE · 360', 'NYLON 306/2': 'NYLON · 306/2 (จีน)', 'NYLON 333/2': 'NYLON · 333/2 (เดมา)',
+            'PRISM TORAY 260/2': 'PRISM TORAY · 260/2', 'Special Loop': 'Special Loop (พิเศษ)', 'ระบุเอง': 'ระบุ กรัม/ตร.ม. เอง'
+        };
+        const PW_FAMILY_ORDER = ['WO 380/1', 'BAMBOO VISCOSE 360', 'NYLON 306/2', 'NYLON 333/2', 'PRISM TORAY 260/2', 'Special Loop', 'ระบุเอง'];
         function planningWsDefaultCatalog() {
-            const cut = [['HWO 35C', 10, 8, 10], ['HWO 40C', 11, 8, 10], ['HWO 45C', 12, 9, 11], ['HWO 50C', 12, 10, 12], ['HWO 55C', 12, 11, 13], ['HWO 60C', 12, 12, 14], ['HWO 65C', 12, 13, 15]]
-                .map(a => ({ name: a[0], type: 'cut', s: 28, r: a[1], fph: a[2], tph: a[3], tex: 380, ends: 4 }));
-            cut.push({ name: 'HWO 75C', type: 'cut', s: 28, r: 12, fph: 12, tph: 14, tex: 380, ends: 5 });
-            const loop = [['HWO 35L', 10, 8], ['HWO 40L', 11, 8], ['HWO 45L', 12, 9], ['HWO 50L', 12, 10], ['HWO 55L', 12, 11], ['HWO 60L', 12, 12], ['HWO 65L', 12, 13]]
-                .map(a => ({ name: a[0], type: 'loop', s: 28, r: a[1], ph: a[2], tex: 380, ends: 4 }));
-            loop.push({ name: 'HWO 85L', type: 'loop', s: 45, r: 12, ph: 9, tex: 380, ends: 5 });
-            const special = [['Needle Point', 45, 12, 6, 380, 2], ['Diamond Point', 45, 12, 7, 240, 6], ['Signature 65 oz/y2', 45, 12, 5, 380, 3],
+            const out = [];
+            // cut: [ชื่อ, เบอร์, S, R, FPH, TPH, เส้น?]  loop: [ชื่อ, เบอร์, S, R, PH, เส้น?]
+            const fam = (family, tex, cut, loop) => {
+                cut.forEach(a => out.push({ name: a[0], level: a[1], family, type: 'cut', s: a[2], r: a[3], fph: a[4], tph: a[5], tex, ends: a[6] || 4 }));
+                loop.forEach(a => out.push({ name: a[0], level: a[1], family, type: 'loop', s: a[2], r: a[3], ph: a[4], tex, ends: a[5] || 4 }));
+            };
+            fam('WO 380/1', 380,
+                [['HWO 35C', '35', 28, 10, 8, 10], ['HWO 40C', '40', 28, 11, 8, 10], ['HWO 45C (8 MM)', '45 (8 MM)', 30, 12, 8, 10], ['HWO 45C', '45 (9 MM)', 28, 12, 9, 11], ['HWO 50C', '50', 28, 12, 10, 12], ['HWO 55C', '55', 28, 12, 11, 13], ['HWO 60C', '60', 28, 12, 12, 14], ['HWO 65C', '65', 28, 12, 13, 15], ['HWO 75C', '75', 28, 12, 12, 14, 5]],
+                [['HWO 35L', '35', 28, 10, 8], ['HWO 40L', '40', 28, 11, 8], ['HWO 45L (8 MM)', '45 (8 MM)', 30, 12, 8], ['HWO 45L', '45 (9 MM)', 28, 12, 9], ['HWO 50L', '50', 28, 12, 10], ['HWO 55L', '55', 28, 12, 11], ['HWO 60L', '60', 28, 12, 12], ['HWO 65L', '65', 28, 12, 13], ['HWO 85L', '85', 45, 12, 9, 5]]);
+            fam('BAMBOO VISCOSE 360', 360,
+                [['HBBVC 35C', '35', 28, 10, 8, 10], ['HBBVC 40C', '40', 28, 11, 8, 10], ['HBBVC 45C', '45 (9 MM)', 28, 12, 9, 11], ['HBBVC 50C', '50', 28, 12, 10, 12], ['HBBVC 55C', '55', 28, 12, 11, 13], ['HBBVC 60C', '60', 28, 12, 12, 14], ['HBBVC 65C', '65', 28, 12, 13, 15], ['HBBVC 75C', '75', 32, 12, 14, 16]],
+                [['HBBVC 35L', '35', 32, 10, 8], ['HBBVC 40L', '40', 32, 11, 8], ['HBBVC 45L', '45 (9 MM)', 32, 12, 9], ['HBBVC 50L', '50', 32, 12, 10], ['HBBVC 55L', '55', 32, 12, 11], ['HBBVC 60L', '60', 32, 12, 12], ['HBBVC 65L', '65', 32, 12, 13], ['HBBVC 75L', '75', 32, 12, 14]]);
+            fam('NYLON 306/2', 306,
+                [['HPA 35C (306/2)', '35', 32, 10, 8, 10], ['HPA 40C (306/2)', '40', 32, 11, 8, 10], ['HPA 45C (8 MM) (306/2)', '45 (8 MM)', 32, 12, 8, 10], ['HPA 45C (9 MM) (306/2)', '45 (9 MM)', 32, 12, 9, 11], ['HPA 50C (306/2)', '50', 32, 12, 10, 12], ['HPA 55C (306/2)', '55', 32, 12, 11, 13], ['HPA 60C (306/2)', '60', 32, 12, 12, 14], ['HPA 65C (306/2)', '65', 32, 12, 13, 15], ['HPA 75C (306/2)', '75', 36, 12, 14, 16]],
+                [['HPA 35L (306/2)', '35', 32, 10, 8], ['HPA 40L (306/2)', '40', 32, 11, 8], ['HPA 45L (8 MM) (306/2)', '45 (8 MM)', 32, 12, 8], ['HPA 45L (9 MM) (306/2)', '45 (9 MM)', 32, 12, 9], ['HPA 50L (306/2)', '50', 32, 12, 10], ['HPA 55L (306/2)', '55', 32, 12, 11], ['HPA 60L (306/2)', '60', 32, 12, 12], ['HPA 65L (306/2)', '65', 32, 12, 13], ['HPA 75L (306/2)', '75', 36, 12, 14]]);
+            fam('NYLON 333/2', 333,
+                [['HPA 35C (333/2)', '35', 28, 10, 8, 10], ['HPA 40C (333/2)', '40', 28, 11, 8, 10], ['HPA 45C (8 MM) (333/2)', '45 (8 MM)', 30, 12, 8, 10], ['HPA 45C (9 MM) (333/2)', '45 (9 MM)', 28, 12, 9, 11], ['HPA 50C (333/2)', '50', 28, 12, 10, 12], ['HPA 55C (333/2)', '55', 28, 12, 11, 13], ['HPA 60C (333/2)', '60', 28, 12, 12, 14], ['HPA 65C (333/2)', '65', 28, 12, 13, 15], ['HPA 75C (333/2)', '75', 28, 12, 12, 14, 5]],
+                [['HPA 35L (333/2)', '35', 28, 10, 8], ['HPA 40L (333/2)', '40', 28, 11, 8], ['HPA 45L (8 MM) (333/2)', '45 (8 MM)', 30, 12, 8], ['HPA 45L (9 MM) (333/2)', '45 (9 MM)', 28, 12, 9], ['HPA 50L (333/2)', '50', 28, 12, 10], ['HPA 55L (333/2)', '55', 28, 12, 11], ['HPA 60L (333/2)', '60', 28, 12, 12], ['HPA 65L (333/2)', '65', 28, 12, 13], ['HPA 75L (333/2)', '75', 28, 12, 9, 5]]);
+            fam('PRISM TORAY 260/2', 260,
+                [['HPRSK 35C', '35', 32, 10, 8, 10], ['HPRSK 40C', '40', 32, 11, 8, 10], ['HPRSK 45C', '45 (9 MM)', 32, 12, 9, 11], ['HPRSK 50C', '50', 32, 12, 10, 12], ['HPRSK 55C', '55', 32, 12, 11, 13], ['HPRSK 60C', '60', 32, 12, 12, 14], ['HPRSK 65C', '65', 32, 12, 13, 15], ['HPRSK 75C', '75', 36, 12, 14, 16]],
+                [['HPRSK 35L', '35', 45, 10, 8], ['HPRSK 40L', '40', 45, 11, 8], ['HPRSK 45L', '45 (9 MM)', 45, 12, 9], ['HPRSK 50L', '50', 45, 12, 10], ['HPRSK 55L', '55', 45, 12, 11], ['HPRSK 60L', '60', 45, 12, 12], ['HPRSK 65L', '65', 45, 12, 13], ['HPRSK 75L', '75', 45, 12, 14]]);
+            [['Needle Point', 45, 12, 6, 380, 2], ['Diamond Point', 45, 12, 7, 240, 6], ['Signature 65 oz/y2', 45, 12, 5, 380, 3],
                 ['Regal 85 oz/y2', 45, 12, 7, 380, 3], ['Petite Point', 45, 12, 6, 240, 4], ['Bellagio Loop', 40, 12, 8.5, 380, 5]]
-                .map(a => ({ name: a[0], type: 'special', s: a[1], r: a[2], ph: a[3], tex: a[4], ends: a[5] }));
-            return cut.concat(loop, special);
+                .forEach(a => out.push({ name: a[0], family: 'Special Loop', type: 'special', s: a[1], r: a[2], ph: a[3], tex: a[4], ends: a[5] }));
+            return out;
         }
         function planningWsSanitizeQuality(q) {
             const type = ['cut', 'loop', 'special', 'manual'].includes(q.type) ? q.type : 'cut';
             const n = v => (v === '' || v === null || v === undefined || isNaN(Number(v))) ? 0 : Number(v);
-            return { name: String(q.name || '').trim(), type, s: n(q.s), r: n(q.r), fph: n(q.fph), tph: n(q.tph), ph: n(q.ph), tex: n(q.tex), ends: n(q.ends), gsm: n(q.gsm) };
+            const name = String(q.name || '').trim();
+            let family = String(q.family || '').trim();
+            if (!family) family = type === 'special' ? 'Special Loop' : (type === 'manual' ? 'ระบุเอง' : (/^HWO\b/i.test(name) ? 'WO 380/1' : ''));
+            let level = String(q.level || '').trim();
+            if (!level && (type === 'cut' || type === 'loop')) {
+                const m = name.match(/(\d{2,3})\s*[CL]\b/i);
+                if (m) { let k = parseInt(m[1], 10); if (k >= 100) k = Math.round(k / 10); const mm = name.match(/\(\s*(\d+)\s*MM\s*\)/i); level = mm ? `${k} (${mm[1]} MM)` : (k === 45 ? `45 (${type === 'cut' ? n(q.fph) : n(q.ph)} MM)` : String(k)); }
+            }
+            return { name, type, family, level, s: n(q.s), r: n(q.r), fph: n(q.fph), tph: n(q.tph), ph: n(q.ph), tex: n(q.tex), ends: n(q.ends), gsm: n(q.gsm) };
         }
         function planningWsLoadCatalog() {
             try {
                 const raw = JSON.parse(localStorage.getItem(PLANNING_WS_QUALITY_KEY) || 'null');
                 if (Array.isArray(raw) && raw.length > 0) {
                     const list = raw.filter(q => q && q.name).map(planningWsSanitizeQuality).filter(q => q.name);
-                    if (list.length > 0) return list;
+                    if (list.length > 0) {
+                        // 2026-11-18: เครื่องที่เคยบันทึกตารางไว้ → เติมสเปคใหม่ (Bamboo/Nylon/Prism + 45 (8 MM)) ครั้งเดียว ไม่ทับ/ไม่คืนรายการที่ลบหรือแก้ไว้
+                        let mig = ''; try { mig = localStorage.getItem(PLANNING_WS_QUALITY_KEY + '_mig') || ''; } catch (e) { /* ignore */ }
+                        if (mig !== '2') {
+                            const have = new Set(list.map(q => q.name.toLowerCase()));
+                            planningWsDefaultCatalog().map(planningWsSanitizeQuality).forEach(d => { if (!have.has(d.name.toLowerCase())) list.push(d); });
+                            try { localStorage.setItem(PLANNING_WS_QUALITY_KEY, JSON.stringify(list)); localStorage.setItem(PLANNING_WS_QUALITY_KEY + '_mig', '2'); } catch (e) { /* ignore */ }
+                        }
+                        return list;
+                    }
                 }
             } catch (e) { /* fall through to defaults */ }
             return planningWsDefaultCatalog().map(planningWsSanitizeQuality);
@@ -15837,6 +15874,29 @@
             const key = String(name || '').trim().toLowerCase();
             if (!key) return null;
             return planningWsCatalog.find(q => q.name.toLowerCase() === key) || null;
+        }
+        function planningWsQFamily(q) { return q ? (q.family || '') : ''; }
+        function planningWsQLevel(q) { return q ? (q.level || '') : ''; }
+        function planningWsFamilyLabel(f) { return PW_FAMILY_LABELS[f] || f || '(ไม่ระบุสเปคไหม)'; }
+        // สเปคไหมทั้งหมดที่มีในตาราง (เรียงตามลำดับมาตรฐานก่อน แล้วที่เพิ่มเอง)
+        function planningWsFamilies() {
+            const seen = []; planningWsCatalog.forEach(q => { const f = planningWsQFamily(q); if (f && !seen.includes(f)) seen.push(f); });
+            return seen.sort((a, b) => { const ia = PW_FAMILY_ORDER.indexOf(a), ib = PW_FAMILY_ORDER.indexOf(b); return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib); });
+        }
+        // สเปคไหมของแถว: ที่เลือกไว้ → ไม่งั้นตามคุณภาพที่เลือกอยู่
+        function planningWsRowFamily(r) { return r.family || planningWsQFamily(planningWsFindQuality(r.quality)); }
+        // คุณภาพของแถว + ความสูง PH ที่ผู้ใช้ระบุเอง (ว่าง = ตามสเปค). Cut: FPH = ค่าที่ระบุ, TPH = FPH + ส่วนต่างเดิมของสเปค (ปกติ +2) · Loop/Special: PH
+        function planningWsRowQuality(r) {
+            const q = planningWsFindQuality(r.quality); if (!q) return null;
+            const ph = (r.ph === '' || r.ph === undefined || r.ph === null) ? 0 : Number(r.ph);
+            if (!(ph > 0) || q.type === 'manual') return q;
+            if (q.type === 'cut') return Object.assign({}, q, { fph: ph, tph: ph + ((Number(q.tph) || 0) - (Number(q.fph) || 0)), phOverride: true });
+            return Object.assign({}, q, { ph, phOverride: true });
+        }
+        // เปลี่ยนเทคนิค/สเปคไหม แล้วหาคุณภาพเบอร์เดิม (level) ในกลุ่มใหม่ เช่น HWO 45C → HWO 45L
+        function planningWsFindSameLevel(q, family, type) {
+            if (!q) return null; const lv = planningWsQLevel(q); if (!lv) return null;
+            return planningWsCatalog.find(x => x.type === type && planningWsQFamily(x) === family && planningWsQLevel(x) === lv) || null;
         }
         // น้ำหนักไหมต่อพื้นที่ (กรัม/ตร.ม.) ตามสูตรในไฟล์ "Tufting Spec."
         function planningWsQualityGsm(q) {
@@ -15852,17 +15912,22 @@
             if (!q) return 'ไม่พบคุณภาพนี้ในตารางสเปค';
             if (q.type === 'manual') return `ระบุเอง ${fmtBomNum(q.gsm, 0)} กรัม/ตร.ม.`;
             const pile = q.type === 'cut' ? `FPH${q.fph}/TPH${q.tph}มม.` : `PH${q.ph}มม.`;
-            return `S${q.s} · R${q.r} · ${pile} · Tex${q.tex} · N${q.ends}`;
+            return `S${q.s} · R${q.r} · ${pile}${q.phOverride ? '*' : ''} · Tex${q.tex} · N${q.ends}`;
         }
-        // เดาคุณภาพจากข้อความคุณภาพของ M/O เช่น "HWO 450 CUT (9 MM.)" -> "HWO 45C"
+        // เดาคุณภาพจากข้อความคุณภาพของ M/O เช่น "HWO 450 CUT (9 MM.)" -> "HWO 45C" · "HWO 450 CUT (8 MM.)" -> "HWO 45C (8 MM)" · รองรับ HBBVC / HPRSK / HPA (HPA มี 306/2 กับ 333/2 → เดาไม่ได้ถ้าไม่ระบุ)
         function planningWsGuessQuality(text) {
-            const m = String(text || '').match(/HWO[\s-]*(\d{2,3})\s*(C|CUT|L|LOOP)?/i);
+            const t = String(text || '');
+            const m = t.match(/\b(HWO|HBBVC|HPRSK|HPA)[\s-]*(\d{2,3})\s*(C|CUT|L|LOOP)?/i);
             if (!m) return '';
-            let n = parseInt(m[1], 10);
+            const prefix = m[1].toUpperCase(); let n = parseInt(m[2], 10);
             if (n >= 100) n = Math.round(n / 10);
-            const letter = /^l/i.test(m[2] || '') ? 'L' : 'C';
-            const name = `HWO ${n}${letter}`;
-            return planningWsFindQuality(name) ? name : '';
+            const type = /^l/i.test(m[3] || '') ? 'loop' : 'cut';
+            const mm = t.match(/\(\s*(\d+)\s*MM/i);
+            let cands = planningWsCatalog.filter(q => q.type === type && q.name.toUpperCase().startsWith(prefix + ' ') && /^\d+/.test(planningWsQLevel(q)) && parseInt(planningWsQLevel(q), 10) === n);
+            if (prefix === 'HPA') { const f = t.match(/(306|333)\s*\/\s*2/); cands = f ? cands.filter(q => planningWsQFamily(q) === 'NYLON ' + f[1] + '/2') : []; }
+            if (mm) { const w = cands.filter(q => planningWsQLevel(q) === `${n} (${mm[1]} MM)`); if (w.length) cands = w; }
+            else if (n === 45) { const w = cands.filter(q => /\(9 MM\)/.test(planningWsQLevel(q))); if (w.length) cands = w; }
+            return cands.length === 1 || (cands.length > 1 && new Set(cands.map(planningWsQFamily)).size === 1) ? cands[0].name : '';
         }
         function planningWsTechniqueType(key) {
             const t = PLANNING_WS_TECHNIQUES.find(x => x.key === key);
@@ -15890,6 +15955,8 @@
                     value: Number(r.value) || 0,
                     quality: r.quality || '',
                     lot: r.lot || '',   // 2026-11-16: LOT ไหมของแถวสี (ส่งต่อไปแผนสั่งย้อม)
+                    family: String(r.family || ''),   // 2026-11-18: สเปคไหม (WO 380/1 / Bamboo / Nylon…) — ว่าง = ตามคุณภาพที่เลือก
+                    ph: (r.ph === '' || r.ph === undefined || r.ph === null || !(Number(r.ph) > 0)) ? '' : Number(r.ph),   // ความสูง PH (มม.) ที่ระบุเอง — ว่าง = ตามสเปค
                     ocr: String(r.ocr || ''),   // 2026-11-17: ร่องรอยการแก้รหัสสีอัตโนมัติจากคลังรหัส ('fixed:<รหัสที่ OCR อ่านได้>' | 'check' | '') — แก้ช่องรหัสเองแล้วจะล้าง
                     allowancePct: planningWsNormAllowance(r.allowancePct),   // '' = ใช้ค่า "บวกเผื่อ (%)" รวมของใบ
                     roundDec: planningWsNormDec(r.roundDec, true)           // '' = ใช้ค่า "ปัดทศนิยม" ของใบ
@@ -16018,7 +16085,7 @@
             const total = planningWsTotalArea(order);
             const allowance = Number(ws.allowancePct) || 0;
             const rows = ws.colorRows.map((r, i) => {
-                const q = planningWsFindQuality(r.quality);
+                const q = planningWsRowQuality(r);
                 const gsm = planningWsQualityGsm(q);
                 const kgPerSqm = gsm / 1000;
                 const area = r.areaMode === 'sqm' ? (Number(r.value) || 0) : total * (Number(r.value) || 0) / 100;
@@ -16496,12 +16563,37 @@
         }
 
         // ---- ส่วนที่ 2: คำนวณน้ำหนักไหมสั่งย้อม ----
+        // ช่อง "คุณภาพ" แยกเป็นรายการ: สเปคไหม (WOOL/Bamboo/Nylon…) → เบอร์ (H450 / 8 MM / 9 MM …) ตามเทคนิค CUT/LOOP → ความสูง PH ระบุเองได้
+        function planningWsQualityCellHtml(r, x, orderIndex) {
+            const type = planningWsTechniqueType(r.technique);
+            const fam = planningWsRowFamily(r);
+            const famOpts = '<option value="">-- สเปคไหม --</option>' + planningWsFamilies().map(f => `<option value="${escapeHtml(f)}" ${f === fam ? 'selected' : ''}>${escapeHtml(planningWsFamilyLabel(f))}</option>`).join('');
+            const baseQ = planningWsFindQuality(r.quality);
+            const specPh = baseQ ? (baseQ.type === 'cut' ? baseQ.fph : baseQ.ph) : '';
+            const phLabel = type === 'cut' ? 'ความสูง FPH' : 'ความสูง PH';
+            const phBox = (baseQ && baseQ.type !== 'manual') ? `<label class="flex items-center gap-1 mt-1 text-[10px] text-slate-500">${phLabel} (มม.)
+                    <input type="number" min="0" step="0.5" value="${r.ph === '' ? '' : r.ph}" placeholder="${specPh}" data-pw-ph onchange="planningWsRowField(${orderIndex}, '${r.id}', 'ph', this.value)" class="w-14 p-1 border border-slate-300 rounded bg-white text-xs text-right">
+                    <span class="text-slate-400">${r.ph === '' ? 'ตามสเปค' : (type === 'cut' ? `TPH ${planningWsRound(Number(r.ph) + ((Number(baseQ.tph) || 0) - (Number(baseQ.fph) || 0)), 2)}` : '')}</span></label>` : '';
+            return `
+                <select onchange="planningWsRowField(${orderIndex}, '${r.id}', 'family', this.value)" data-pw-family class="w-full p-1.5 border border-slate-300 rounded bg-white text-xs mb-1">${famOpts}</select>
+                <select onchange="planningWsRowField(${orderIndex}, '${r.id}', 'quality', this.value)" data-pw-quality class="w-full p-1.5 border ${x.quality || !r.quality ? 'border-slate-300' : 'border-rose-300'} rounded bg-white text-xs">${planningWsQualityOptionsHtml(r)}</select>
+                ${phBox}
+                <p class="text-[10px] ${x.quality ? 'text-slate-400' : 'text-rose-500'} mt-0.5">${escapeHtml(r.quality ? planningWsQualitySpecText(x.quality) : 'ยังไม่ได้เลือกคุณภาพ')}</p>`;
+        }
         function planningWsQualityOptionsHtml(row) {
             const type = planningWsTechniqueType(row.technique);
-            const list = planningWsCatalog.filter(q => q.type === type || q.type === 'manual');
+            const fam = planningWsRowFamily(row);
+            const byFam = (q) => !fam || planningWsQFamily(q) === fam;
+            const list = planningWsCatalog.filter(q => (q.type === type && byFam(q)) || (q.type === 'manual' && (!fam || fam === 'ระบุเอง')));
             const hasCurrent = !row.quality || list.some(q => q.name === row.quality);
             const all = hasCurrent ? list : list.concat(planningWsFindQuality(row.quality) ? [planningWsFindQuality(row.quality)] : [{ name: row.quality, type: 'cut' }]);
-            return `<option value="">-- เลือกคุณภาพ --</option>` + all.map(q => `<option value="${escapeHtml(q.name)}" ${q.name === row.quality ? 'selected' : ''}>${escapeHtml(q.name)}${q.name === row.quality ? ' ✓' : ''}</option>`).join('');
+            const opt = q => `<option value="${escapeHtml(q.name)}" ${q.name === row.quality ? 'selected' : ''}>${escapeHtml(q.name)}${q.name === row.quality ? ' ✓' : ''}</option>`;
+            const head = `<option value="">-- เลือกคุณภาพ --</option>`;
+            if (fam) return head + all.map(opt).join('');
+            // ยังไม่เลือกสเปคไหม: แสดงรวมทุกสเปค จัดกลุ่มตามสเปคไหม
+            const groups = planningWsFamilies().map(f => { const items = all.filter(q => planningWsQFamily(q) === f); return items.length ? `<optgroup label="${escapeHtml(planningWsFamilyLabel(f))}">${items.map(opt).join('')}</optgroup>` : ''; }).join('');
+            const rest = all.filter(q => !planningWsQFamily(q)).map(opt).join('');
+            return head + groups + rest;
         }
 
         function planningWsSection2Html(order, orderIndex) {
@@ -16536,8 +16628,7 @@
                             </div>
                         </td>
                         <td class="py-2 pr-2 min-w-[170px]">
-                            <select onchange="planningWsRowField(${orderIndex}, '${r.id}', 'quality', this.value)" class="w-full p-1.5 border ${x.quality || !r.quality ? 'border-slate-300' : 'border-rose-300'} rounded bg-white text-xs">${planningWsQualityOptionsHtml(r)}</select>
-                            <p class="text-[10px] ${x.quality ? 'text-slate-400' : 'text-rose-500'} mt-0.5">${escapeHtml(r.quality ? planningWsQualitySpecText(x.quality) : 'ยังไม่ได้เลือกคุณภาพ')}</p>
+                            ${planningWsQualityCellHtml(r, x, orderIndex)}
                         </td>
                         <td class="py-2 pr-2 text-right whitespace-nowrap font-medium text-slate-700">${x.kgPerSqm > 0 ? planningWsFmt(x.kgPerSqm, 3) : '-'}</td>
                         <td class="py-2 pr-2 text-right whitespace-nowrap text-slate-700">${x.area > 0 ? planningWsFmt(x.area, 2) : '-'}</td>
@@ -16772,7 +16863,7 @@
             const tech = technique || PLANNING_WS_TECHNIQUES[0].key;
             let quality = guess;
             if (quality && planningWsFindQuality(quality).type !== planningWsTechniqueType(tech) && planningWsFindQuality(quality).type !== 'manual') quality = '';
-            return { id: 'pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), code: '', yarn: '', stipple: false, technique: tech, areaMode: 'pct', value: 0, quality, lot: '', allowancePct: '', roundDec: '', ocr: '' };
+            return { id: 'pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), code: '', yarn: '', stipple: false, technique: tech, areaMode: 'pct', value: 0, quality, lot: '', allowancePct: '', roundDec: '', ocr: '', family: '', ph: '' };
         }
         // จำนวนสีเปลี่ยน -> เกรดทอใช้ "จำนวนสีสูงสุด" ด้วย จึงยกให้ไม่ต่ำกว่าจำนวนสี (ไม่เคยลดค่าที่กรอก/นำเข้าไว้)
         function planningWsSyncColorCount(order, ws) {
@@ -16818,13 +16909,22 @@
                 else if (field === 'roundDec') row.roundDec = planningWsNormDec(value, true);
                 else if (field === 'stipple') row.stipple = !!value;
                 else if (field === 'code') { row.code = String(value || '').trim(); row.ocr = ''; }
+                else if (field === 'ph') { const v = Number(value); row.ph = (value === '' || value === null || !(v > 0)) ? '' : v; }
+                else if (field === 'quality') { row.quality = value; row.ph = ''; if (value) { const fq = planningWsQFamily(planningWsFindQuality(value)); if (fq) row.family = fq; } }
+                else if (field === 'family') {
+                    row.family = value || ''; row.ph = '';
+                    const cur = planningWsFindQuality(row.quality), ty = planningWsTechniqueType(row.technique);
+                    if (cur && cur.type !== 'manual' && value && planningWsQFamily(cur) !== value) { const sw = planningWsFindSameLevel(cur, value, ty); row.quality = sw ? sw.name : ''; }   // เปลี่ยนสเปคไหม → ลองคงเบอร์เดิม (เช่น 45 (9 MM))
+                }
                 else if (field === 'technique') {
                     row.technique = value;
                     // เปลี่ยนเทคนิคแล้วคุณภาพเดิมไม่ตรงชนิด (Cut/Loop) -> ลองเดาใหม่จากคุณภาพของ M/O ไม่เจอก็ล้างให้เลือกใหม่
                     const q = planningWsFindQuality(row.quality);
                     if (q && q.type !== 'manual' && q.type !== planningWsTechniqueType(value)) {
-                        const swap = planningWsFindQuality(row.quality.replace(/[CL]$/, planningWsTechniqueType(value) === 'cut' ? 'C' : 'L'));
-                        row.quality = (swap && swap.type === planningWsTechniqueType(value)) ? swap.name : '';
+                        const nt = planningWsTechniqueType(value);
+                        let swap = planningWsFindSameLevel(q, planningWsQFamily(q), nt);
+                        if (!swap) swap = planningWsFindQuality(row.quality.replace(/[CL]$/, nt === 'cut' ? 'C' : 'L'));   // ชื่อเดิมที่ไม่มีเบอร์ (level)
+                        row.quality = (swap && swap.type === nt) ? swap.name : ''; row.ph = '';
                     }
                 }
                 else row[field] = value;
@@ -17357,6 +17457,7 @@
                 const dash = '<span class="text-slate-300">-</span>';
                 return `<tr class="border-t border-slate-100" data-pwq-row="${i}">
                     <td class="py-1 pr-1"><input type="text" value="${escapeHtml(q.name)}" onchange="planningWsCatalogField(${i}, 'name', this.value)" class="w-36 p-1 border border-slate-300 rounded text-xs"></td>
+                    <td class="pr-1"><input type="text" list="pwFamList" value="${escapeHtml(q.family || '')}" placeholder="สเปคไหม" data-pwq-family onchange="planningWsCatalogField(${i}, 'family', this.value)" class="w-28 p-1 border border-slate-300 rounded text-xs"></td>
                     <td class="pr-1"><select onchange="planningWsCatalogField(${i}, 'type', this.value)" class="p-1 border border-slate-300 rounded text-xs bg-white">${Object.keys(PLANNING_WS_QUALITY_TYPE_LABELS).map(t => `<option value="${t}" ${q.type === t ? 'selected' : ''}>${PLANNING_WS_QUALITY_TYPE_LABELS[t]}</option>`).join('')}</select></td>
                     <td class="pr-1">${isManual ? dash : numCell(i, 's', q.s)}</td>
                     <td class="pr-1">${isManual ? dash : numCell(i, 'r', q.r)}</td>
@@ -17376,8 +17477,9 @@
                         <button type="button" onclick="closePlanningWsModal()" class="text-slate-500 hover:text-slate-800 text-xl px-2">✕</button>
                     </div>
                     <div class="px-5 py-3 overflow-x-auto">
+                        <datalist id="pwFamList">${PW_FAMILY_ORDER.map(f => `<option value="${escapeHtml(f)}"></option>`).join('')}</datalist>
                         <table class="w-full text-xs">
-                            <thead><tr class="text-[10px] text-slate-500 text-left"><th class="pb-1">ชื่อคุณภาพ</th><th>ประเภท</th><th>S</th><th>R</th><th>FPH</th><th>TPH / PH</th><th>Tex</th><th>เส้น</th><th class="text-right">กรัม/ตร.ม.</th><th></th></tr></thead>
+                            <thead><tr class="text-[10px] text-slate-500 text-left"><th class="pb-1">ชื่อคุณภาพ</th><th>สเปคไหม</th><th>ประเภท</th><th>S</th><th>R</th><th>FPH</th><th>TPH / PH</th><th>Tex</th><th>เส้น</th><th class="text-right">กรัม/ตร.ม.</th><th></th></tr></thead>
                             <tbody>${rows}</tbody>
                         </table>
                     </div>
@@ -17400,6 +17502,7 @@
                 // ชื่อเปลี่ยน -> แถวสีในใบวางแผนที่อ้างชื่อเก่าตามไปด้วย
                 productionOrders.forEach(o => { const ws = o.planning && o.planning.worksheet; if (ws) ws.colorRows.forEach(r => { if (r.quality === old) r.quality = name; }); });
             } else if (field === 'type') q.type = value;
+            else if (field === 'family') q.family = String(value || '').trim();
             else q[field] = Number(value) || 0;
             planningWsSaveCatalog();
             renderPlanningWsQualityModal();
