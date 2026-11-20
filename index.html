@@ -4169,7 +4169,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-132';
+        const APP_BUILD = 'QCDashboard-133';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -15824,6 +15824,7 @@
                     family: String(r.family || ''),   // 2026-11-18: สเปคไหม (WO 380/1 / Bamboo / Nylon…) — ว่าง = ตามคุณภาพที่เลือก
                     ph: (r.ph === '' || r.ph === undefined || r.ph === null || !(Number(r.ph) > 0)) ? '' : Number(r.ph),   // ความสูง PH (มม.) ที่ระบุเอง — ว่าง = ตามสเปค
                     ocr: String(r.ocr || ''),   // 2026-11-17: ร่องรอยการแก้รหัสสีอัตโนมัติจากคลังรหัส ('fixed:<รหัสที่ OCR อ่านได้>' | 'check' | '') — แก้ช่องรหัสเองแล้วจะล้าง
+                    orderKg: (r.orderKg === '' || r.orderKg === undefined || r.orderKg === null || !isFinite(Number(r.orderKg))) ? '' : Math.max(0, Number(r.orderKg)),   // 2026-11-20: ยอด "สั่งย้อมจริง" ที่คีย์เอง (ว่าง = ใช้ยอดจาก Excel Sheet SIAM ถ้ามี)
                     allowancePct: planningWsNormAllowance(r.allowancePct),   // '' = ใช้ค่า "บวกเผื่อ (%)" รวมของใบ
                     roundDec: planningWsNormDec(r.roundDec, true)           // '' = ใช้ค่า "ปัดทศนิยม" ของใบ
                 })),
@@ -15831,6 +15832,7 @@
                 allowancePct: (raw.allowancePct === undefined || raw.allowancePct === '' || isNaN(Number(raw.allowancePct))) ? 5 : Number(raw.allowancePct),
                 roundDec: planningWsNormDec(raw.roundDec, false),
                 roundMode: raw.roundMode === 'up' ? 'up' : 'round',
+                siamSnap: normalizePlanningSiamSnap(raw.siamSnap),   // 2026-11-20: ใบสั่งย้อมจริงจาก Excel Sheet "SIAM" (ยอดสั่งย้อมรายสี) ไว้เทียบกับยอดคำนวณ
                 excelSnap: normalizePlanningExcelSnap(raw.excelSnap),   // 2026-11-17: สำเนาข้อมูล Dye Order A จาก Excel ที่นำเข้า (ไว้เทียบกับใบคำนวณ)
                 manpower: { hoursPerDay: numOrBlank(mp.hoursPerDay), tuftingStaff: numOrBlank(mp.tuftingStaff), designStaff: numOrBlank(mp.designStaff), finishingStaff: numOrBlank(mp.finishingStaff), dyeLeadDays: numOrBlank(mp.dyeLeadDays) }
             };
@@ -16016,6 +16018,145 @@
         function planningWsBuildExcelSnap(item) {
             return normalizePlanningExcelSnap({ fileName: item.fileName || '', importedAt: new Date().toISOString(), area: item.totalSqm || 0, quality: item.quality || '', totalKg: item.totalKg || 0, spec: item.specCalc || null, colors: item.colors || [] });
         }
+        // =====================================================================================
+        // NEW (2026-11-20): ยอด "สั่งย้อมจริง" จาก Excel Sheet "SIAM" (ใบสั่งย้อมที่ส่งแผนกย้อม — น้ำหนักรายสีรวมตัวบวกที่คีย์เพิ่มแล้ว)
+        //   อ่าน: ลำดับ/สี/ชนิดไหม/TEX/น้ำหนัก (ก.ก.)/วันที่ต้องการ/สถานที่ ใต้หัวตาราง "No." + ยอดรวม · เก็บใน ws.siamSnap
+        //   ในตารางส่วนที่ 2 มีช่อง "สั่งย้อมจริง" (คีย์เองได้ · ว่าง = ใช้ยอดจาก SIAM ตามรหัสสี) + ช่อง "ส่วนต่าง" = สั่งย้อมจริง − ยอดคำนวณระบบ
+        //   และมีรายการส่วนต่างรายสี (รวมสีที่มีเฉพาะ SIAM / เฉพาะระบบ)
+        // =====================================================================================
+        function normalizePlanningSiamSnap(raw) {
+            if (!raw || typeof raw !== 'object' || !Array.isArray(raw.colors)) return null;
+            return {
+                fileName: String(raw.fileName || ''), importedAt: String(raw.importedAt || ''), moSo: String(raw.moSo || ''),
+                area: Number(raw.area) || 0, totalKg: Number(raw.totalKg) || 0, note: String(raw.note || ''),
+                colors: raw.colors.filter(c => c && typeof c === 'object').map(c => ({ colorCode: String(c.colorCode || ''), kg: Number(c.kg) || 0, yarnType: String(c.yarnType || ''), tex: String(c.tex || ''), reqDate: String(c.reqDate || ''), where: String(c.where || '') }))
+            };
+        }
+        function planningParseSiamSheet(workbook, fileName) {
+            const name = (workbook.SheetNames || []).find(n => /^siam$/i.test(String(n).trim()));
+            if (!name) return null;
+            const aoa = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, raw: true, defval: null });
+            const t = v => String(v == null ? '' : v).trim();
+            const hIdx = aoa.findIndex(row => row && t(row[0]) === 'No.');
+            if (hIdx < 0) return null;
+            const thai = aoa[hIdx - 1] || [], eng = aoa[hIdx] || [];
+            const col = (re, def) => { let i = thai.findIndex(c => re.test(t(c))); if (i < 0) i = eng.findIndex(c => re.test(t(c))); return i < 0 ? def : i; };
+            const cColor = col(/^(สี|color)$/i, 1), cYarn = col(/^(ชนิดไหม|yarn type)$/i, 2), cTex = eng.findIndex(c => /^tex$/i.test(t(c))), cKg = col(/^(น้ำหนัก|weight)/i, 4), cReq = col(/^(วันที่ต้องการ|req)/i, 5), cLoc = col(/^สถานที่/, 6);
+            const colors = []; let blanks = 0;
+            for (let r = hIdx + 1; r < aoa.length && r < hIdx + 40; r++) {
+                const row = aoa[r] || [];
+                const code = t(row[cColor]); const kg = Number(row[cKg]);
+                const isNo = row[0] !== null && row[0] !== '' && Number.isFinite(Number(row[0]));
+                if (!isNo && !code) { if (++blanks >= 2) break; continue; }
+                if (/^รวม$/.test(code)) break;
+                if (!code || !(kg > 0)) { if (!isNo) break; continue; }
+                colors.push({ colorCode: code, kg, yarnType: t(row[cYarn]), tex: cTex >= 0 ? t(row[cTex]) : '', reqDate: t(row[cReq]), where: t(row[cLoc]) });
+            }
+            if (colors.length === 0) return null;
+            let total = 0;
+            for (let r = hIdx + 1; r < aoa.length; r++) { const row = aoa[r] || []; if (/^รวม$/.test(t(row[cColor]))) { total = Number(row[cKg]) || 0; break; } }
+            const sum = colors.reduce((a, c) => a + c.kg, 0);
+            const labelVal = (re) => { for (let r = 0; r < hIdx; r++) { const row = aoa[r] || []; for (let c = 0; c < row.length; c++) if (re.test(t(row[c]))) { for (let k = c + 1; k < Math.min(row.length, c + 4); k++) if (row[k] !== null && row[k] !== '') return row[k]; } } return null; };
+            const moRaw = labelVal(/^M\/O\s*:?$/i);
+            return normalizePlanningSiamSnap({ fileName: fileName || '', importedAt: new Date().toISOString(), moSo: moRaw === null ? '' : t(moRaw), area: Number(labelVal(/^พื้นที่รวม/)) || 0, totalKg: total > 0 ? total : sum, note: t(labelVal(/^อ้างถึง/)), colors });
+        }
+        function planningWsRowManualKg(r) { return (r.orderKg === '' || r.orderKg === undefined || r.orderKg === null || !isFinite(Number(r.orderKg))) ? null : Number(r.orderKg); }
+        // ส่วนต่าง: ยอดสั่งย้อมจริง (คีย์เอง หรือจาก SIAM ตามรหัสสี) เทียบ ยอดสั่งย้อมสุทธิของระบบ (รวมเผื่อ/ปัดแล้ว) — เทียบรายสี (รหัสเดียวกันหลายแถวรวมกัน)
+        function planningWsSiamDiff(order, c) {
+            const ws = planningWsGet(order);
+            c = c || planningWsComputeColors(order);
+            const snap = ws.siamSnap;
+            const key = (code, fallback) => normalizeDyeColorCodeKey(code) || fallback;
+            const siamMap = new Map();
+            (snap ? snap.colors : []).forEach(sc => { const k = key(sc.colorCode, '#s' + sc.colorCode); const e = siamMap.get(k) || { code: sc.colorCode, kg: 0, yarn: sc.yarnType }; e.kg += sc.kg; siamMap.set(k, e); });
+            const groups = new Map(), orderKeys = [];
+            c.rows.forEach(x => {
+                const code = String(x.row.code || '').trim();
+                if (!code && !(x.netKg > 0) && planningWsRowManualKg(x.row) === null) return;
+                const k = key(code, '#r' + x.row.id);
+                if (!groups.has(k)) { groups.set(k, { key: k, code: code || '(ไม่มีรหัส)', sysKg: 0, manual: null, rows: [], siamKg: null }); orderKeys.push(k); }
+                const g = groups.get(k); g.sysKg += x.netKg; g.rows.push(x.row.id);
+                const m = planningWsRowManualKg(x.row); if (m !== null) g.manual = (g.manual || 0) + m;
+            });
+            const byRow = {};
+            const list = orderKeys.map(k => {
+                const g = groups.get(k);
+                if (siamMap.has(k)) g.siamKg = siamMap.get(k).kg;
+                g.actual = g.manual !== null ? g.manual : g.siamKg;
+                g.src = g.manual !== null ? 'manual' : (g.siamKg !== null ? 'siam' : '');
+                if (g.actual === null) g.status = 'none';
+                else { g.diff = g.actual - g.sysKg; g.diffPct = g.sysKg > 0 ? g.diff / g.sysKg * 100 : null; g.status = Math.abs(g.diff) <= 0.05 ? 'match' : 'diff'; }
+                g.rows.forEach((id, i) => {
+                    const row = c.rows.find(x => x.row.id === id);
+                    const m = planningWsRowManualKg(row.row);
+                    if (m !== null) byRow[id] = { actual: m, src: 'manual', diff: m - row.netKg };
+                    else if (g.siamKg !== null && i === 0) byRow[id] = { actual: g.siamKg, src: 'siam', diff: g.rows.length === 1 ? g.siamKg - row.netKg : null, grouped: g.rows.length > 1 };
+                });
+                return g;
+            });
+            siamMap.forEach((e, k) => { if (!groups.has(k)) list.push({ key: k, code: e.code, sysKg: null, actual: e.kg, src: 'siam', status: 'siamOnly', diff: null, diffPct: null, rows: [] }); });
+            const have = list.some(g => g.actual !== null && g.actual !== undefined);
+            const actualTotal = list.reduce((a, g) => a + (g.actual || 0), 0);
+            return { list, byRow, snap, have, actualTotal, sysTotal: c.netKg, diffTotal: actualTotal - c.netKg, diffPctTotal: c.netKg > 0 ? (actualTotal - c.netKg) / c.netKg * 100 : null };
+        }
+        function planningWsSiamPanelHtml(order, orderIndex, c) {
+            const sd = planningWsSiamDiff(order, c);
+            const ws = planningWsGet(order), snap = sd.snap;
+            const f2 = n => planningWsFmt(n, 2);
+            const sgn = n => (n > 0 ? '+' : '') + planningWsFmt(n, 2);
+            const lbl = { match: ['ตรงกัน', 'bg-emerald-100 text-emerald-700'], diff: ['ต่างกัน', 'bg-amber-100 text-amber-800'], siamOnly: ['มีเฉพาะ SIAM', 'bg-rose-100 text-rose-700'], none: ['ยังไม่มียอดจริง', 'bg-slate-100 text-slate-500'] };
+            const moKey = v => { const m = String(v || '').match(/(\d+)\s*[\/\-]\s*(\d{2})\b/); return m ? parseInt(m[1], 10) + '/' + m[2] : ''; };
+            const moMismatch = !!(snap && moKey(snap.moSo) && moKey(order.moSo) && moKey(snap.moSo) !== moKey(order.moSo));
+            const src = snap ? `ไฟล์ ${escapeHtml(snap.fileName || '-')}${snap.moSo ? ` · M/O ${escapeHtml(snap.moSo)}` : ''} · ${snap.colors.length} สี รวม ${f2(snap.totalKg)} กก.` : 'ยังไม่ได้ดึงจาก Excel — กด "ดึงสั่งย้อมจาก Excel (SIAM)" หรือคีย์ "สั่งย้อมจริง" ในตารางเอง';
+            const rowsHtml = sd.list.map(g => {
+                const st = lbl[g.status];
+                const d = g.diff === null || g.diff === undefined ? '-' : `<span class="${Math.abs(g.diff) <= 0.05 ? 'text-emerald-700' : (g.diff > 0 ? 'text-amber-700' : 'text-rose-600')} font-semibold">${sgn(g.diff)}</span>`;
+                return `<tr class="border-t border-slate-100" data-pw-siam-row="${escapeHtml(g.code)}" data-status="${g.status}">
+                    <td class="py-1.5 pr-2 font-mono">${escapeHtml(g.code)}</td>
+                    <td class="py-1.5 pr-2 text-right">${g.sysKg === null ? '-' : f2(g.sysKg)}</td>
+                    <td class="py-1.5 pr-2 text-right">${g.actual === null || g.actual === undefined ? '-' : f2(g.actual)}${g.src === 'manual' ? ' <span class="text-[9px] text-slate-400">(คีย์เอง)</span>' : ''}</td>
+                    <td class="py-1.5 pr-2 text-right" data-pw-siam-diff>${d}</td>
+                    <td class="py-1.5 pr-2 text-right text-slate-500">${g.diffPct === null || g.diffPct === undefined ? '-' : (g.diffPct > 0 ? '+' : '') + planningWsFmt(g.diffPct, 1) + '%'}</td>
+                    <td class="py-1.5"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${st[1]}">${st[0]}</span></td></tr>`;
+            }).join('');
+            return `
+                <div class="border border-slate-200 rounded-md p-3 space-y-2" data-pw-siam-panel>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div><h4 class="font-bold text-xs text-slate-900">ส่วนต่าง: สั่งย้อมจริง (Excel Sheet SIAM) เทียบ ยอดสั่งย้อมที่ระบบคำนวณ</h4>
+                            <p class="text-[10px] text-slate-500" data-pw-siam-src>${src}</p></div>
+                        <div class="flex items-center gap-2">
+                            <label class="px-2.5 py-1 text-[11px] font-semibold border border-violet-600 text-violet-700 rounded bg-white hover:bg-violet-50 cursor-pointer"><i class="fa-solid fa-file-excel mr-1"></i>ดึงสั่งย้อมจาก Excel (SIAM)<input type="file" accept=".xlsx,.xlsm,.xls" class="hidden" data-pw-siam-file onchange="planningWsSiamLoadFile(${orderIndex}, this)"></label>
+                            ${snap ? `<button type="button" data-pw-siam-clear onclick="planningWsSiamClear(${orderIndex})" class="px-2 py-1 text-[11px] border border-slate-300 text-slate-600 rounded bg-white hover:bg-slate-50">ล้าง</button>` : ''}
+                        </div>
+                    </div>
+                    ${moMismatch ? '<p class="text-[11px] text-amber-700" data-pw-siam-warn><i class="fa-solid fa-triangle-exclamation"></i> เลขที่ M/O ในไฟล์ไม่ตรงกับใบนี้ — ตรวจสอบว่าเลือกไฟล์ถูกงาน</p>' : ''}
+                    ${sd.have ? `
+                    <div class="flex flex-wrap gap-2">
+                        <div class="border border-slate-200 rounded px-3 py-1.5"><p class="text-[10px] text-slate-500">ยอดคำนวณระบบ</p><p class="text-sm font-bold text-slate-900" data-pw-siam-sys>${f2(sd.sysTotal)} กก.</p></div>
+                        <div class="border border-violet-200 bg-violet-50/40 rounded px-3 py-1.5"><p class="text-[10px] text-slate-500">สั่งย้อมจริง</p><p class="text-sm font-bold text-violet-800" data-pw-siam-actual>${f2(sd.actualTotal)} กก.</p></div>
+                        <div class="border-t-4 ${Math.abs(sd.diffTotal) <= 0.05 ? 'border-emerald-500' : (sd.diffTotal > 0 ? 'border-amber-500' : 'border-rose-500')} border-x border-b border-slate-200 rounded px-3 py-1.5"><p class="text-[10px] text-slate-500">ส่วนต่างรวม (จริง − ระบบ)</p><p class="text-sm font-bold ${Math.abs(sd.diffTotal) <= 0.05 ? 'text-emerald-700' : (sd.diffTotal > 0 ? 'text-amber-700' : 'text-rose-600')}" data-pw-siam-total>${sgn(sd.diffTotal)} กก.${sd.diffPctTotal === null ? '' : ` (${sd.diffPctTotal > 0 ? '+' : ''}${planningWsFmt(sd.diffPctTotal, 1)}%)`}</p></div>
+                    </div>
+                    <div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-[10px] text-slate-500 text-left border-b border-slate-200"><th class="py-1">รหัสสี</th><th class="text-right">ระบบ (กก.)</th><th class="text-right">สั่งย้อมจริง (กก.)</th><th class="text-right">ส่วนต่าง (กก.)</th><th class="text-right">%</th><th>สถานะ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>` : ''}
+                </div>`;
+        }
+        // ดึง Sheet SIAM จากไฟล์ Excel (ไม่ต้องมี Sheet Dye Order A) — เก็บเป็น ws.siamSnap
+        async function planningWsSiamLoadFile(orderIndex, input) {
+            const f = input.files && input.files[0]; input.value = '';
+            const order = productionOrders[orderIndex]; if (!f || !order) return;
+            let snap = null, err = '';
+            try {
+                const buf = await f.arrayBuffer();
+                const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
+                snap = planningParseSiamSheet(wb, f.name);
+                if (!snap) err = (wb.SheetNames || []).some(n => /^siam$/i.test(String(n).trim())) ? 'Sheet "SIAM" ไม่มีรายการสี/น้ำหนัก' : 'ไม่พบ Sheet "SIAM" ในไฟล์นี้';
+            } catch (e) { err = 'อ่านไฟล์ไม่สำเร็จ: ' + e.message; }
+            if (!snap) { showToast(err, 'fa-triangle-exclamation', 'text-rose-400'); return; }
+            planningWsMutate(orderIndex, ws => { ws.siamSnap = snap; });
+            planningWsCodeLibAdd(snap.colors.map(c => c.colorCode));
+            showToast(`ดึงสั่งย้อมจาก SIAM แล้ว ${snap.colors.length} สี รวม ${planningWsFmt(snap.totalKg, 2)} กก.`, 'fa-file-excel', 'text-emerald-400');
+        }
+        function planningWsSiamClear(orderIndex) { planningWsMutate(orderIndex, ws => { ws.siamSnap = null; }); }
+
         function planningWsLevenshtein(a, b) {
             const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
             let prev = Array.from({ length: n + 1 }, (_, j) => j);
@@ -16188,7 +16329,7 @@
             if (!item.ok) { showToast('อ่านไฟล์ไม่สำเร็จ: ' + (item.error || 'ไม่พบ Sheet Dye Order A'), 'fa-triangle-exclamation', 'text-rose-400'); return; }
             const same = !item.moSo || String(item.moSo).trim() === String(order.moSo).trim();
             if (same) planningWsCodeLibAdd(item.colors.map(c => c.colorCode));
-            planningWsMutate(orderIndex, ws => { ws.excelSnap = planningWsBuildExcelSnap(item); });
+            planningWsMutate(orderIndex, ws => { ws.excelSnap = planningWsBuildExcelSnap(item); if (item.siam) ws.siamSnap = item.siam; });
             showToast(same ? `เก็บข้อมูลจาก ${f.name} เพื่อเทียบแล้ว (ไม่ได้เปลี่ยนแผนสั่งย้อม)` : `ไฟล์นี้เป็นของ M/O ${item.moSo} แต่กำลังเทียบกับ ${order.moSo} — ตรวจสอบว่าเลือกไฟล์ถูกใบ`, 'fa-scale-balanced', same ? 'text-indigo-400' : 'text-amber-400');
         }
         function planningWsCmpExport(orderIndex) {
@@ -16504,6 +16645,7 @@
             const c = planningWsComputeColors(order);
             const blankPct = Number(ws.blankPct) || 0;
             const pctOk = Math.abs(c.pctSum + blankPct - 100) < 0.05;
+            const sd = planningWsSiamDiff(order, c);
             const rowsHtml = c.rows.map((x, i) => {
                 const r = x.row;
                 return `
@@ -16546,6 +16688,13 @@
                             </select>
                         </td>
                         <td class="py-2 pr-2 text-right whitespace-nowrap font-bold text-teal-800" data-pw-row-net>${x.netKg > 0 ? planningWsFmt(x.netKg, x.dec === 'none' ? 3 : x.dec) : '-'}</td>
+                        <td class="py-2 pr-2 whitespace-nowrap">${(() => {
+                            const a = sd.byRow[r.id];
+                            return `<input type="number" min="0" step="0.01" data-pw-order-kg value="${r.orderKg === '' || r.orderKg === undefined ? '' : r.orderKg}" placeholder="${a && a.src === 'siam' ? planningWsFmt(a.actual, 2) : '-'}" title="ยอดสั่งย้อมจริง — ว่าง = ใช้ยอดจาก Excel Sheet SIAM ตามรหัสสี" onchange="planningWsRowField(${orderIndex}, '${r.id}', 'orderKg', this.value)" class="w-20 p-1.5 border ${a && a.src === 'manual' ? 'border-violet-400 bg-violet-50/40' : 'border-slate-300'} rounded bg-white text-xs">${a && a.src === 'siam' ? '<span class="text-[9px] text-violet-600 ml-1" data-pw-siam-tag>SIAM</span>' : ''}`; })()}</td>
+                        <td class="py-2 pr-2 text-right whitespace-nowrap" data-pw-row-diff>${(() => {
+                            const a = sd.byRow[r.id];
+                            if (!a || a.diff === null || a.diff === undefined) return a && a.grouped ? '<span class="text-[10px] text-slate-400">ดูรวมในรายการส่วนต่าง</span>' : '-';
+                            return `<span class="${Math.abs(a.diff) <= 0.05 ? 'text-emerald-700' : (a.diff > 0 ? 'text-amber-700' : 'text-rose-600')} font-semibold">${a.diff > 0 ? '+' : ''}${planningWsFmt(a.diff, 2)}</span>`; })()}</td>
                         <td class="py-2 text-right"><button type="button" onclick="planningWsRemoveRow(${orderIndex}, '${r.id}')" class="text-slate-500 hover:text-rose-600 border border-slate-300 rounded px-2 py-0.5" title="ลบแถวนี้">✕</button></td>
                     </tr>`;
             }).join('');
@@ -16573,7 +16722,7 @@
                         <table class="w-full text-xs" data-pw-color-table>
                             <thead><tr class="text-[10px] text-slate-500 text-left">
                                 <th class="pb-1">#</th><th class="pb-1">รหัสสี</th><th class="pb-1">เทคนิคทอ</th><th class="pb-1">ตัดส่วน</th><th class="pb-1">คุณภาพ</th>
-                                <th class="pb-1 text-right">น้ำหนัก (กก./ตร.ม.)</th><th class="pb-1 text-right">พื้นที่ (ตร.ม.)</th><th class="pb-1 text-right">น้ำหนักไหม (กก.)</th><th class="pb-1">เผื่อ (%)</th><th class="pb-1">ปัดทศนิยม</th><th class="pb-1 text-right">สั่งย้อม (กก.)</th><th></th>
+                                <th class="pb-1 text-right">น้ำหนัก (กก./ตร.ม.)</th><th class="pb-1 text-right">พื้นที่ (ตร.ม.)</th><th class="pb-1 text-right">น้ำหนักไหม (กก.)</th><th class="pb-1">เผื่อ (%)</th><th class="pb-1">ปัดทศนิยม</th><th class="pb-1 text-right">สั่งย้อม (กก.)</th><th class="pb-1">สั่งย้อมจริง (SIAM)</th><th class="pb-1 text-right">ส่วนต่าง (กก.)</th><th></th>
                             </tr></thead>
                             <tbody>${rowsHtml}</tbody>
                         </table>
@@ -16598,6 +16747,7 @@
                         <thead><tr class="text-[10px] text-slate-500 text-left border-b border-slate-200"><th class="py-1.5">หมวดเทคนิค</th><th class="text-center">จำนวนสี</th><th class="text-right">น้ำหนักฐาน (กก.)</th><th class="text-right">สั่งย้อมสุทธิ (รวมเผื่อ/ปัดแล้ว) (กก.)</th></tr></thead>
                         <tbody>${groupHtml || '<tr><td colspan="4" class="py-3 text-center text-slate-400">-</td></tr>'}</tbody>
                     </table>
+                    ${planningWsSiamPanelHtml(order, orderIndex, c)}
                     <div class="flex flex-wrap items-center gap-2 pt-1">
                         <button type="button" onclick="planningWsApplyDyePlan(${orderIndex})" ${c.netKg > 0 ? '' : 'disabled'} class="px-3 py-1.5 text-xs font-semibold rounded ${c.netKg > 0 ? 'bg-teal-700 text-white hover:bg-teal-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}">นำยอดสั่งย้อมไปใส่ "แผนสั่งย้อม"</button>
                         <p class="text-[11px] text-slate-500">${existingPlan.length > 0 ? `แผนสั่งย้อมตอนนี้มี ${existingPlan.length} สี รวม ${planningWsFmt(existingPlan.reduce((s, r) => s + (Number(r.kg) || 0), 0), 2)} กก. — กดแล้วอัปเดตตามรหัสสี (ไม่ลบรายการ Surplus เดิม)` : 'แผนสั่งย้อมยังว่าง — กดแล้วระบบสร้างให้ตามรหัสสี และแผนกย้อมจะเห็นทันที'}</p>
@@ -16771,7 +16921,7 @@
             const tech = technique || PLANNING_WS_TECHNIQUES[0].key;
             let quality = guess;
             if (quality && planningWsFindQuality(quality).type !== planningWsTechniqueType(tech) && planningWsFindQuality(quality).type !== 'manual') quality = '';
-            return { id: 'pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), code: '', yarn: '', stipple: false, technique: tech, areaMode: 'pct', value: 0, quality, lot: '', allowancePct: '', roundDec: '', ocr: '', family: '', ph: '' };
+            return { id: 'pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), code: '', yarn: '', stipple: false, technique: tech, areaMode: 'pct', value: 0, quality, lot: '', allowancePct: '', roundDec: '', ocr: '', family: '', ph: '', orderKg: '' };
         }
         // จำนวนสีเปลี่ยน -> เกรดทอใช้ "จำนวนสีสูงสุด" ด้วย จึงยกให้ไม่ต่ำกว่าจำนวนสี (ไม่เคยลดค่าที่กรอก/นำเข้าไว้)
         function planningWsSyncColorCount(order, ws) {
@@ -16816,6 +16966,7 @@
                 if (field === 'value') row.value = Math.max(0, Number(value) || 0);
                 else if (field === 'allowancePct') row.allowancePct = planningWsNormAllowance(value);
                 else if (field === 'roundDec') row.roundDec = planningWsNormDec(value, true);
+                else if (field === 'orderKg') row.orderKg = (value === '' || value === null || !isFinite(Number(value))) ? '' : Math.max(0, Number(value));
                 else if (field === 'stipple') row.stipple = !!value;
                 else if (field === 'code') { row.code = String(value || '').trim(); row.ocr = ''; }
                 else if (field === 'ph') { const v = Number(value); row.ph = (value === '' || value === null || !(v > 0)) ? '' : v; }
@@ -26377,6 +26528,7 @@
             const dyeSheetName = sheetOf(/^dye\s*order\s*a$/i) || sheetOf(/^ใบปะหน้า$/) || sheetOf(/^dyed$/i) || sheetOf(/^ส่งย้อม$/);
             if (!dyeSheetName) { item.error = 'ไม่พบ Sheet "Dye Order A" (ไฟล์ S/O: "ใบปะหน้า" หรือ "DyeD") ในไฟล์นี้'; return item; }
             item.dyeSheetName = dyeSheetName;
+            try { item.siam = planningParseSiamSheet(workbook, fileName); } catch (e) { item.siam = null; }   // 2026-11-20: ใบสั่งย้อมจริง Sheet "SIAM" (ถ้ามี) เก็บไว้เทียบกับยอดคำนวณ
             const gradeSheetName = workbook.SheetNames.find(n => /^grade/i.test(String(n).trim()));
 
             const aoa = XLSX.utils.sheet_to_json(workbook.Sheets[dyeSheetName], { header: 1, raw: true, defval: null });
@@ -26650,7 +26802,7 @@
                 if (gradeBuilt) raw.productionCalc = gradeBuilt.calc;
                 else if (item.totalSqm > 0) raw.productionCalc = { totalArea: item.totalSqm };
                 const order = normalizeOrder(raw);
-                planningWsGet(order).excelSnap = planningWsBuildExcelSnap(item);   // 2026-11-17: เก็บสำเนา Excel ไว้เทียบกับใบคำนวณ
+                planningWsGet(order).excelSnap = planningWsBuildExcelSnap(item); if (item.siam) planningWsGet(order).siamSnap = item.siam;   // 2026-11-17: เก็บสำเนา Excel ไว้เทียบกับใบคำนวณ
                 planningWsCodeLibAdd(item.colors.map(c => c.colorCode));
                 productionOrders.push(order);
                 return { action: 'created', order, orderIndex: productionOrders.length - 1 };
@@ -26688,7 +26840,7 @@
             // NEW (2026-10-19): บันทึกสั่งย้อมเดิมของ M/O นี้ (ส่งจากแผนไปแล้ว) → เติมชนิดไหม/วันที่กำหนดเสร็จตามแผน/ประเภทไหม ตาม Code สี (เติมเฉพาะช่องที่ว่าง)
             const backfilled = backfillDyeLogFromPlanRows(order);
             planningWsCodeLibAdd(item.colors.map(c => c.colorCode));   // 2026-11-17: เรียนรู้รหัสสีเข้าคลัง
-            planningWsGet(order).excelSnap = planningWsBuildExcelSnap(item);   // 2026-11-17: เก็บสำเนา Excel ไว้เทียบกับใบคำนวณ
+            planningWsGet(order).excelSnap = planningWsBuildExcelSnap(item); if (item.siam) planningWsGet(order).siamSnap = item.siam;   // 2026-11-17: เก็บสำเนา Excel ไว้เทียบกับใบคำนวณ
             persistOrderChange(order);
             return { action: 'updated', order, orderIndex, backfilled };
         }
