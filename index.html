@@ -753,23 +753,6 @@
                 </button>
             </div>
 
-            <!-- NEW (2026-09-16): "ปฏิทินรายเดือน" — a whole-month calendar-grid view of the production
-                 schedule, showing each day which department every active M/O, S/O is scheduled to be in
-                 (built from computeOrderTimelineSegments(), the same per-order stage date ranges the
-                 "ไทม์ไลน์การผลิต" tab already draws bars from — see renderProductionCalendar()). This
-                 toggle swaps the WHOLE department-tabs/Kanban section below (wrapped as
-                 #boardKanbanSection) for the calendar container (#productionCalendarContainer) and back
-                 — see setBoardViewMode()/updateBoardViewModeVisibility(). Kept as a mode WITHIN
-                 "แผนผังการผลิต" per the user's request, not a separate top-level tab. -->
-            <div class="flex items-center gap-2 mb-4">
-                <button onclick="setBoardViewMode('kanban')" id="boardViewModeBtn-kanban" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition">
-                    <i class="fa-solid fa-table-columns"></i> มุมมองบอร์ด
-                </button>
-                <button onclick="setBoardViewMode('calendar')" id="boardViewModeBtn-calendar" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
-                    <i class="fa-solid fa-calendar-days"></i> ปฏิทินรายเดือน
-                </button>
-            </div>
-
             <div id="boardKanbanSection">
             <!-- REMOVED (2026-09-16): the "กรองรายงาน QC ตามแผนก" pills that briefly lived here (moved
                  from the QC records tab) were pulled back out — per the user's feedback they duplicated
@@ -2067,63 +2050,17 @@
                 </div>
             </div>
             </div>
-            <!-- NEW (2026-09-16): calendar container — see the toggle/comment above. Hidden by default;
-                 populated entirely by renderProductionCalendar(). -->
-            <div id="productionCalendarContainer" class="hidden space-y-4">
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 flex flex-wrap items-center gap-2">
-                    <button onclick="shiftProductionCalendarMonth(-1)" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition" title="เดือนก่อนหน้า">
-                        <i class="fa-solid fa-chevron-left text-xs"></i>
-                    </button>
-                    <input type="month" id="productionCalendarMonthInput" onchange="onProductionCalendarMonthInputChange()" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <button onclick="shiftProductionCalendarMonth(1)" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition" title="เดือนถัดไป">
-                        <i class="fa-solid fa-chevron-right text-xs"></i>
-                    </button>
-                    <button onclick="goToCurrentProductionCalendarMonth()" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium px-3 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition">เดือนนี้</button>
-                    <div class="relative flex-grow min-w-[160px] max-w-xs">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 text-xs"><i class="fa-solid fa-search"></i></span>
-                        <input type="text" id="productionCalendarSearchInput" oninput="renderProductionCalendar()" placeholder="ค้นหา M/O, S/O, ลูกค้า..." class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                </div>
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-slate-500">
-                    <span class="font-semibold text-slate-600">คำอธิบายสี (แผนก):</span>
-                    <span id="productionCalendarLegend" class="flex flex-wrap items-center gap-x-4 gap-y-1.5"></span>
-                </div>
-
-                <!-- CHANGED (2026-09-16): "ให้แยก M/O กับ S/O" — same convention as every other view in
-                     this app (ภาพรวมการผลิต's overviewMoBoxContainer/overviewSoBoxContainer,
-                     ไทม์ไลน์การผลิต's timelineMoSectionContainer/timelineSoSectionContainer): TWO fully
-                     separate calendars, sharing the month/search toolbar above, one per order type —
-                     rather than mixing both types into one grid. Each is hidden entirely (not just
-                     emptied) when the global M/O, S/O switch narrows to the other type. -->
-                <div id="productionCalendarMoSection" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div class="px-4 py-2 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
-                        <h4 class="text-xs font-bold text-indigo-700"><i class="fa-solid fa-tag mr-1"></i> M/O</h4>
-                        <span id="productionCalendarMoCountBadge" class="text-[11px] text-slate-400"></span>
-                    </div>
-                    <div class="grid grid-cols-7 bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase text-center">
-                        <div class="py-2">จันทร์</div><div class="py-2">อังคาร</div><div class="py-2">พุธ</div><div class="py-2">พฤหัสบดี</div><div class="py-2">ศุกร์</div><div class="py-2 text-rose-400">เสาร์</div><div class="py-2 text-rose-400">อาทิตย์</div>
-                    </div>
-                    <div id="productionCalendarGrid-MO" class="grid grid-cols-7"></div>
-                </div>
-                <div id="productionCalendarSoSection" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div class="px-4 py-2 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
-                        <h4 class="text-xs font-bold text-amber-700"><i class="fa-solid fa-tag mr-1"></i> S/O</h4>
-                        <span id="productionCalendarSoCountBadge" class="text-[11px] text-slate-400"></span>
-                    </div>
-                    <div class="grid grid-cols-7 bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase text-center">
-                        <div class="py-2">จันทร์</div><div class="py-2">อังคาร</div><div class="py-2">พุธ</div><div class="py-2">พฤหัสบดี</div><div class="py-2">ศุกร์</div><div class="py-2 text-rose-400">เสาร์</div><div class="py-2 text-rose-400">อาทิตย์</div>
-                    </div>
-                    <div id="productionCalendarGrid-SO" class="grid grid-cols-7"></div>
-                </div>
-                <p class="text-[11px] text-slate-400 px-1">แถบสีในแต่ละวันหมายถึงช่วงที่ M/O, S/O นั้นถูกวางแผนให้อยู่แผนกนั้น (จากวันที่ตั้งเป้าหมายของแต่ละแผนก) คลิกที่รายการเพื่อเปิดดู/แก้ไขรายละเอียด</p>
-            </div>
         </div>
 
+        <!-- REMOVED (2026-11-20): "ปฏิทินรายเดือน" (the month-grid view inside "แผนผังการผลิต", with its
+             มุมมองบอร์ด/ปฏิทินรายเดือน toggle) was removed per the user's request — the board view is
+             now the only view. renderProductionCalendar()/setBoardViewMode() and friends are gone.
+        -->
         <!-- REMOVED (2026-10-01): the "ไทม์ไลน์การผลิต" Gantt tab was removed from the nav menu per
              the user's request ("เอาไทม์ไลน์การผลิตออก"). The underlying helper functions
              (computeOrderTimelineSegments/computeTimelineRange/renderTimelineSection/
              renderProductionTimeline) are KEPT, unchanged — computeOrderTimelineSegments() is still used
-             by the production calendar (renderProductionCalendar()/buildProductionCalendarDayMap()), and
+             by other views, and
              the render functions are already null-safe (`if (!grid) return 0;` / `if (containerEl) ...`)
              so leaving their many existing call sites in place is harmless now that this container and
              tabTimelineBtn no longer exist — they simply become no-ops. -->
@@ -4232,7 +4169,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-129';
+        const APP_BUILD = 'QCDashboard-131';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -12745,7 +12682,39 @@
 
         // Refreshes every place an order can be shown after an edit: the Kanban board, the overview
         // table, and — if it's currently open — the cross-department detail modal for this order.
+        // NEW (2026-11-20): แก้ "พิมพ์แล้วเด้งหลุดช่อง" ในใบวางแผน — เดิมกดค่าในช่อง (onchange) แล้ววาดทั้งหน้าใหม่ทันที ขณะที่ปุ่ม Tab/เมาส์ยังย้ายโฟกัสไม่เสร็จ
+        //   → โฟกัสหายไป ต้องคลิกใหม่ทุกช่อง (และถ้าคลิกปุ่มต่อ ปุ่มถูกวาดใหม่ก่อนปล่อยเมาส์ คลิกหาย). ตอนนี้: ถ้าช่องที่โฟกัสอยู่เป็นช่องกรอกในใบวางแผน → รอให้โฟกัส/เมาส์เสร็จก่อนค่อยวาดใหม่
+        //   (บันทึก/ซิงค์ทำทันทีเหมือนเดิม) แล้ว renderPlanningWorksheetPage() คืนโฟกัส + ตำแหน่งเลื่อนของตารางให้เอง
+        let pwPointerDown = false;
+        const pwPendingRerender = new Set();
+        let pwRerenderTimer = null;
+        let pwPointerDownAt = 0;
+        document.addEventListener('pointerdown', () => { pwPointerDown = true; pwPointerDownAt = Date.now(); }, true);
+        document.addEventListener('pointerup', () => { pwPointerDown = false; pwRerenderSchedule(); }, true);
+        document.addEventListener('pointercancel', () => { pwPointerDown = false; pwRerenderSchedule(); }, true);
+        function pwActiveFieldInWorksheet() {
+            const col = document.getElementById('boardColumn-planning');
+            if (!col) return false;
+            const isField = el => !!(el && el.nodeType === 1 && col.contains(el) && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName));
+            // ตอน onchange ทำงาน (กด Tab/คลิกที่อื่น) Chrome ตั้ง activeElement = body ไปแล้ว → ดูจากช่องที่ส่ง event แทน
+            const ev = window.event;
+            if (ev && /^(change|input|blur|focusout)$/.test(ev.type) && isField(ev.target)) return true;
+            return isField(document.activeElement);
+        }
+        function pwRerenderSchedule() {
+            if (pwPendingRerender.size === 0 || pwRerenderTimer) return;
+            pwRerenderTimer = setTimeout(() => {
+                pwRerenderTimer = null;
+                if (pwPointerDown && Date.now() - pwPointerDownAt < 3000) { setTimeout(pwRerenderSchedule, 250); return; }   // ยังกดเมาส์ค้างอยู่ → รอ pointerup (คลิกปุ่มต้องไม่ถูกวาดทับ)
+                const list = Array.from(pwPendingRerender); pwPendingRerender.clear();
+                list.forEach(i => rerenderOrderViewsNow(i));
+            }, 0);
+        }
         function rerenderOrderViews(orderIndex) {
+            if (pwActiveFieldInWorksheet() || pwPendingRerender.size > 0) { pwPendingRerender.add(orderIndex); pwRerenderSchedule(); return; }
+            rerenderOrderViewsNow(orderIndex);
+        }
+        function rerenderOrderViewsNow(orderIndex) {
             renderProductionBoard();
             renderProductionTimeline();
             renderProductionOverview();
@@ -14049,6 +14018,8 @@
         }
 
         function renderProductionBoard() {
+            // 2026-11-20: ต้องจำโฟกัส/ตำแหน่งเลื่อนของใบวางแผน "ก่อน" ที่ลูปด้านล่างล้างคอลัมน์ (column.innerHTML = '') ไม่งั้นโฟกัสและตำแหน่งเลื่อนหายตั้งแต่ตรงนั้น
+            pwUiKeep = pwCaptureUiState(document.getElementById('boardColumn-planning'));
             updateBoardMonthOptions();
             const searchInputEl = document.getElementById('boardSearchInput');
             const searchTerm = (searchInputEl ? searchInputEl.value : '').trim().toLowerCase();
@@ -14141,10 +14112,6 @@
             // above, this function gets called on every productionOrders mutation already.
             if (typeof salesActiveSubTab !== 'undefined' && salesActiveSubTab === 'report') renderSalesReportTables();
             updateBoardDepartmentTabCounts();
-            // NEW (2026-09-16): keep "ปฏิทินรายเดือน" fresh too whenever it's the active view mode —
-            // same reasoning as the design/notify columns and sales report above, this function already
-            // runs on every productionOrders mutation (add/edit/transfer/delete/sync).
-            if (typeof boardViewMode !== 'undefined' && boardViewMode === 'calendar') renderProductionCalendar();
         }
 
         // NEW (2026-09-11): "แจ้งเตือน (รอส่ง)" Kanban column — same non-currentStage pattern as
@@ -14714,186 +14681,6 @@
 
             renderTimelineSection('MO', 'timelineMoGrid', 'emptyTimelineMoState', 'timelineMoCountBadge');
             renderTimelineSection('SO', 'timelineSoGrid', 'emptyTimelineSoState', 'timelineSoCountBadge');
-        }
-
-        // =========================================================================================
-        // "ปฏิทินรายเดือน" (Production Calendar) — a mode WITHIN "แผนผังการผลิต" (see
-        // #productionCalendarContainer / the view-mode toggle above it in the HTML). Re-slices the
-        // SAME per-order stage schedule the "ไทม์ไลน์การผลิต" Gantt view already draws bars from
-        // (computeOrderTimelineSegments()) into a whole-month calendar grid — "which department is
-        // this M/O, S/O scheduled to be in on day X" instead of one long horizontal bar. Split into
-        // separate M/O and S/O calendars, same convention as every other split view in this app.
-        // =========================================================================================
-
-        let boardViewMode = 'kanban'; // 'kanban' | 'calendar' — see setBoardViewMode()
-        let productionCalendarMonthKey = null; // 'YYYY-MM'; lazily set to the current month on first render
-
-        function setBoardViewMode(mode) {
-            boardViewMode = (mode === 'calendar') ? 'calendar' : 'kanban';
-            updateBoardViewModeVisibility();
-            if (boardViewMode === 'calendar') renderProductionCalendar();
-        }
-
-        function updateBoardViewModeVisibility() {
-            const activeClasses = ['bg-indigo-600', 'text-white', 'shadow-sm'];
-            const inactiveClasses = ['bg-slate-100', 'text-slate-600', 'hover:bg-slate-200'];
-            const kanbanBtn = document.getElementById('boardViewModeBtn-kanban');
-            const calendarBtn = document.getElementById('boardViewModeBtn-calendar');
-            [kanbanBtn, calendarBtn].forEach(btn => { if (btn) btn.classList.remove(...activeClasses, ...inactiveClasses); });
-            if (kanbanBtn) kanbanBtn.classList.add(...(boardViewMode === 'kanban' ? activeClasses : inactiveClasses));
-            if (calendarBtn) calendarBtn.classList.add(...(boardViewMode === 'calendar' ? activeClasses : inactiveClasses));
-
-            const kanbanSection = document.getElementById('boardKanbanSection');
-            const calendarSection = document.getElementById('productionCalendarContainer');
-            if (kanbanSection) kanbanSection.classList.toggle('hidden', boardViewMode !== 'kanban');
-            if (calendarSection) calendarSection.classList.toggle('hidden', boardViewMode !== 'calendar');
-        }
-
-        function shiftProductionCalendarMonth(delta) {
-            if (!productionCalendarMonthKey) productionCalendarMonthKey = getCurrentMonthKey();
-            const [y, m] = productionCalendarMonthKey.split('-').map(Number);
-            const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-            productionCalendarMonthKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-            renderProductionCalendar();
-        }
-
-        function goToCurrentProductionCalendarMonth() {
-            productionCalendarMonthKey = getCurrentMonthKey();
-            renderProductionCalendar();
-        }
-
-        function onProductionCalendarMonthInputChange() {
-            const el = document.getElementById('productionCalendarMonthInput');
-            if (el && el.value) productionCalendarMonthKey = el.value;
-            renderProductionCalendar();
-        }
-
-        // CHANGED (2026-09-30): "ปฏิทินรายเดือน ให้เหลือแค่กำหนดส่งพรม ตามแผนกไม่ต้อง" — ผู้ใช้ขอให้ปฏิทิน
-        // แสดงเฉพาะวันกำหนดส่งพรม (order.dueDate) เท่านั้น ไม่ต้องแสดงว่าวันนั้น M/O อยู่แผนกไหน (ของเดิม
-        // ใช้ buildProductionCalendarDayMap() อิง computeOrderTimelineSegments() วาด chip สีตามแผนก) — จึง
-        // ลบฟังก์ชันนั้นและ PRODUCTION_CALENDAR_STAGE_ORDER ออก เหลือแค่ buildProductionCalendarDueDateMap()
-        // ด้านล่างเป็นแหล่งข้อมูลเดียวของปฏิทินนี้.
-        //
-        // Builds { 'YYYY-MM-DD': [{order, orderIndex}] } straight from order.dueDate (via
-        // normalizeDateString/parseDateOnly — skips a due date that survives normalizeDateString's
-        // fallback as truthy-but-unparseable text instead of crashing; see
-        // claude/timeline-daysbetweenutc-null-crash-fix.md).
-        function buildProductionCalendarDueDateMap(ordersWithIndex, rangeStart, rangeEnd) {
-            const map = {};
-            ordersWithIndex.forEach(({ order, orderIndex }) => {
-                const dueDateNorm = normalizeDateString(order.dueDate);
-                if (!dueDateNorm) return;
-                const dueDate = parseDateOnly(dueDateNorm);
-                if (!dueDate || dueDate < rangeStart || dueDate > rangeEnd) return;
-                const key = formatDateKeyUTC(dueDate);
-                if (!map[key]) map[key] = [];
-                map[key].push({ order, orderIndex });
-            });
-            return map;
-        }
-
-        // Renders ONE order-type's month grid into gridId — same per-type split as
-        // renderTimelineSection('MO'/'SO', ...), sharing the already-computed [gridStart, gridEnd]
-        // 6-week window and search term so both calendars always show the exact same days.
-        function renderProductionCalendarSection(orderType, gridId, countBadgeId, gridStart, gridEnd, monthIndex, searchTerm) {
-            const grid = document.getElementById(gridId);
-            if (!grid) return 0;
-
-            let ordersWithIndex = [];
-            productionOrders.forEach((order, orderIndex) => {
-                if (getEffectiveStage(order) === 'shipped') return;
-                if ((order.orderType || detectOrderTypeFromMoSo(order.moSo)) !== orderType) return;
-                if (!matchesMarketFilter(order)) return;
-                if (searchTerm) {
-                    const haystack = [order.moSo, order.customerName, order.customerPO].map(v => String(v || '').toLowerCase()).join(' ');
-                    if (!haystack.includes(searchTerm)) return;
-                }
-                ordersWithIndex.push({ order, orderIndex });
-            });
-
-            const dueDateMap = buildProductionCalendarDueDateMap(ordersWithIndex, gridStart, gridEnd);
-            const todayKey = formatDateKeyUTC(new Date());
-            const totalCells = daysBetweenUTC(gridStart, gridEnd) + 1;
-
-            let cellsHtml = '';
-            for (let i = 0; i < totalCells; i++) {
-                const d = addDaysUTC(gridStart, i);
-                const dateKey = formatDateKeyUTC(d);
-                const inMonth = d.getUTCMonth() === monthIndex;
-                const isToday = dateKey === todayKey;
-
-                // CHANGED (2026-09-30): "ให้เหลือแค่กำหนดส่งพรม ตามแผนกไม่ต้อง" — เนื้อหาหลักของแต่ละช่องวันที่
-                // ตอนนี้คือรายชื่อ M/O, S/O ที่ครบกำหนดส่งวันนั้น (ไม่มี chip สีตามแผนกอีกต่อไป).
-                const dueEntries = (dueDateMap[dateKey] || []).sort((a, b) => String(a.order.moSo).localeCompare(String(b.order.moSo)));
-                const hasDue = dueEntries.length > 0;
-
-                const MAX_VISIBLE = 4;
-                const visibleEntries = dueEntries.slice(0, MAX_VISIBLE);
-                const hiddenCount = dueEntries.length - visibleEntries.length;
-
-                const chipsHtml = visibleEntries.map(({ order, orderIndex: idx }) => {
-                    const tooltip = `กำหนดส่งพรม: ${order.moSo}${order.customerName ? ' — ' + order.customerName : ''}`;
-                    return `<button onclick="openOrderDetailModal(${idx})" title="${escapeHtml(tooltip)}" class="w-full text-left bg-rose-500 text-white text-[9px] leading-tight rounded px-1 py-0.5 truncate hover:opacity-80 transition">${escapeHtml(order.moSo)}</button>`;
-                }).join('');
-                const moreHtml = hiddenCount > 0 ? `<div class="text-[9px] text-slate-400 px-1">+${hiddenCount} เพิ่มเติม</div>` : '';
-                const dueBadgeHtml = hasDue
-                    ? `<span class="inline-flex items-center gap-0.5 text-[9px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1 leading-tight"><i class="fa-solid fa-flag text-[8px]"></i>${dueEntries.length}</span>`
-                    : '';
-
-                cellsHtml += `
-                    <div class="min-h-[92px] border-b border-r border-slate-100 p-1 space-y-0.5 ${inMonth ? 'bg-white' : 'bg-slate-50/60'} ${hasDue ? 'ring-1 ring-inset ring-rose-300' : ''}">
-                        <div class="px-0.5 flex items-center gap-1">
-                            <span class="text-[10px] inline-flex items-center justify-center ${isToday ? 'w-4 h-4 rounded-full bg-indigo-600 text-white font-bold' : (inMonth ? 'text-slate-500 font-semibold' : 'text-slate-300')}">${d.getUTCDate()}</span>
-                            ${dueBadgeHtml}
-                        </div>
-                        ${chipsHtml}
-                        ${moreHtml}
-                    </div>
-                `;
-            }
-            grid.innerHTML = cellsHtml;
-
-            const countBadgeEl = countBadgeId ? document.getElementById(countBadgeId) : null;
-            if (countBadgeEl) countBadgeEl.textContent = `${ordersWithIndex.length} ${orderType === 'SO' ? 'S/O' : 'M/O'} ในสายการผลิต`;
-            return ordersWithIndex.length;
-        }
-
-        function renderProductionCalendar() {
-            const monthInput = document.getElementById('productionCalendarMonthInput');
-            const legendEl = document.getElementById('productionCalendarLegend');
-            const moSection = document.getElementById('productionCalendarMoSection');
-            const soSection = document.getElementById('productionCalendarSoSection');
-            if (!document.getElementById('productionCalendarGrid-MO')) return;
-
-            if (!productionCalendarMonthKey) productionCalendarMonthKey = getCurrentMonthKey();
-            if (monthInput) monthInput.value = productionCalendarMonthKey;
-
-            if (moSection) moSection.classList.toggle('hidden', orderTypeFilter === 'SO');
-            if (soSection) soSection.classList.toggle('hidden', orderTypeFilter === 'MO');
-
-            const [year, month] = productionCalendarMonthKey.split('-').map(Number);
-            const firstOfMonth = new Date(Date.UTC(year, month - 1, 1));
-            const firstDow = firstOfMonth.getUTCDay(); // 0=Sun..6=Sat
-            // Calendar weeks start Monday — same "จันทร์-อาทิตย์" convention as the weekly QC summary.
-            const leadingDays = (firstDow === 0) ? 6 : firstDow - 1;
-            const gridStart = addDaysUTC(firstOfMonth, -leadingDays);
-            const gridEnd = addDaysUTC(gridStart, 41); // fixed 6 weeks so the grid height never jumps month to month
-
-            const searchInputEl = document.getElementById('productionCalendarSearchInput');
-            const searchTerm = (searchInputEl ? searchInputEl.value : '').trim().toLowerCase();
-
-            renderProductionCalendarSection('MO', 'productionCalendarGrid-MO', 'productionCalendarMoCountBadge', gridStart, gridEnd, month - 1, searchTerm);
-            renderProductionCalendarSection('SO', 'productionCalendarGrid-SO', 'productionCalendarSoCountBadge', gridStart, gridEnd, month - 1, searchTerm);
-
-            // CHANGED (2026-09-30): legend เดิมไล่สีตามแผนก (PRODUCTION_CALENDAR_STAGE_ORDER) — ลบออก
-            // ตามที่ผู้ใช้ขอ "ตามแผนกไม่ต้อง" เหลือแค่คำอธิบายเดียวว่าสีแดง = วันกำหนดส่งพรม
-            if (legendEl) {
-                legendEl.innerHTML = `
-                    <span class="flex items-center gap-1.5 text-rose-600 font-semibold">
-                        <i class="fa-solid fa-flag text-[10px]"></i>วันกำหนดส่งพรม — คลิกที่รายการเพื่อดู/แก้ไข M/O, S/O
-                    </span>
-                `;
-            }
         }
 
         // Compact Kanban card for the CURRENT stage of an order: just a live summary (done-count, QC
@@ -16415,7 +16202,9 @@
         function renderPlanningWorksheetPage(ordersHere, searchTerm) {
             const column = document.getElementById('boardColumn-planning');
             if (!column) return;
-            const scrollY = window.scrollY;
+            const keep = pwUiKeep || pwCaptureUiState(column);
+            pwUiKeep = null;
+            const scrollY = keep.scrollY;
             const current = planningWsUi.currentMo ? productionOrders.find(o => o.moSo === planningWsUi.currentMo) : null;
             if (current && getEffectiveStage(current) === 'planning') {
                 column.innerHTML = buildPlanningWorksheetDetailHtml(current, productionOrders.indexOf(current));
@@ -16423,7 +16212,40 @@
                 planningWsUi.currentMo = '';
                 column.innerHTML = buildPlanningWorksheetGridHtml(ordersHere || [], searchTerm || '');
             }
+            pwRestoreUiState(column, keep);
             window.scrollTo(0, scrollY);
+        }
+        // จำ "ช่องที่โฟกัสอยู่ + ตำแหน่งเลื่อนซ้าย-ขวา/บน-ล่างของตาราง" ก่อนวาดใหม่ แล้วคืนให้หลังวาด (ช่องกรอก/เลือกเท่านั้น ไม่ดึงโฟกัสไปที่ปุ่ม)
+        function pwFocusables(root) { return Array.from(root.querySelectorAll('input,select,textarea,button,summary')); }
+        let pwUiKeep = null;
+        function pwCaptureUiState(column) {
+            const st = { scrolls: [], focus: null, scrollY: window.scrollY };
+            if (!column) return st;
+            Array.from(column.querySelectorAll('*')).forEach((el, i) => { if ((el.scrollLeft || el.scrollTop) && el.scrollWidth + el.scrollHeight > 0) st.scrolls.push({ i, l: el.scrollLeft, t: el.scrollTop }); });
+            const ae = document.activeElement;
+            if (ae && column.contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) {
+                const rowEl = ae.closest('[data-pw-row]');
+                const scope = rowEl || column;
+                st.focus = { rowId: rowEl ? rowEl.getAttribute('data-pw-row') : '', idx: pwFocusables(scope).indexOf(ae), id: ae.id || '',
+                    ss: (typeof ae.selectionStart === 'number' && ae.type !== 'number') ? ae.selectionStart : null, se: (typeof ae.selectionEnd === 'number' && ae.type !== 'number') ? ae.selectionEnd : null };
+            }
+            return st;
+        }
+        function pwRestoreUiState(column, st) {
+            if (!st) return;
+            const all = Array.from(column.querySelectorAll('*'));
+            st.scrolls.forEach(s => { const el = all[s.i]; if (el && el.scrollWidth > el.clientWidth) { el.scrollLeft = s.l; } if (el && el.scrollHeight > el.clientHeight) { el.scrollTop = s.t; } });
+            const f = st.focus;
+            if (!f) return;
+            let target = null;
+            if (f.id) target = document.getElementById(f.id);
+            if (!target) {
+                const scope = f.rowId ? Array.from(column.querySelectorAll('[data-pw-row]')).find(e => e.getAttribute('data-pw-row') === f.rowId) : column;
+                if (scope) target = pwFocusables(scope)[f.idx] || null;
+            }
+            if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) {
+                try { target.focus({ preventScroll: true }); if (f.ss !== null && typeof target.setSelectionRange === 'function' && target.type !== 'number') target.setSelectionRange(f.ss, f.se); } catch (e) { /* ignore */ }
+            }
         }
 
         function planningWsHeaderHtml() {
@@ -16653,6 +16475,7 @@
                 ${phBox}
                 <p class="text-[10px] ${x.quality ? 'text-slate-400' : 'text-rose-500'} mt-0.5">${escapeHtml(r.quality ? planningWsQualitySpecText(x.quality) : 'ยังไม่ได้เลือกคุณภาพ')}</p>`;
         }
+        const PW_NEW_QUALITY = '__new_quality__';
         function planningWsQualityOptionsHtml(row) {
             const type = planningWsTechniqueType(row.technique);
             const fam = planningWsRowFamily(row);
@@ -16662,11 +16485,12 @@
             const all = hasCurrent ? list : list.concat(planningWsFindQuality(row.quality) ? [planningWsFindQuality(row.quality)] : [{ name: row.quality, type: 'cut' }]);
             const opt = q => `<option value="${escapeHtml(q.name)}" ${q.name === row.quality ? 'selected' : ''}>${escapeHtml(q.name)}${q.name === row.quality ? ' ✓' : ''}</option>`;
             const head = `<option value="">-- เลือกคุณภาพ --</option>`;
-            if (fam) return head + all.map(opt).join('');
+            const addNew = `<option value="${PW_NEW_QUALITY}">➕ เพิ่มคุณภาพใหม่…</option>`;   // 2026-11-20: สเปคที่ไม่มีในตาราง → เพิ่มเองได้จากช่องนี้เลย
+            if (fam) return head + all.map(opt).join('') + addNew;
             // ยังไม่เลือกสเปคไหม: แสดงรวมทุกสเปค จัดกลุ่มตามสเปคไหม
             const groups = planningWsFamilies().map(f => { const items = all.filter(q => planningWsQFamily(q) === f); return items.length ? `<optgroup label="${escapeHtml(planningWsFamilyLabel(f))}">${items.map(opt).join('')}</optgroup>` : ''; }).join('');
             const rest = all.filter(q => !planningWsQFamily(q)).map(opt).join('');
-            return head + groups + rest;
+            return head + groups + rest + addNew;
         }
 
         function planningWsSection2Html(order, orderIndex) {
@@ -16750,6 +16574,11 @@
                     </div>`}
                     <div class="flex flex-wrap gap-2 items-stretch">
                         <div class="border-t-4 ${pctOk ? 'border-emerald-500' : 'border-rose-500'} border-x border-b border-slate-200 rounded-md px-3 py-2 min-w-[120px]"><p class="text-[10px] text-slate-500">รวม % ที่กรอก</p><p id="pwPctSum" class="text-lg font-bold ${pctOk ? 'text-emerald-600' : 'text-rose-600'}">${planningWsFmt(c.pctSum, 2)}%</p>${blankPct > 0 ? `<p class="text-[10px] text-slate-500" data-pw-blank>+ พื้นที่ว่าง (X) ${planningWsFmt(blankPct, 2)}% ไม่คำนวณ</p>` : ''}</div>
+                        <div class="min-w-[170px]" data-pw-blank-card>
+                            <label class="block text-[10px] text-slate-500">% พื้นที่ว่าง (พรมวงรี/ไม่เต็มสี่เหลี่ยม)</label>
+                            <div class="flex items-center gap-1"><input id="pwBlankPct" type="number" min="0" max="100" step="0.01" value="${blankPct > 0 ? blankPct : ''}" placeholder="0" onchange="planningWsSetBlank(${orderIndex}, this.value)" class="w-20 p-2 text-sm font-semibold border ${blankPct > 0 ? 'border-teal-400 bg-teal-50/40' : 'border-slate-300'} rounded bg-white"><span class="text-[10px] text-slate-500">%</span>
+                                <button type="button" data-pw-blank-fill onclick="planningWsFillBlank(${orderIndex})" ${Math.abs(100 - c.pctSum - blankPct) < 0.005 ? 'disabled' : ''} title="ใส่ 100 − รวม % ที่กรอก เป็นพื้นที่ว่าง" class="px-2 py-1.5 text-[10px] font-semibold rounded border ${Math.abs(100 - c.pctSum - blankPct) < 0.005 ? 'border-slate-200 text-slate-300 cursor-not-allowed' : 'border-teal-600 text-teal-700 hover:bg-teal-50'} bg-white whitespace-nowrap">เติมส่วนที่เหลือ</button></div>
+                            <p class="text-[9px] text-slate-400 mt-0.5" data-pw-blank-hint>${blankPct > 0 && c.total > 0 ? `ว่าง ≈ ${planningWsFmt(c.total * blankPct / 100, 2)} ตร.ม. ไม่คิดน้ำหนักไหม · ` : ''}รวมสี + ว่าง = ${planningWsFmt(c.pctSum + blankPct, 2)}%</p></div>
                         <div class="min-w-[110px]"><label class="block text-[10px] text-slate-500">บวกเผื่อ (%)</label>
                             <input id="pwAllowance" type="number" min="0" step="0.5" value="${ws.allowancePct}" onchange="planningWsSetAllowance(${orderIndex}, this.value)" class="w-full p-2 text-sm font-semibold border border-slate-300 rounded bg-white"><p class="text-[9px] text-slate-400 mt-0.5">ค่าตั้งต้นทุกสี (แก้รายสีได้ในตาราง)</p></div>
                         <div class="min-w-[150px]"><label class="block text-[10px] text-slate-500">ปัดทศนิยมยอดสั่งย้อม</label>
@@ -16974,6 +16803,7 @@
             });
         }
         function planningWsRowField(orderIndex, rowId, field, value) {
+            if (field === 'quality' && value === PW_NEW_QUALITY) { openPlanningWsQuickQuality(orderIndex, rowId); return; }
             planningWsMutate(orderIndex, (ws, order) => {
                 const row = ws.colorRows.find(r => r.id === rowId);
                 if (!row) return;
@@ -17007,6 +16837,16 @@
             planningWsMutate(orderIndex, (ws) => {
                 if (field === 'roundMode') ws.roundMode = raw === 'up' ? 'up' : 'round';
                 else ws.roundDec = planningWsNormDec(raw, false);
+            });
+        }
+        // NEW (2026-11-20): % พื้นที่ว่าง (พรมวงรี/รูปทรงที่ไม่เต็มสี่เหลี่ยม) กรอกเองได้ — ไม่คิดน้ำหนักไหม แต่นับรวมในการเช็ก "รวม % = 100"
+        function planningWsSetBlank(orderIndex, raw) {
+            planningWsMutate(orderIndex, (ws) => { ws.blankPct = planningWsRound(Math.min(100, Math.max(0, Number(raw) || 0)), 2); });
+        }
+        function planningWsFillBlank(orderIndex) {
+            planningWsMutate(orderIndex, (ws, order) => {
+                const c = planningWsComputeColors(order);
+                ws.blankPct = planningWsRound(Math.min(100, Math.max(0, 100 - c.pctSum)), 2);
             });
         }
         function planningWsSetAllowance(orderIndex, raw) {
@@ -17600,6 +17440,100 @@
             planningWsCatalog = planningWsDefaultCatalog().map(planningWsSanitizeQuality);
             planningWsSaveCatalog();
             renderPlanningWsQualityModal();
+        }
+
+        // =====================================================================================
+        // NEW (2026-11-20): เพิ่มคุณภาพใหม่จากช่อง "คุณภาพ" ในใบวางแผนได้เลย (กรณีสเปคที่ไม่มีใน Tufting Spec.) — เติมค่าตั้งต้นจากคุณภาพ/สเปคไหมของแถวนั้น
+        //   บันทึกลงตารางสเปค (ใช้ซ้ำได้ทุกงานในเครื่องนี้) แล้วเลือกให้แถวนั้นทันที · แก้/ลบภายหลังได้ที่ "จัดการสเปคคุณภาพ"
+        // =====================================================================================
+        let pwQuick = null;
+        function openPlanningWsQuickQuality(orderIndex, rowId) {
+            const order = productionOrders[orderIndex];
+            const ws = order ? planningWsGet(order) : null;
+            const row = ws ? ws.colorRows.find(r => r.id === rowId) : null;
+            if (!row) return;
+            const type = planningWsTechniqueType(row.technique);
+            const cur = planningWsFindQuality(row.quality);
+            const fam = planningWsRowFamily(row);
+            const base = (cur && cur.type === type && cur.type !== 'manual') ? cur
+                : (planningWsCatalog.find(q => q.type === type && (!fam || planningWsQFamily(q) === fam)) || planningWsCatalog.find(q => q.type === type) || {});
+            pwQuick = { orderIndex, rowId, rowType: type, q: {
+                name: '', type: type, family: fam || '', s: base.s || 28, r: base.r || 12, fph: base.fph || 9, tph: base.tph || 11, ph: base.ph || 9, tex: base.tex || 380, ends: base.ends || 4, gsm: 0
+            } };
+            // เลือกค้างในช่องเลือกไว้ที่ "เพิ่มใหม่" → คืนค่าเดิมก่อน (ยังไม่ได้บันทึก)
+            const sel = document.querySelector(`[data-pw-row="${rowId}"] [data-pw-quality]`);
+            if (sel) sel.value = row.quality || '';
+            const el = planningWsEnsureModal();
+            el.classList.remove('hidden');
+            renderPlanningWsQuickQuality();
+        }
+        function planningWsQuickPreview() {
+            const q = pwQuick ? planningWsSanitizeQuality(pwQuick.q) : null;
+            const g = q ? planningWsQualityGsm(q) : 0;
+            const out = document.getElementById('pwQuickGsm');
+            if (out) out.textContent = g > 0 ? planningWsFmt(g, 1) : '-';
+            return g;
+        }
+        function planningWsQuickField(field, value) {
+            if (!pwQuick) return;
+            const q = pwQuick.q;
+            if (field === 'name' || field === 'family') q[field] = String(value || '');
+            else if (field === 'type') { q.type = value; renderPlanningWsQuickQuality(); return; }
+            else q[field] = Number(value) || 0;
+            if (field === 'fph' && !(pwQuick.tphTouched)) { q.tph = (Number(value) || 0) + 2; const t = document.getElementById('pwQuick_tph'); if (t) t.value = q.tph; }   // Cut: TPH = FPH + 2 (ตามสเปคเดิม) ปรับเองได้
+            if (field === 'tph') pwQuick.tphTouched = true;
+            planningWsQuickPreview();
+        }
+        function renderPlanningWsQuickQuality() {
+            if (!pwQuick) return;
+            const el = planningWsEnsureModal();
+            const q = pwQuick.q, isCut = q.type === 'cut', isManual = q.type === 'manual';
+            const typeOpts = [pwQuick.rowType, 'manual'].map(t => `<option value="${t}" ${q.type === t ? 'selected' : ''}>${PLANNING_WS_QUALITY_TYPE_LABELS[t]}</option>`).join('');
+            const num = (f, label, v, extra) => `<div><label class="block text-[10px] text-slate-500">${label}</label><input id="pwQuick_${f}" type="number" step="any" min="0" value="${v || ''}" onchange="planningWsQuickField('${f}', this.value)" oninput="planningWsQuickField('${f}', this.value)" class="w-full p-1.5 border border-slate-300 rounded text-sm bg-white" ${extra || ''}></div>`;
+            el.innerHTML = `
+                <div class="bg-white rounded-xl shadow-xl w-full max-w-xl my-6" data-pw-quick>
+                    <div class="flex items-center justify-between px-5 py-3 border-b border-slate-200">
+                        <div><h3 class="font-bold text-slate-900">➕ เพิ่มคุณภาพใหม่</h3><p class="text-[11px] text-slate-500">สำหรับสเปคที่ไม่มีในตาราง — บันทึกแล้วเลือกให้แถวนี้ทันที และใช้ซ้ำกับงานอื่นได้</p></div>
+                        <button type="button" onclick="closePlanningWsQuickQuality()" class="text-slate-500 hover:text-slate-800 text-xl px-2">✕</button>
+                    </div>
+                    <div class="px-5 py-3 space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div><label class="block text-[10px] text-slate-500">ชื่อคุณภาพ *</label><input id="pwQuick_name" type="text" value="${escapeHtml(q.name)}" placeholder="เช่น HWO 48C" onchange="planningWsQuickField('name', this.value)" class="w-full p-1.5 border border-slate-300 rounded text-sm bg-white"></div>
+                            <div><label class="block text-[10px] text-slate-500">สเปคไหม (เลือกที่มี หรือพิมพ์ชื่อใหม่)</label><input id="pwQuick_family" type="text" list="pwFamList" value="${escapeHtml(q.family)}" placeholder="เช่น WO 380/1" onchange="planningWsQuickField('family', this.value)" class="w-full p-1.5 border border-slate-300 rounded text-sm bg-white"><datalist id="pwFamList">${PW_FAMILY_ORDER.concat(planningWsFamilies().filter(f => !PW_FAMILY_ORDER.includes(f))).map(f => `<option value="${escapeHtml(f)}"></option>`).join('')}</datalist></div>
+                        </div>
+                        <div><label class="block text-[10px] text-slate-500">ประเภท</label><select onchange="planningWsQuickField('type', this.value)" class="p-1.5 border border-slate-300 rounded text-sm bg-white">${typeOpts}</select></div>
+                        ${isManual ? `<div class="grid grid-cols-2 gap-2">${num('gsm', 'น้ำหนัก (กรัม/ตร.ม.) *', q.gsm)}</div>` : `
+                        <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                            ${num('s', 'S (ก้าว/10 ซม.)', q.s)}${num('r', 'R (แถว/5 ซม.)', q.r)}
+                            ${isCut ? num('fph', 'FPH (มม.)', q.fph) + num('tph', 'TPH (มม.)', q.tph) : num('ph', 'PH (มม.)', q.ph)}
+                            ${num('tex', 'Tex', q.tex)}${num('ends', 'จำนวนเส้น', q.ends)}
+                        </div>`}
+                        <p class="text-sm text-slate-700">น้ำหนัก = <b id="pwQuickGsm" class="text-teal-800">-</b> กรัม/ตร.ม.</p>
+                    </div>
+                    <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-200">
+                        <button type="button" onclick="closePlanningWsQuickQuality()" class="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded bg-white hover:bg-slate-50">ยกเลิก</button>
+                        <button type="button" data-pw-quick-save onclick="savePlanningWsQuickQuality()" class="px-4 py-1.5 text-xs font-semibold bg-teal-700 text-white rounded hover:bg-teal-800">บันทึกและเลือกใช้</button>
+                    </div>
+                </div>`;
+            planningWsQuickPreview();
+        }
+        function closePlanningWsQuickQuality() {
+            pwQuick = null;
+            const el = document.getElementById('planningWsModal');
+            if (el) el.classList.add('hidden');
+        }
+        function savePlanningWsQuickQuality() {
+            if (!pwQuick) return;
+            const q = planningWsSanitizeQuality(pwQuick.q);
+            if (!q.name) { showToast('ใส่ชื่อคุณภาพก่อน', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            if (planningWsCatalog.some(o => o.name.toLowerCase() === q.name.toLowerCase())) { showToast(`มีคุณภาพชื่อ "${q.name}" อยู่แล้ว — เลือกจากรายการ หรือตั้งชื่ออื่น`, 'fa-circle-exclamation', 'text-amber-400'); return; }
+            if (!(planningWsQualityGsm(q) > 0)) { showToast(q.type === 'manual' ? 'ใส่น้ำหนัก (กรัม/ตร.ม.) ก่อน' : 'กรอก S, R, ความสูง, Tex และจำนวนเส้นให้ครบ จึงคำนวณน้ำหนักได้', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            planningWsCatalog.push(q);
+            planningWsSaveCatalog();
+            const { orderIndex, rowId } = pwQuick;
+            closePlanningWsQuickQuality();
+            planningWsRowField(orderIndex, rowId, 'quality', q.name);
+            showToast(`เพิ่มคุณภาพ "${q.name}" แล้ว`, 'fa-circle-check', 'text-emerald-400');
         }
 
         function openPlanningWsGradeModal() {
