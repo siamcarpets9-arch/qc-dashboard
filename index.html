@@ -4232,7 +4232,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-128';
+        const APP_BUILD = 'QCDashboard-129';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -9819,6 +9819,11 @@
                 design.entering = true;
             }
             design.done = !!(design.doneBy && normalizedDesignReceivedDate);
+            // NEW (2026-11-20): ขนาดชิ้นงานที่แผนกดีไซน์/ขยายลายคีย์เองสำหรับคำนวณผ้าใบ — ดู canvasSourceInfo()
+            design.canvasItems = (Array.isArray(design.canvasItems) ? design.canvasItems : []).filter(it => it && typeof it === 'object').map(it => ({
+                width: Number(it.width) > 0 ? Number(it.width) : 0, length: Number(it.length) > 0 ? Number(it.length) : 0,
+                qty: Number(it.qty) > 0 ? Number(it.qty) : 1, canvasDir: (it.canvasDir === 'w' || it.canvasDir === 'l') ? it.canvasDir : ''
+            }));
 
             // NEW (2026-09-10): Carpet Production Planning calc engine (เอกสารอ้างอิง TH098/26-แก้แบบ) —
             // the "Global Design Inputs" that drive the auto-grade/hours/production-days suggestions for
@@ -12367,8 +12372,19 @@
             });
         }
 
+        // NEW (2026-11-20): แผนกดีไซน์/ขยายลายคีย์ขนาดชิ้นงานเองได้ (order.design.canvasItems: กว้าง × ยาว × จำนวน) — ถ้ามีแถวที่กรอก กว้าง+ยาว ครบ
+        // ใช้ชุดนี้คำนวณผ้าใบแทนรายการขนาดของ M/O (ไหลไปที่กาวมาตรฐาน/ต้นทุนผ้าใบเหมือนเดิม); ไม่มี → ใช้ sizeItems ของ M/O
+        function canvasSourceInfo(order) {
+            const valid = (it) => it && typeof it === 'object' && (Number(it.width) || 0) > 0 && (Number(it.length) || 0) > 0;
+            const dItems = (order && order.design && Array.isArray(order.design.canvasItems)) ? order.design.canvasItems : [];
+            if (dItems.some(valid)) return { source: 'design', items: dItems };
+            const mo = Array.isArray(order && order.sizeItems) ? order.sizeItems : [];
+            return { source: mo.some(valid) ? 'mo' : 'none', items: mo };
+        }
+
         function computeCanvasForOrder(order) {
-            const items = Array.isArray(order && order.sizeItems) ? order.sizeItems : [];
+            const src = canvasSourceInfo(order);
+            const items = src.items;
             const pieces = [];
             items.forEach((it, idx) => { const c = computeCanvasForPiece(it); if (c) { c.itemIndex = idx; pieces.push(c); } });
             const byRoll = {};
@@ -12382,7 +12398,7 @@
             });
             const totalSqm = Math.round(total * 100) / 100;
             return {
-                pieces, byRoll: Object.values(byRoll).sort((x, y) => (x.roll || 99) - (y.roll || 99)), totalSqm,
+                source: src.source, pieces, byRoll: Object.values(byRoll).sort((x, y) => (x.roll || 99) - (y.roll || 99)), totalSqm,
                 glueKg: computeGlueStandardKg(totalSqm), hasAny: pieces.length > 0, allFit: pieces.every(c => c.fits)
             };
         }
@@ -12395,22 +12411,79 @@
             rerenderOrderViews(orderIndex);
         }
 
-        function renderCanvasCardHtml(order, orderIndex) {
+        function setDesignCanvasDir(orderIndex, itemIndex, value) {
+            const order = productionOrders[orderIndex];
+            if (!order || !order.design || !Array.isArray(order.design.canvasItems) || !order.design.canvasItems[itemIndex]) return;
+            order.design.canvasItems[itemIndex].canvasDir = (value === 'w' || value === 'l') ? value : '';
+            persistOrderChange(order);
+            rerenderOrderViews(orderIndex);
+        }
+        function addDesignCanvasItem(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            if (!order.design || typeof order.design !== 'object') order.design = { done: false, doneBy: '', note: '', entering: false };
+            if (!Array.isArray(order.design.canvasItems)) order.design.canvasItems = [];
+            order.design.canvasItems.push({ width: 0, length: 0, qty: 1, canvasDir: '' });
+            persistOrderChange(order);
+            rerenderOrderViews(orderIndex);
+        }
+        function updateDesignCanvasItem(orderIndex, itemIndex, field, value) {
+            const order = productionOrders[orderIndex];
+            if (!order || !order.design || !Array.isArray(order.design.canvasItems) || !order.design.canvasItems[itemIndex]) return;
+            if (!['width', 'length', 'qty'].includes(field)) return;
+            const v = Number(value);
+            order.design.canvasItems[itemIndex][field] = (isFinite(v) && v > 0) ? v : (field === 'qty' ? 1 : 0);
+            persistOrderChange(order);
+            rerenderOrderViews(orderIndex);
+        }
+        function removeDesignCanvasItem(orderIndex, itemIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order || !order.design || !Array.isArray(order.design.canvasItems)) return;
+            order.design.canvasItems.splice(itemIndex, 1);
+            persistOrderChange(order);
+            rerenderOrderViews(orderIndex);
+        }
+        // คัดลอกรายการขนาดจาก M/O มาเป็นชุดที่แผนกดีไซน์แก้เองได้ (ไม่แก้ข้อมูลของ M/O)
+        function pullDesignCanvasFromMo(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            const mo = (Array.isArray(order.sizeItems) ? order.sizeItems : []).filter(it => it && (Number(it.width) || 0) > 0 && (Number(it.length) || 0) > 0);
+            if (mo.length === 0) { showToast('M/O นี้ยังไม่มีรายการขนาด (กว้าง × ยาว) ให้ดึง', 'fa-triangle-exclamation', 'text-amber-400'); return; }
+            const had = order.design && Array.isArray(order.design.canvasItems) && order.design.canvasItems.length > 0;
+            if (had && !confirm('แทนที่ขนาดที่คีย์ไว้เดิมด้วยรายการขนาดจาก M/O ?')) return;
+            if (!order.design || typeof order.design !== 'object') order.design = { done: false, doneBy: '', note: '', entering: false };
+            order.design.canvasItems = mo.map(it => ({ width: Number(it.width) || 0, length: Number(it.length) || 0, qty: Number(it.qty) > 0 ? Number(it.qty) : 1, canvasDir: it.canvasDir === 'w' || it.canvasDir === 'l' ? it.canvasDir : '' }));
+            persistOrderChange(order);
+            rerenderOrderViews(orderIndex);
+            showToast(`ดึงขนาดจาก M/O ${mo.length} รายการแล้ว — แก้ไขได้ในแท็บนี้`, 'fa-circle-check', 'text-emerald-400');
+        }
+        function clearDesignCanvasItems(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order || !order.design || !Array.isArray(order.design.canvasItems) || order.design.canvasItems.length === 0) return;
+            if (!confirm('ล้างขนาดที่แผนกดีไซน์คีย์ไว้ทั้งหมด แล้วกลับไปใช้รายการขนาดจาก M/O ?')) return;
+            order.design.canvasItems = [];
+            persistOrderChange(order);
+            rerenderOrderViews(orderIndex);
+        }
+
+        function renderCanvasCardHtml(order, orderIndex, opts) {
+            opts = opts || {};
             const c = computeCanvasForOrder(order);
+            const dirFn = c.source === 'design' ? 'setDesignCanvasDir' : 'setSizeItemCanvasDir';
             const f2 = (v) => (Number(v) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const header = `<div class="flex items-center justify-between flex-wrap gap-1">
                     <span class="text-xs font-bold text-teal-700"><i class="fa-solid fa-scroll mr-1"></i> คำนวณผ้าใบ + กาวทาหลังพรม</span>
-                    <span class="text-[10px] text-slate-400">หน้าผ้า ${CANVAS_ROLL_WIDTHS_M.join(' / ')} ม. · เผื่อด้านละ ${Math.round(CANVAS_MARGIN_PER_SIDE_M * 100)} ซม. · อัตโนมัติจากรายการขนาด</span>
+                    <span class="text-[10px] text-slate-400">หน้าผ้า ${CANVAS_ROLL_WIDTHS_M.join(' / ')} ม. · เผื่อด้านละ ${Math.round(CANVAS_MARGIN_PER_SIDE_M * 100)} ซม. · ${c.source === 'design' ? 'จากขนาดที่แผนกดีไซน์คีย์เอง' : 'อัตโนมัติจากรายการขนาด'}</span>
                 </div>`;
             if (!c.hasAny) {
-                return `<div id="canvasCalcCard" class="bg-teal-50/50 border border-teal-100 rounded-xl p-3.5 space-y-1.5">${header}<p class="text-[11px] text-slate-400">ใส่ กว้าง × ยาว (ม.) ในรายการขนาดด้านบน ระบบจะคำนวณผ้าใบให้อัตโนมัติ</p></div>`;
+                return `<div id="canvasCalcCard" class="bg-teal-50/50 border border-teal-100 rounded-xl p-3.5 space-y-1.5">${header}<p class="text-[11px] text-slate-400">${opts.emptyText || 'ใส่ กว้าง × ยาว (ม.) ในรายการขนาดด้านบน ระบบจะคำนวณผ้าใบให้อัตโนมัติ'}</p></div>`;
             }
             const rows = c.pieces.map((p, i) => {
                 const altTxt = p.alt ? `${p.alt.fits ? `แนวสลับ: หน้า ${p.alt.roll} ม. = ${f2(p.alt.areaEach)} ตร.ม./ชิ้น` : `แนวสลับ: ไม่พอดีหน้าผ้า (ต้องการ ${f2(p.alt.needAcross)} ม.)`}` : '';
                 return `<div class="bg-white border ${p.fits ? 'border-teal-100' : 'border-rose-300'} rounded-lg p-2 space-y-1" data-canvas-row="${p.itemIndex}">
                     <div class="flex items-center gap-2 flex-wrap text-[11px]">
                         <span class="font-semibold text-slate-700">ชิ้นที่ ${p.itemIndex + 1}: ${p.width} × ${p.length} ม. × ${p.qty} ชิ้น</span>
-                        <select data-canvas-dir onchange="setSizeItemCanvasDir(${orderIndex}, ${p.itemIndex}, this.value)" class="ml-auto p-1 bg-white border ${p.manual ? 'border-amber-300 text-amber-700' : 'border-slate-200'} rounded-md text-[11px]" title="ด้านไหนของพรมขวางหน้าผ้า">
+                        <select data-canvas-dir onchange="${dirFn}(${orderIndex}, ${p.itemIndex}, this.value)" class="ml-auto p-1 bg-white border ${p.manual ? 'border-amber-300 text-amber-700' : 'border-slate-200'} rounded-md text-[11px]" title="ด้านไหนของพรมขวางหน้าผ้า">
                             <option value="" ${!p.manual ? 'selected' : ''}>แนววาง: อัตโนมัติ (ใช้ผ้าน้อยสุด)</option>
                             <option value="w" ${p.manual && p.dir === 'w' ? 'selected' : ''}>ด้านกว้างขวางหน้าผ้า</option>
                             <option value="l" ${p.manual && p.dir === 'l' ? 'selected' : ''}>ด้านยาวขวางหน้าผ้า</option>
@@ -21376,6 +21449,17 @@
                 ${design.done ? `<p class="text-[11px] text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>ข้อมูลครบ — ถือว่าเสร็จแล้ว</p>` : `<p class="text-[11px] text-slate-400"><i class="fa-solid fa-circle-info mr-1"></i>กรอก "ผู้ดำเนินการ" และ "วันที่ได้รับแบบจากแผนกดีไซน์" ให้ครบ ระบบจะทำเครื่องหมายเสร็จให้อัตโนมัติ</p>`}
             ` : '';
 
+            // NEW (2026-11-20): แท็บ "คำนวณผ้าใบ" ในใบงานดีไซน์/ขยายลาย — แผนกดีไซน์คีย์ขนาดชิ้นงานเอง (กว้าง × ยาว × จำนวน) แล้วคำนวณผ้าใบ + กาวทาหลังพรม
+            const f2t = (v) => (Number(v) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const tab = designSecTab[order.moSo] === 'canvas' ? 'canvas' : 'info';
+            const cvTab = computeCanvasForOrder(order);
+            const tabBtn = (key, label, extra) => `<button type="button" data-design-tab="${key}" onclick="setDesignSecTab(${orderIndex}, '${key}')" class="px-3 py-1.5 rounded-md text-[11px] font-semibold transition ${tab === key ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-cyan-600'}">${label}${extra || ''}</button>`;
+            const tabsHtml = `<div class="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mb-1" data-design-tabs>
+                ${tabBtn('info', '<i class="fa-solid fa-pen-ruler mr-1"></i>ข้อมูลดีไซน์/ขยายลาย')}
+                ${tabBtn('canvas', '<i class="fa-solid fa-scroll mr-1"></i>คำนวณผ้าใบ', cvTab.hasAny && cvTab.totalSqm > 0 ? ` <span class="ml-1 text-teal-700">${f2t(cvTab.totalSqm)} ตร.ม.</span>` : '')}
+            </div>`;
+            const bodyHtml = tab === 'canvas' ? renderDesignCanvasTabHtml(order, orderIndex) : `${enteringToggleHtml}${detailFieldsHtml}`;
+
             return `
                 <div id="orderDetailSection-design" class="border border-slate-200 rounded-2xl overflow-hidden">
                     <div class="bg-slate-50 p-3 flex flex-wrap justify-between items-center gap-2 border-b border-slate-200">
@@ -21387,10 +21471,65 @@
                     </div>
                     <div class="p-3 space-y-2">
                         ${planDateBadgeHtml}
-                        ${enteringToggleHtml}
-                        ${detailFieldsHtml}
+                        ${tabsHtml}
+                        <div data-design-tab-body="${tab}" class="space-y-2">${bodyHtml}</div>
                     </div>
                 </div>
+            `;
+        }
+
+        const designSecTab = {}; // moSo → 'info' | 'canvas'
+        function setDesignSecTab(orderIndex, tab) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            designSecTab[order.moSo] = tab === 'canvas' ? 'canvas' : 'info';
+            rerenderOrderViews(orderIndex);
+        }
+
+        // แท็บ "คำนวณผ้าใบ": ตารางคีย์ขนาด (กว้าง × ยาว × จำนวนชิ้น) + การ์ดคำนวณผ้าใบ/กาวทาหลังพรม (renderCanvasCardHtml)
+        function renderDesignCanvasTabHtml(order, orderIndex) {
+            const f2 = (v) => (Number(v) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const items = (order.design && Array.isArray(order.design.canvasItems)) ? order.design.canvasItems : [];
+            const moItems = (Array.isArray(order.sizeItems) ? order.sizeItems : []).filter(it => it && (Number(it.width) || 0) > 0 && (Number(it.length) || 0) > 0);
+            const c = computeCanvasForOrder(order);
+            const srcTxt = c.source === 'design'
+                ? '<span class="text-cyan-700 font-semibold" data-canvas-source="design"><i class="fa-solid fa-keyboard mr-1"></i>ใช้ขนาดที่แผนกดีไซน์คีย์เอง</span>'
+                : c.source === 'mo'
+                    ? `<span class="text-slate-600" data-canvas-source="mo"><i class="fa-solid fa-link mr-1"></i>ใช้รายการขนาดจาก M/O (${moItems.length} รายการ) — คีย์ขนาดด้านล่างเพื่อใช้ขนาดของแผนกดีไซน์แทน</span>`
+                    : '<span class="text-amber-700" data-canvas-source="none"><i class="fa-solid fa-circle-info mr-1"></i>ยังไม่มีขนาด — คีย์ กว้าง × ยาว (ม.) ด้านล่าง</span>';
+            const rows = items.map((it, i) => `
+                <div class="flex items-center gap-1.5" data-design-canvas-row="${i}">
+                    <span class="text-[10px] text-slate-400 w-5 text-right shrink-0">${i + 1}</span>
+                    <input type="number" min="0" step="0.01" value="${it.width || ''}" placeholder="กว้าง (ม.)" data-dcf="width" onchange="updateDesignCanvasItem(${orderIndex}, ${i}, 'width', this.value)" class="w-0 flex-1 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                    <span class="text-slate-400 text-xs">×</span>
+                    <input type="number" min="0" step="0.01" value="${it.length || ''}" placeholder="ยาว (ม.)" data-dcf="length" onchange="updateDesignCanvasItem(${orderIndex}, ${i}, 'length', this.value)" class="w-0 flex-1 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                    <span class="text-slate-400 text-xs">×</span>
+                    <input type="number" min="1" step="1" value="${it.qty || ''}" placeholder="จำนวน (ชิ้น)" data-dcf="qty" onchange="updateDesignCanvasItem(${orderIndex}, ${i}, 'qty', this.value)" class="w-0 flex-1 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                    <button type="button" onclick="removeDesignCanvasItem(${orderIndex}, ${i})" class="shrink-0 text-rose-400 hover:text-rose-600 px-1" title="ลบ"><i class="fa-solid fa-trash text-xs"></i></button>
+                </div>`).join('');
+            const keyedSqm = items.reduce((s, it) => s + (Number(it.width) || 0) * (Number(it.length) || 0) * (Number(it.qty) > 0 ? Number(it.qty) : 1), 0);
+            const moSqm = Number(order.totalSqm) || 0;
+            const diffWarn = keyedSqm > 0 && moSqm > 0 && Math.abs(keyedSqm - moSqm) / moSqm > 0.01;
+            const sumLine = keyedSqm > 0
+                ? `<p class="text-[10px] ${diffWarn ? 'text-amber-700' : 'text-slate-400'}" data-design-canvas-area>พื้นที่พรมตามขนาดที่คีย์ ${f2(keyedSqm)} ตร.ม.${moSqm > 0 ? ` · M/O ระบุ ${f2(moSqm)} ตร.ม.${diffWarn ? ' — ไม่ตรงกัน ตรวจสอบขนาดอีกครั้ง' : ''}` : ''}</p>` : '';
+            const hint = items.length === 0 && moItems.length === 0
+                ? `<p class="text-[10px] text-slate-400">M/O นี้ยังไม่มีรายการขนาด${moSqm > 0 ? ` (พื้นที่รวม ${f2(moSqm)} ตร.ม. · ${Number(order.totalPieces) || 0} ชิ้น)` : ''} — แผนกดีไซน์/ขยายลายคีย์ขนาดแต่ละชิ้นเองได้ที่นี่</p>` : '';
+            return `
+                <div class="bg-white border border-slate-200 rounded-xl p-3 space-y-2" data-design-canvas-editor>
+                    <div class="flex flex-wrap items-center justify-between gap-1">
+                        <span class="text-xs font-bold text-cyan-700"><i class="fa-solid fa-ruler-combined mr-1"></i> ขนาดชิ้นงาน (แผนกดีไซน์/ขยายลายคีย์เอง)</span>
+                        <span class="text-[10px]">${srcTxt}</span>
+                    </div>
+                    ${hint}
+                    ${rows}
+                    ${sumLine}
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" data-design-canvas-add onclick="addDesignCanvasItem(${orderIndex})" class="px-3 py-1.5 border-2 border-dashed border-cyan-200 text-cyan-700 hover:bg-cyan-50 rounded-lg text-[11px] font-semibold transition"><i class="fa-solid fa-plus mr-1"></i>เพิ่มขนาด</button>
+                        ${moItems.length > 0 ? `<button type="button" data-design-canvas-pull onclick="pullDesignCanvasFromMo(${orderIndex})" class="px-3 py-1.5 border border-slate-300 text-slate-600 hover:bg-slate-50 rounded-lg text-[11px] font-semibold transition" title="คัดลอกรายการขนาดของ M/O มาเป็นชุดที่แก้เองได้ (ไม่แก้ข้อมูลของ M/O)"><i class="fa-solid fa-download mr-1"></i>ดึงขนาดจาก M/O</button>` : ''}
+                        ${items.length > 0 ? `<button type="button" data-design-canvas-clear onclick="clearDesignCanvasItems(${orderIndex})" class="ml-auto px-3 py-1.5 text-[11px] text-rose-600 hover:text-rose-700 underline">ล้างที่คีย์เอง${moItems.length > 0 ? ' (กลับไปใช้ขนาดจาก M/O)' : ''}</button>` : ''}
+                    </div>
+                </div>
+                ${renderCanvasCardHtml(order, orderIndex, { emptyText: 'คีย์ กว้าง × ยาว (ม.) ด้านบน ระบบจะคำนวณผ้าใบ + กาวทาหลังพรมให้อัตโนมัติ' })}
             `;
         }
         const STAGE_ITEM_RENDERERS = {
