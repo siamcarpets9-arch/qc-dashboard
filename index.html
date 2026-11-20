@@ -4169,7 +4169,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-131';
+        const APP_BUILD = 'QCDashboard-132';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -14989,15 +14989,18 @@
 
         // Section 1.3.A — แผนกทอ (Tufting): grade selected by the FIRST matching rule, evaluated in the
         // order given in the PRD (highest-complexity rule first, falling through to Grade A last).
+        // 2026-11-20: ปรับให้ตรงตาราง "ตารางประสิทธิภาพการทอพรม" (Excel แนบ M/O TH 200/26) — Max No. Color เป็น "ไม่เกินกี่สี" (ไม่ใช่ต้องเท่ากับพอดี):
+        //   A ≤3 · B ≤5 · C ≤7 · C+ ≤9 · D ≤12 · D+ ≤14 · E ≤16 · X ≤20 · Z >20 ; ก้าว (Stitching): N ≤28 → A–C+ · D (29–36) → เกรด D ขึ้นไป · VD (>36) → เกรด E ขึ้นไป
+        //   เกรดสุดท้าย = เกรดที่ "ยากที่สุด" ของปัจจัยทั้งหมด (% ลาย / จำนวนสี / ก้าว) — ตรวจจากยากสุดลงมา
         const TUFTING_GRADE_TABLE = [
-            { grade: 'Z',  target: 0.05,   test: c => c.patternPercentage >= 100 || c.maxColors > 20 || c.stitchingDensity === 'VD' },
-            { grade: 'X',  target: 0.10,   test: c => c.patternPercentage >= 90 || c.maxColors === 20 },
-            { grade: 'E',  target: 0.1296, test: c => c.patternPercentage >= 80 || c.maxColors === 16 },
-            { grade: 'D+', target: 0.15,   test: c => c.patternPercentage >= 75 || c.maxColors === 14 || c.stitchingDensity === 'D' },
-            { grade: 'D',  target: 0.20,   test: c => c.patternPercentage >= 70 || c.maxColors === 12 },
-            { grade: 'C+', target: 0.25,   test: c => c.patternPercentage >= 60 || c.maxColors === 9 },
-            { grade: 'C',  target: 0.30,   test: c => c.patternPercentage >= 50 || c.maxColors === 7 },
-            { grade: 'B',  target: 0.39,   test: c => c.patternPercentage >= 40 || c.maxColors === 5 }
+            { grade: 'Z',  target: 0.05,   test: c => c.patternPercentage >= 100 || c.maxColors > 20 },
+            { grade: 'X',  target: 0.10,   test: c => c.patternPercentage >= 90 || c.maxColors > 16 },
+            { grade: 'E',  target: 0.1296, test: c => c.patternPercentage >= 80 || c.maxColors > 14 || c.stitchingDensity === 'VD' },
+            { grade: 'D+', target: 0.15,   test: c => c.patternPercentage >= 75 || c.maxColors > 12 },
+            { grade: 'D',  target: 0.20,   test: c => c.patternPercentage >= 70 || c.maxColors > 9 || c.stitchingDensity === 'D' },
+            { grade: 'C+', target: 0.25,   test: c => c.patternPercentage >= 60 || c.maxColors > 7 },
+            { grade: 'C',  target: 0.30,   test: c => c.patternPercentage >= 50 || c.maxColors > 5 },
+            { grade: 'B',  target: 0.39,   test: c => c.patternPercentage >= 40 || c.maxColors > 3 }
         ];
         function computeTuftingGrade(calc) {
             for (const row of TUFTING_GRADE_TABLE) { if (row.test(calc)) return { grade: row.grade, target: row.target }; }
@@ -15101,7 +15104,10 @@
         // Convenience wrapper used by the UI: given an order + the shared productionSettings, returns
         // { grade, target, baseHours, days } for all 3 auto-calculated departments in one call.
         function computeProductionSuggestions(order) {
-            const calc = order.productionCalc || {};
+            // 2026-11-20: พื้นที่รวมใช้ค่าเดียวกับใบวางแผน (productionCalc.totalArea → ไม่มีใช้ order.totalSqm) — เดิมอ่านเฉพาะ productionCalc.totalArea
+            //   ถ้า M/O มีแต่ตร.ม. รวม (ไม่ได้กรอกพื้นที่ในช่องคำนวณ) ชั่วโมง/วันของทอ-ตกแต่งออกเป็น 0 ทั้งที่ Excel ได้ 26.29 ÷ 0.20 = 131.5 ชม.
+            const calc = Object.assign({}, order.productionCalc || {});
+            if (!(Number(calc.totalArea) > 0)) calc.totalArea = (typeof planningWsTotalArea === 'function') ? planningWsTotalArea(order) : (Number(order.totalSqm) || 0);
             // NEW (2026-10-06): ใบวางแผนงานปรับเกรดเอง/กำลังคนเฉพาะ M/O ได้ — ไม่ได้ปรับ = ใช้ค่ากลางเหมือนเดิม
             const s = (typeof planningWsEffectiveSettings === 'function') ? planningWsEffectiveSettings(order) : productionSettings;
             const wsOv = (order.planning && order.planning.worksheet && order.planning.worksheet.gradeOverride) || {};
@@ -16616,7 +16622,7 @@
             const rows = [
                 { stage: 'design', dept: 'ดีไซน์/ขยายลาย', job: area > 0 ? `ตอกลาย/ขยายลาย ${planningWsFmt(area, 2)} ตร.ม. · เกรด ${String(g.design.grade).split(' ')[0]}` : '-', suggest: sug.design.days },
                 { stage: 'dyeing', dept: 'ย้อม', job: dyeExt ? 'ย้อมนอกบริษัท (ข้ามแผนกย้อม)' : `ย้อม ${planningWsFmt(c.netKg, 2)} กก. · ${order.colorsCount || c.rows.length || 0} สี`, suggest: dyeExt ? null : dyeSuggest },
-                { stage: 'weaving', dept: 'ทอ', job: weaveExt ? 'ทอนอกบริษัท (ข้ามแผนกทอ)' : (area > 0 ? `ทอ ${planningWsFmt(area, 2)} ตร.ม. · เกรด ${g.weaving.grade}${sug.weaving.baseHours ? ` · ${planningWsFmt(sug.weaving.baseHours, 1)} ชม.` : ''}` : '-'), suggest: weaveExt ? null : sug.weaving.days },
+                { stage: 'weaving', dept: 'ทอ', job: weaveExt ? 'ทอนอกบริษัท (ข้ามแผนกทอ)' : (area > 0 ? `ทอ ${planningWsFmt(area, 2)} ตร.ม. · เกรด ${g.weaving.grade} (${planningWsFmt(sug.weaving.target, 2)} ตร.ม./คน·ชม.)${sug.weaving.baseHours ? ` · ใช้เวลาทอ ${planningWsFmt(sug.weaving.baseHours, 1)} ชม. ÷ (${eff.tufting.staffCount || 0} คน × ${(Number(eff.regularHoursPerDay) || 0) + (Number(eff.tufting.otHours) || 0)} ชม./วัน)` : ''}` : '-'), suggest: weaveExt ? null : sug.weaving.days },
                 { stage: 'finishing', dept: 'ตกแต่ง', job: area > 0 ? `ทากาว/ตกแต่ง ${planningWsFmt(area, 2)} ตร.ม. · เกรด ${g.finishing.grade}${sug.finishing.baseHours ? ` · ${planningWsFmt(sug.finishing.baseHours, 1)} ชม.` : ''}` : '-', suggest: sug.finishing.days }
             ];
             const startOf = (stage) => {
