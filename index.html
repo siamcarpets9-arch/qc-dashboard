@@ -715,7 +715,7 @@
             <div id="overviewMoBoxContainer" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div class="p-4 bg-indigo-50/50 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <h3 class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-industry mr-2 text-indigo-600"></i> M/O — เรียงตามกำหนดเสร็จ (วางแผน → ย้อม → ทอ → ตกแต่ง/บรรจุ → รอส่ง → ส่งแล้ว)</h3>
-                    <span class="flex flex-wrap items-center gap-1.5"><button type="button" id="overviewMoClearBtn" onclick="overviewGridClear('mo')" class="hidden text-[11px] font-semibold px-2 py-1 rounded border border-rose-300 text-rose-600 bg-white hover:bg-rose-50"><i class="fa-solid fa-filter-circle-xmark mr-1"></i>ล้างตัวกรอง</button><button type="button" onclick="overviewGridExport('mo')" class="text-[11px] font-semibold px-2 py-1 rounded border border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50"><i class="fa-solid fa-file-excel mr-1"></i>ส่งออก Excel</button><span id="overviewMoCountBadge" class="text-xs bg-indigo-100 text-indigo-800 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">0 M/O ในสายการผลิต</span></span>
+                    <span class="flex flex-wrap items-center gap-1.5"><button type="button" id="overviewMoExtraBtn" onclick="overviewGridToggleExtra()" class="text-[11px] font-semibold px-2 py-1 rounded border border-slate-300 text-slate-600 bg-white hover:bg-slate-50"><i class="fa-solid fa-eye mr-1"></i>แสดงแจ้งเตือน/หมายเหตุ</button><button type="button" id="overviewMoClearBtn" onclick="overviewGridClear('mo')" class="hidden text-[11px] font-semibold px-2 py-1 rounded border border-rose-300 text-rose-600 bg-white hover:bg-rose-50"><i class="fa-solid fa-filter-circle-xmark mr-1"></i>ล้างตัวกรอง</button><button type="button" onclick="overviewGridExport('mo')" class="text-[11px] font-semibold px-2 py-1 rounded border border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50"><i class="fa-solid fa-file-excel mr-1"></i>ส่งออก Excel</button><span id="overviewMoCountBadge" class="text-xs bg-indigo-100 text-indigo-800 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">0 M/O ในสายการผลิต</span></span>
                 </div>
                 <div class="overflow-auto" id="overviewMoScroll" style="max-height:75vh">
                     <table class="ov-grid" id="overviewMoTable">
@@ -736,7 +736,7 @@
             <div id="overviewSoBoxContainer" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div class="p-4 bg-amber-50/50 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <h3 class="font-bold text-amber-900 text-sm"><i class="fa-solid fa-swatchbook mr-2 text-amber-600"></i> S/O — เรียงตามกำหนดเสร็จ (วางแผน → ย้อม → ทอ → ตกแต่ง/บรรจุ → รอส่ง → ส่งแล้ว)</h3>
-                    <span class="flex flex-wrap items-center gap-1.5"><button type="button" id="overviewSoClearBtn" onclick="overviewGridClear('so')" class="hidden text-[11px] font-semibold px-2 py-1 rounded border border-rose-300 text-rose-600 bg-white hover:bg-rose-50"><i class="fa-solid fa-filter-circle-xmark mr-1"></i>ล้างตัวกรอง</button><button type="button" onclick="overviewGridExport('so')" class="text-[11px] font-semibold px-2 py-1 rounded border border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50"><i class="fa-solid fa-file-excel mr-1"></i>ส่งออก Excel</button><span id="overviewSoCountBadge" class="text-xs bg-amber-100 text-amber-800 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">0 S/O ในสายการผลิต</span></span>
+                    <span class="flex flex-wrap items-center gap-1.5"><button type="button" id="overviewSoExtraBtn" onclick="overviewGridToggleExtra()" class="text-[11px] font-semibold px-2 py-1 rounded border border-slate-300 text-slate-600 bg-white hover:bg-slate-50"><i class="fa-solid fa-eye mr-1"></i>แสดงแจ้งเตือน/หมายเหตุ</button><button type="button" id="overviewSoClearBtn" onclick="overviewGridClear('so')" class="hidden text-[11px] font-semibold px-2 py-1 rounded border border-rose-300 text-rose-600 bg-white hover:bg-rose-50"><i class="fa-solid fa-filter-circle-xmark mr-1"></i>ล้างตัวกรอง</button><button type="button" onclick="overviewGridExport('so')" class="text-[11px] font-semibold px-2 py-1 rounded border border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50"><i class="fa-solid fa-file-excel mr-1"></i>ส่งออก Excel</button><span id="overviewSoCountBadge" class="text-xs bg-amber-100 text-amber-800 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">0 S/O ในสายการผลิต</span></span>
                 </div>
                 <div class="overflow-auto" id="overviewSoScroll" style="max-height:75vh">
                     <table class="ov-grid" id="overviewSoTable">
@@ -4180,7 +4180,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-135';
+        const APP_BUILD = 'QCDashboard-136';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -13347,16 +13347,45 @@
         const overviewGrid = { mo: { sort: '', dir: 1, f: {}, rows: [] }, so: { sort: '', dir: 1, f: {}, rows: [] } };
         let overviewGridTimer = null;
 
+        // 2026-11-23: ซ่อนคอลัมน์ "แจ้งเตือน" และ "หมายเหตุ" ไว้ตั้งต้น (ตารางดูรกเกินไป) — กดปุ่มที่หัวตารางเพื่อแสดง/ซ่อน จำค่าไว้ในเครื่อง
+        const OVERVIEW_GRID_EXTRA_KEYS = ['warn', 'remark'];
+        let overviewGridShowExtra = false;
+        try { overviewGridShowExtra = localStorage.getItem('ovGridShowExtra') === '1'; } catch (e) { /* ใช้ค่าตั้งต้น */ }
+        function overviewGridCols() { return OVERVIEW_GRID_COLS.filter(c => overviewGridShowExtra || !OVERVIEW_GRID_EXTRA_KEYS.includes(c.key)); }
+        function overviewGridUpdateExtraBtn() {
+            ['Mo', 'So'].forEach(k => {
+                const b = document.getElementById('overview' + k + 'ExtraBtn'); if (!b) return;
+                b.innerHTML = overviewGridShowExtra
+                    ? '<i class="fa-solid fa-eye-slash mr-1"></i>ซ่อนแจ้งเตือน/หมายเหตุ'
+                    : '<i class="fa-solid fa-eye mr-1"></i>แสดงแจ้งเตือน/หมายเหตุ';
+            });
+        }
+        function overviewGridToggleExtra() {
+            overviewGridShowExtra = !overviewGridShowExtra;
+            try { localStorage.setItem('ovGridShowExtra', overviewGridShowExtra ? '1' : '0'); } catch (e) { /* ไม่เป็นไร */ }
+            ['mo', 'so'].forEach(kind => {
+                const g = overviewGrid[kind];
+                if (!overviewGridShowExtra) {
+                    OVERVIEW_GRID_EXTRA_KEYS.forEach(k => { delete g.f[k]; });
+                    if (OVERVIEW_GRID_EXTRA_KEYS.includes(g.sort)) { g.sort = ''; g.dir = 1; }
+                }
+                const thead = document.getElementById(kind === 'so' ? 'overviewSoThead' : 'overviewMoThead');
+                if (thead) { thead.dataset.built = ''; const cg = thead.closest('table').querySelector('colgroup'); if (cg) cg.remove(); }
+            });
+            renderProductionOverview();
+        }
+
         function overviewGridEnsureHeader(kind) {
             const thead = document.getElementById(kind === 'so' ? 'overviewSoThead' : 'overviewMoThead');
             if (!thead || thead.dataset.built === '1') return;
             const label = kind === 'so' ? 'S/O' : 'M/O';
-            const total = OVERVIEW_GRID_COLS.reduce((a, c) => a + c.w, 0);
+            const cols = overviewGridCols();
+            const total = cols.reduce((a, c) => a + c.w, 0);
             thead.closest('table').style.width = '100%'; thead.closest('table').style.minWidth = total + 'px';
-            const cg = '<colgroup>' + OVERVIEW_GRID_COLS.map(c => `<col style="width:${c.w}px">`).join('') + '</colgroup>';
+            const cg = '<colgroup>' + cols.map(c => `<col style="width:${c.w}px">`).join('') + '</colgroup>';
             if (!thead.closest('table').querySelector('colgroup')) thead.insertAdjacentHTML('beforebegin', cg);
-            const h1 = OVERVIEW_GRID_COLS.map(c => `<th data-key="${c.key}" class="${c.cls || ''} ${c.sort ? 'ov-sortable' : ''}" ${c.sort ? `onclick="overviewGridSort('${kind}','${c.key}')" title="คลิกเพื่อเรียง"` : ''}>${c.label === '__MO__' ? label : c.label}${c.sort ? '<span class="ov-arrow">▲▼</span>' : ''}</th>`).join('');
-            const h2 = OVERVIEW_GRID_COLS.map(c => {
+            const h1 = cols.map(c => `<th data-key="${c.key}" class="${c.cls || ''} ${c.sort ? 'ov-sortable' : ''}" ${c.sort ? `onclick="overviewGridSort('${kind}','${c.key}')" title="คลิกเพื่อเรียง"` : ''}>${c.label === '__MO__' ? label : c.label}${c.sort ? '<span class="ov-arrow">▲▼</span>' : ''}</th>`).join('');
+            const h2 = cols.map(c => {
                 let inner = '';
                 if (c.filter === 'select') inner = `<select data-fkey="${c.key}" onchange="overviewGridFilter('${kind}','${c.key}',this.value)">${c.options.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('')}</select>`;
                 else if (c.filter) inner = `<input type="text" data-fkey="${c.key}" placeholder="${c.filter === 'num' ? '>10' : (c.filter === 'date' ? '2026-12' : 'กรอง…')}" oninput="overviewGridFilter('${kind}','${c.key}',this.value)">`;
@@ -13364,6 +13393,9 @@
             }).join('');
             thead.innerHTML = `<tr class="ov-h1">${h1}</tr><tr class="ov-h2">${h2}</tr>`;
             thead.dataset.built = '1';
+            // คืนค่าตัวกรองที่ยังใช้อยู่ลงช่อง (กรณีสร้างหัวตารางใหม่หลังสลับคอลัมน์)
+            const fv = overviewGrid[kind].f;
+            thead.querySelectorAll('[data-fkey]').forEach(el => { if (fv[el.dataset.fkey] != null) el.value = fv[el.dataset.fkey]; });
         }
         function overviewGridSort(kind, key) {
             const g = overviewGrid[kind];
@@ -13519,8 +13551,8 @@
                     <td><div class="ov-rs">${buildDueDateRescheduleWidgetHtml(order, orderIndex, true)}</div></td>
                     <td>${overviewStageMiniHtml(effectiveStage)}</td>
                     <td><div class="ov-qc">${qcBadge}${qcHistoryBtn}</div></td>
-                    <td>${warnHtml ? `<div class="ov-warn" title="${escapeHtml(warnHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())}">${warnHtml}</div>` : '<span class="text-slate-300">-</span>'}</td>
-                    <td>${remarkHtml}</td>
+                    ${overviewGridShowExtra ? `<td>${warnHtml ? `<div class="ov-warn" title="${escapeHtml(warnHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())}">${warnHtml}</div>` : '<span class="text-slate-300">-</span>'}</td>
+                    <td>${remarkHtml}</td>` : ''}
                     <td class="whitespace-nowrap text-slate-500 text-[11px]">${escapeHtml(order.lastUpdated || '-')}</td>
                     <td class="text-center whitespace-nowrap">
                         <button onclick="openOrderDetailModal(${orderIndex})" title="แก้ไข" class="inline-flex items-center justify-center w-6 h-6 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded transition text-[11px]"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -14068,6 +14100,7 @@
                     const clearBtn = document.getElementById(gridKind === 'so' ? 'overviewSoClearBtn' : 'overviewMoClearBtn');
                     if (clearBtn) clearBtn.classList.toggle('hidden', !filtering);
                     overviewGridUpdateSortUi(gridKind);
+                    overviewGridUpdateExtraBtn();
                     const riskCount = list.filter(x => getDeadlineWarning(x.order)).length;
                     document.getElementById(countBadgeId).textContent = `${filtering ? `แสดง ${shown.length}/${fullCount} ${unitLabel}` : `${list.length} ${unitLabel} ในสายการผลิต`}${riskCount > 0 ? ` • ${riskCount} รายการเสี่ยงไม่ทันกำหนด` : ''}`;
 
