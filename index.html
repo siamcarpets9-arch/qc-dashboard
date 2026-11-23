@@ -321,6 +321,26 @@
         .rc-tile { background:#f1f5f9; border-top:3px solid #0d9488; border-radius:10px; padding:8px 10px; min-width:0; }
         .rc-tile-l { font-size:10px; font-weight:600; color:#64748b; line-height:1.3; }
         .rc-tile-v { font-size:15px; font-weight:700; color:#0f172a; margin-top:2px; font-variant-numeric:tabular-nums; word-break:break-all; }
+
+        /* 2026-11-23: ตารางภาพรวมแบบ Excel — เส้นตารางทุกช่อง · หัวตาราง + คอลัมน์ # / M/O ตรึง · แถวเตี้ย · แถบสลับสี */
+        .ov-grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 12px; }
+        .ov-grid th, .ov-grid td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 3px 8px; vertical-align: middle; }
+        .ov-grid thead th { position: sticky; background: #f1f5f9; z-index: 5; color: #475569; font-weight: 700; font-size: 11px; text-align: left; white-space: nowrap; }
+        .ov-grid thead tr.ov-h1 th { top: 0; height: 30px; }
+        .ov-grid thead tr.ov-h2 th { top: 30px; background: #f8fafc; padding: 2px 4px; font-weight: 400; }
+        .ov-grid th.ov-sortable { cursor: pointer; user-select: none; }
+        .ov-grid th.ov-sortable:hover { background: #e2e8f0; }
+        .ov-grid .ov-arrow { color: #cbd5e1; font-size: 9px; margin-left: 3px; }
+        .ov-grid th.ov-active .ov-arrow { color: #4f46e5; }
+        .ov-grid thead input, .ov-grid thead select { width: 100%; padding: 2px 4px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; }
+        .ov-grid td { background: #fff; color: #334155; }
+        .ov-grid tbody tr:nth-child(even) td { background: #f8fafc; }
+        .ov-grid tbody tr:hover td { background: #eef2ff; }
+        .ov-grid .ov-s1 { position: sticky; left: 0; z-index: 4; }
+        .ov-grid .ov-s2 { position: sticky; left: 44px; z-index: 4; box-shadow: 2px 0 0 #cbd5e1; }
+        .ov-grid thead th.ov-s1, .ov-grid thead th.ov-s2 { z-index: 7; }
+        .ov-grid .ov-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ov-grid .ov-n { text-align: right; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
@@ -686,21 +706,12 @@
             <div id="overviewMoBoxContainer" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div class="p-4 bg-indigo-50/50 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <h3 class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-industry mr-2 text-indigo-600"></i> M/O — เรียงตามกำหนดเสร็จ (วางแผน → ย้อม → ทอ → ตกแต่ง/บรรจุ → รอส่ง → ส่งแล้ว)</h3>
-                    <span id="overviewMoCountBadge" class="text-xs bg-indigo-100 text-indigo-800 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">0 M/O ในสายการผลิต</span>
+                    <span class="flex flex-wrap items-center gap-1.5"><button type="button" id="overviewMoClearBtn" onclick="overviewGridClear('mo')" class="hidden text-[11px] font-semibold px-2 py-1 rounded border border-rose-300 text-rose-600 bg-white hover:bg-rose-50"><i class="fa-solid fa-filter-circle-xmark mr-1"></i>ล้างตัวกรอง</button><button type="button" onclick="overviewGridExport('mo')" class="text-[11px] font-semibold px-2 py-1 rounded border border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50"><i class="fa-solid fa-file-excel mr-1"></i>ส่งออก Excel</button><span id="overviewMoCountBadge" class="text-xs bg-indigo-100 text-indigo-800 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">0 M/O ในสายการผลิต</span></span>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b border-slate-100">
-                                <th class="py-3.5 px-4 text-center w-14">ลำดับ</th>
-                                <th class="py-3.5 px-4">M/O / ลูกค้า / PO</th>
-                                <th class="py-3.5 px-4">กำหนดเสร็จ</th>
-                                <th class="py-3.5 px-4">สถานะขั้นตอนการผลิต</th>
-                                <th class="py-3.5 px-4">อัปเดตล่าสุด</th>
-                                <th class="py-3.5 px-4 text-center">จัดการ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="overviewMoTableBody" class="divide-y divide-slate-100 text-sm text-slate-700">
+                <div class="overflow-auto" id="overviewMoScroll" style="max-height:75vh">
+                    <table class="ov-grid" id="overviewMoTable">
+                        <thead id="overviewMoThead"></thead>
+                        <tbody id="overviewMoTableBody">
                             <!-- M/O overview rows injected via JS -->
                         </tbody>
                     </table>
@@ -716,21 +727,12 @@
             <div id="overviewSoBoxContainer" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div class="p-4 bg-amber-50/50 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <h3 class="font-bold text-amber-900 text-sm"><i class="fa-solid fa-swatchbook mr-2 text-amber-600"></i> S/O — เรียงตามกำหนดเสร็จ (วางแผน → ย้อม → ทอ → ตกแต่ง/บรรจุ → รอส่ง → ส่งแล้ว)</h3>
-                    <span id="overviewSoCountBadge" class="text-xs bg-amber-100 text-amber-800 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">0 S/O ในสายการผลิต</span>
+                    <span class="flex flex-wrap items-center gap-1.5"><button type="button" id="overviewSoClearBtn" onclick="overviewGridClear('so')" class="hidden text-[11px] font-semibold px-2 py-1 rounded border border-rose-300 text-rose-600 bg-white hover:bg-rose-50"><i class="fa-solid fa-filter-circle-xmark mr-1"></i>ล้างตัวกรอง</button><button type="button" onclick="overviewGridExport('so')" class="text-[11px] font-semibold px-2 py-1 rounded border border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50"><i class="fa-solid fa-file-excel mr-1"></i>ส่งออก Excel</button><span id="overviewSoCountBadge" class="text-xs bg-amber-100 text-amber-800 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">0 S/O ในสายการผลิต</span></span>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b border-slate-100">
-                                <th class="py-3.5 px-4 text-center w-14">ลำดับ</th>
-                                <th class="py-3.5 px-4">S/O / ลูกค้า / PO</th>
-                                <th class="py-3.5 px-4">กำหนดเสร็จ</th>
-                                <th class="py-3.5 px-4">สถานะขั้นตอนการผลิต</th>
-                                <th class="py-3.5 px-4">อัปเดตล่าสุด</th>
-                                <th class="py-3.5 px-4 text-center">จัดการ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="overviewSoTableBody" class="divide-y divide-slate-100 text-sm text-slate-700">
+                <div class="overflow-auto" id="overviewSoScroll" style="max-height:75vh">
+                    <table class="ov-grid" id="overviewSoTable">
+                        <thead id="overviewSoThead"></thead>
+                        <tbody id="overviewSoTableBody">
                             <!-- S/O overview rows injected via JS -->
                         </tbody>
                     </table>
@@ -4169,7 +4171,7 @@
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-133';
+        const APP_BUILD = 'QCDashboard-134';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -13303,87 +13305,200 @@
             }
         }
 
+        // =========================================================================================
+        // NEW (2026-11-23): ตารางภาพรวมแบบ Excel — "ตารางภาพรวมหน้าแรก ให้ทำคล้ายตารางแบบ excel ได้ไหม"
+        //   แถวเตี้ย + เส้นตารางทุกช่อง + หัวตาราง/คอลัมน์ # และ M/O ตรึงเวลาเลื่อน · คลิกหัวคอลัมน์เรียง (▲ ▼ กดซ้ำ = กลับค่าเริ่มต้นตามกำหนดเสร็จ)
+        //   มีแถวกรองใต้หัวตาราง: ข้อความ (มีคำนี้) · ตัวเลข (>10, <=5, 10-20) · วันที่ (2026-12 หรือ >=2026-12-01) · เลือกจากรายการ
+        //   คงฟีเจอร์เดิมครบ: รูป · ป้ายต่าง ๆ · หมายเหตุ · เลื่อนเข้า/เลื่อนออก+รับทราบ · QC · เตือนเสี่ยงไม่ทัน · แก้ไข/ลบ — และปุ่ม "ส่งออก Excel" (ตามตัวกรองที่เลือก)
+        //   หัวตาราง (thead) วาดครั้งเดียว ไม่วาดทับตอนพิมพ์กรอง → ไม่เสียโฟกัสช่องกรอง
+        // =========================================================================================
+        const OVERVIEW_GRID_COLS = [
+            { key: 'no', label: '#', w: 44, cls: 'ov-s1' },
+            { key: 'mo', label: '__MO__', w: 215, cls: 'ov-s2', sort: true, filter: 'text' },
+            { key: 'img', label: 'รูป', w: 46 },
+            { key: 'customer', label: 'ลูกค้า', w: 170, sort: true, filter: 'text' },
+            { key: 'po', label: 'PO', w: 115, sort: true, filter: 'text' },
+            { key: 'sales', label: 'เซล', w: 85, sort: true, filter: 'text' },
+            { key: 'sqm', label: 'ตร.ม.', w: 70, sort: true, filter: 'num' },
+            { key: 'pieces', label: 'ชิ้น', w: 54, sort: true, filter: 'num' },
+            { key: 'market', label: 'ตลาด', w: 88, sort: true, filter: 'select', options: [['', 'ทั้งหมด'], ['domestic', 'ในประเทศ'], ['export', 'ต่างประเทศ'], ['none', 'ไม่ระบุ']] },
+            { key: 'due', label: 'กำหนดเสร็จ', w: 150, sort: true, filter: 'date' },
+            { key: 'resched', label: 'เลื่อน', w: 140 },
+            { key: 'stage', label: 'ขั้นตอน', w: 215, sort: true, filter: 'select', options: [['', 'ทั้งหมด'], ['planning', 'วางแผน'], ['dyeing', 'ย้อม'], ['weaving', 'ทอ'], ['finishing', 'ตกแต่ง/บรรจุ']] },
+            { key: 'qc', label: 'QC', w: 150 },
+            { key: 'warn', label: 'แจ้งเตือน', w: 175, sort: true, filter: 'select', options: [['', 'ทั้งหมด'], ['any', 'มีเตือน'], ['overdue', 'เลย/ช้ากว่าแผน'], ['risk', 'เสี่ยงไม่ทัน']] },
+            { key: 'remark', label: 'หมายเหตุ', w: 190, sort: true, filter: 'text' },
+            { key: 'updated', label: 'อัปเดตล่าสุด', w: 105, sort: true, filter: 'date' },
+            { key: 'act', label: 'จัดการ', w: 74 }
+        ];
+        const overviewGrid = { mo: { sort: '', dir: 1, f: {}, rows: [] }, so: { sort: '', dir: 1, f: {}, rows: [] } };
+        let overviewGridTimer = null;
+
+        function overviewGridEnsureHeader(kind) {
+            const thead = document.getElementById(kind === 'so' ? 'overviewSoThead' : 'overviewMoThead');
+            if (!thead || thead.dataset.built === '1') return;
+            const label = kind === 'so' ? 'S/O' : 'M/O';
+            const total = OVERVIEW_GRID_COLS.reduce((a, c) => a + c.w, 0);
+            thead.closest('table').style.width = total + 'px';
+            const cg = '<colgroup>' + OVERVIEW_GRID_COLS.map(c => `<col style="width:${c.w}px">`).join('') + '</colgroup>';
+            if (!thead.closest('table').querySelector('colgroup')) thead.insertAdjacentHTML('beforebegin', cg);
+            const h1 = OVERVIEW_GRID_COLS.map(c => `<th data-key="${c.key}" class="${c.cls || ''} ${c.sort ? 'ov-sortable' : ''}" ${c.sort ? `onclick="overviewGridSort('${kind}','${c.key}')" title="คลิกเพื่อเรียง"` : ''}>${c.label === '__MO__' ? label : c.label}${c.sort ? '<span class="ov-arrow">▲▼</span>' : ''}</th>`).join('');
+            const h2 = OVERVIEW_GRID_COLS.map(c => {
+                let inner = '';
+                if (c.filter === 'select') inner = `<select data-fkey="${c.key}" onchange="overviewGridFilter('${kind}','${c.key}',this.value)">${c.options.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('')}</select>`;
+                else if (c.filter) inner = `<input type="text" data-fkey="${c.key}" placeholder="${c.filter === 'num' ? '>10, 5-20' : (c.filter === 'date' ? '2026-12, >=…' : 'กรอง…')}" oninput="overviewGridFilter('${kind}','${c.key}',this.value)">`;
+                return `<th class="${c.cls || ''}">${inner}</th>`;
+            }).join('');
+            thead.innerHTML = `<tr class="ov-h1">${h1}</tr><tr class="ov-h2">${h2}</tr>`;
+            thead.dataset.built = '1';
+        }
+        function overviewGridSort(kind, key) {
+            const g = overviewGrid[kind];
+            if (g.sort !== key) { g.sort = key; g.dir = 1; }
+            else if (g.dir === 1) g.dir = -1;
+            else { g.sort = ''; g.dir = 1; }
+            renderProductionOverview();
+        }
+        function overviewGridFilter(kind, key, val) {
+            overviewGrid[kind].f[key] = String(val == null ? '' : val);
+            clearTimeout(overviewGridTimer);
+            overviewGridTimer = setTimeout(renderProductionOverview, 120);
+        }
+        function overviewGridClear(kind) {
+            overviewGrid[kind].f = {};
+            const thead = document.getElementById(kind === 'so' ? 'overviewSoThead' : 'overviewMoThead');
+            if (thead) thead.querySelectorAll('input,select').forEach(el => { el.value = ''; });
+            renderProductionOverview();
+        }
+        function overviewGridActiveFilters(kind) { return Object.keys(overviewGrid[kind].f).filter(k => String(overviewGrid[kind].f[k]).trim() !== ''); }
+        function overviewGridMoSortKey(moSo) {
+            const m = String(moSo || '').match(/(\d+)\s*[\/\-]\s*(\d{2})\b/);
+            return m ? m[2] + String(m[1]).padStart(7, '0') : String(moSo || '');
+        }
+        function overviewGridModel(order, orderIndex) {
+            const eff = getEffectiveStage(order);
+            const warn = getDeadlineWarning(order);
+            const num = v => (v === '' || v === null || v === undefined || !isFinite(Number(v))) ? null : Number(v);
+            return {
+                order, orderIndex, eff, warn,
+                v: {
+                    mo: overviewGridMoSortKey(order.moSo), moText: String(order.moSo || ''), customer: String(order.customerName || ''), po: String(order.customerPO || ''), sales: String(order.salesName || ''),
+                    sqm: num(order.totalSqm), pieces: num(order.totalPieces), market: order.market || '', due: String(order.dueDate || ''),
+                    stage: ALL_STAGES.indexOf(eff), warn: warn ? (warn.level === 'overdue' ? 2 : 1) : 0, remark: String(order.orderRemark || '').trim(), updated: String(order.lastUpdated || '')
+                }
+            };
+        }
+        function overviewGridMatch(m, key, expr, col) {
+            expr = String(expr || '').trim(); if (!expr) return true;
+            const v = m.v;
+            if (col.filter === 'select') {
+                if (key === 'market') return expr === 'none' ? !v.market : v.market === expr;
+                if (key === 'stage') return m.eff === expr;
+                if (key === 'warn') return expr === 'any' ? v.warn > 0 : (expr === 'overdue' ? v.warn === 2 : v.warn === 1);
+                return true;
+            }
+            if (col.filter === 'num') {
+                const n = v[key]; let r;
+                if ((r = expr.match(/^(>=|<=|>|<|=)\s*(-?\d+(?:\.\d+)?)$/))) { if (n === null) return false; const x = Number(r[2]); return r[1] === '>' ? n > x : r[1] === '>=' ? n >= x : r[1] === '<' ? n < x : r[1] === '<=' ? n <= x : n === x; }
+                if ((r = expr.match(/^(-?\d+(?:\.\d+)?)\s*[-–~]\s*(-?\d+(?:\.\d+)?)$/))) { if (n === null) return false; return n >= Math.min(Number(r[1]), Number(r[2])) && n <= Math.max(Number(r[1]), Number(r[2])); }
+                return String(n === null ? '' : n).includes(expr);
+            }
+            const sv = key === 'mo' ? v.moText : String(v[key] || '');
+            if (col.filter === 'date') {
+                const r = expr.match(/^(>=|<=|>|<)\s*(\S+)$/);
+                if (r) { if (!sv) return false; return r[1] === '>' ? sv > r[2] : r[1] === '>=' ? sv >= r[2] : r[1] === '<' ? sv < r[2] : sv <= r[2]; }
+            }
+            return sv.toLowerCase().includes(expr.toLowerCase());
+        }
+        function overviewGridCompare(a, b, key, dir) {
+            const va = a.v[key], vb = b.v[key];
+            const ea = va === '' || va === null || va === undefined, eb = vb === '' || vb === null || vb === undefined;
+            if (ea && eb) return 0; if (ea) return 1; if (eb) return -1;   // ช่องว่างอยู่ท้ายเสมอ (ทั้งเรียงขึ้น/ลง)
+            if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+            return String(va).localeCompare(String(vb), 'th', { numeric: true }) * dir;
+        }
+        // กรอง + เรียง รายการ M/O หรือ S/O ของตาราง → คืน models ที่จะแสดง
+        function overviewGridApply(kind, list) {
+            const g = overviewGrid[kind];
+            let models = list.map(x => overviewGridModel(x.order, x.orderIndex));
+            overviewGridActiveFilters(kind).forEach(key => {
+                const col = OVERVIEW_GRID_COLS.find(c => c.key === key); if (!col) return;
+                models = models.filter(m => overviewGridMatch(m, key, g.f[key], col));
+            });
+            if (g.sort) models = models.map((m, i) => ({ m, i })).sort((x, y) => overviewGridCompare(x.m, y.m, g.sort, g.dir) || (x.i - y.i)).map(x => x.m);
+            return models;
+        }
+        function overviewGridUpdateSortUi(kind) {
+            const thead = document.getElementById(kind === 'so' ? 'overviewSoThead' : 'overviewMoThead'); if (!thead) return;
+            const g = overviewGrid[kind];
+            thead.querySelectorAll('tr.ov-h1 th').forEach(th => {
+                const on = g.sort && th.dataset.key === g.sort;
+                th.classList.toggle('ov-active', !!on);
+                const ar = th.querySelector('.ov-arrow'); if (ar) ar.textContent = on ? (g.dir === 1 ? '▲' : '▼') : '▲▼';
+            });
+        }
+        function overviewGridExport(kind) {
+            const g = overviewGrid[kind]; const unit = kind === 'so' ? 'S/O' : 'M/O';
+            const stageTh = { planning: 'วางแผน', dyeing: 'ย้อม', weaving: 'ทอ', finishing: 'ตกแต่ง/บรรจุ' };
+            if (!g.rows.length) { showToast('ไม่มีรายการให้ส่งออก', 'fa-circle-info', 'text-amber-400'); return; }
+            const rows = g.rows.map((m, i) => ({ no: i + 1, mo: m.order.moSo || '', customer: m.v.customer, po: m.v.po, sales: m.v.sales, sqm: m.v.sqm === null ? '' : m.v.sqm, pieces: m.v.pieces === null ? '' : m.v.pieces,
+                market: m.v.market === 'export' ? 'ต่างประเทศ' : (m.v.market === 'domestic' ? 'ในประเทศ' : ''), due: m.v.due, stage: stageTh[m.eff] || STAGE_LABELS[m.eff] || '', warn: m.warn ? (m.warn.level === 'overdue' ? 'เลย/ช้ากว่าแผน' : 'เสี่ยงไม่ทัน') : '', remark: m.v.remark, updated: m.v.updated }));
+            exportFlatRowsToExcel(`ภาพรวมการผลิต_${unit.replace('/', '')}_${new Date().toISOString().slice(0, 10)}.xlsx`, unit, [
+                { key: 'no', label: 'ลำดับ' }, { key: 'mo', label: unit }, { key: 'customer', label: 'ลูกค้า' }, { key: 'po', label: 'PO' }, { key: 'sales', label: 'เซล' }, { key: 'sqm', label: 'ตร.ม.' }, { key: 'pieces', label: 'ชิ้น' },
+                { key: 'market', label: 'ตลาด' }, { key: 'due', label: 'กำหนดเสร็จ' }, { key: 'stage', label: 'ขั้นตอน' }, { key: 'warn', label: 'แจ้งเตือน' }, { key: 'remark', label: 'หมายเหตุ' }, { key: 'updated', label: 'อัปเดตล่าสุด' }], rows);
+        }
+        function overviewStageMiniHtml(eff) {
+            const idx = ALL_STAGES.indexOf(eff);
+            const dots = ALL_STAGES.map((s, i) => {
+                const c = STAGE_COLORS[s];
+                const cls = i < idx ? `${c.solid} text-white` : (i === idx ? `${c.current} text-white ring-2` : c.light);
+                return `<span class="inline-flex w-4 h-4 rounded-full border items-center justify-center text-[8px] font-bold ${cls}" title="${escapeHtml(STAGE_LABELS[s])}">${i < idx ? '<i class="fa-solid fa-check" style="font-size:7px"></i>' : i + 1}</span>`;
+            }).join('');
+            return `<div class="flex items-center gap-0.5">${dots}<span class="text-[11px] font-semibold ${STAGE_COLORS[eff].text} ml-1.5 whitespace-nowrap">${escapeHtml(STAGE_LABELS[eff])}</span></div>`;
+        }
+
         function buildOverviewRowHtml(order, orderIndex, runningNo, today) {
             const effectiveStage = getEffectiveStage(order);
             const isOverdue = order.dueDate && order.dueDate < today && effectiveStage !== 'shipped';
             const dueDateHtml = order.dueDate
-                ? `${escapeHtml(order.dueDate)}${isOverdue ? '<span class="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 text-[10px] font-bold">เลยกำหนด</span>' : ''}${buildDueDatePostponeBadge(order)}`
+                ? `${escapeHtml(order.dueDate)}${isOverdue ? '<span class="ml-1 inline-block px-1 py-0.5 rounded bg-rose-100 text-rose-600 text-[9px] font-bold">เลยกำหนด</span>' : ''}${buildDueDatePostponeBadge(order)}`
                 : '<span class="text-slate-400">-</span>';
-
-            const customerLineHtml = (order.customerName || order.customerPO)
-                ? `<p class="text-[11px] text-slate-500 mt-0.5">${escapeHtml(order.customerName || '-')}${order.customerPO ? ` • PO ${escapeHtml(order.customerPO)}` : ''}</p>`
-                : '';
-            const salesLineHtml = order.salesName
-                ? `<p class="text-[11px] text-slate-400 mt-0.5"><i class="fa-solid fa-user-tie mr-1"></i>เซล: ${escapeHtml(order.salesName)}</p>`
-                : '';
-            const sqmPiecesLineHtml = (order.totalSqm || order.totalPieces)
-                ? `<p class="text-[11px] text-slate-400 mt-0.5">${order.totalSqm ? `${order.totalSqm} ตร.ม.` : ''}${order.totalSqm && order.totalPieces ? ' • ' : ''}${order.totalPieces ? `${order.totalPieces} ชิ้น` : ''}</p>`
-                : '';
-            const deadlineWarningHtml = renderDeadlineWarningBadge(order);
-
-            // NEW (2026-10-02): "ป้ายกำกับ M/O,S/O เลย" — persistent green "ไหมย้อมครบแล้ว" badge next to
-            // the M/O,S/O itself in ภาพรวมการผลิต, per the user's explicit choice (not a toast, not tied
-            // to the current stage). Set once by checkAndAutoTransferDyeingIfComplete() the moment every
-            // planned color is fully dyed, and never cleared — keeps showing even after the order moves
-            // on to ทอ/ตกแต่ง/ส่งมอบ, so anyone scanning the Overview can see dyeing is done for this order.
             const fullyDyedBadgeHtml = (order.dyeing && order.dyeing.fullyDyedFlag)
-                ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold ml-1" title="ย้อมครบตามแผนแล้ว"><i class="fa-solid fa-droplet"></i>ไหมย้อมครบแล้ว</span>`
+                ? `<span class="inline-flex items-center gap-1 px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-bold" title="ย้อมครบตามแผนแล้ว"><i class="fa-solid fa-droplet"></i></span>`
                 : '';
-
-            // NEW (2026-10-02): "รายงาน QC ถ้าบันทึกตรวจ M/O ไหนที่แผนกอะไรให้ขึ้นที่แผนกนั้นด้วย เพราะบางที
-            // แต่ละแผนกไม่ UPDATE ข้อมูล" — the Overview row didn't show any QC info before; it only lived
-            // in the order detail modal and the Board cards. Reuses the existing renderQcBadge()/
-            // STAGE_QC_DEPT mapping (already used by the Board) so the SAME QC record shows here too.
-            // Deliberately keyed to effectiveStage (not persistent — confirmed with the user) so it only
-            // shows the QC status for the department the order is CURRENTLY sitting in; it naturally
-            // disappears from here once the order moves to the next department.
-            const overviewQcBadgeHtml = STAGE_QC_DEPT[effectiveStage] ? renderQcBadge(order.moSo, effectiveStage) : '';
-
-            // NEW (2026-10-02): "เอาตารางรายงาน QC ทั้งหมดนี้ไปใส่ในหน้าภาพรวมการผลิต" — a small button that
-            // pops up the FULL QC history (every department, every date — see buildQcHistoryTableHtml())
-            // for this one M/O, S/O, right from its Overview row, instead of only the current-department
-            // badge above. Shows the record count so it's obvious at a glance whether anything's on file.
+            // QC: ป้ายสถานะของแผนกที่งานอยู่ตอนนี้ + ปุ่มดูประวัติ QC ทั้งหมด (เหมือนเดิม ย่อให้เล็ก)
+            const qcBadge = STAGE_QC_DEPT[effectiveStage] ? renderQcBadge(order.moSo, effectiveStage) : '';
             const qcHistoryCount = qcData.filter(d => (d.moSo || '').trim() === (order.moSo || '').trim()).length;
-            const qcHistoryButtonHtml = `
-                <button type="button" onclick="openOverviewQcHistoryModal(${orderIndex})" class="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-indigo-500 hover:text-indigo-700 transition">
-                    <i class="fa-solid fa-clock-rotate-left"></i>ดูประวัติ QC${qcHistoryCount > 0 ? ` (${qcHistoryCount})` : ''}
-                </button>`;
-
+            const qcHistoryBtn = `<button type="button" onclick="openOverviewQcHistoryModal(${orderIndex})" title="ดูประวัติ QC ทั้งหมด" class="text-[10px] font-medium text-indigo-500 hover:text-indigo-700 ml-1 whitespace-nowrap"><i class="fa-solid fa-clock-rotate-left"></i>${qcHistoryCount > 0 ? ` (${qcHistoryCount})` : ''}</button>`;
+            const warnHtml = renderDeadlineWarningBadge(order);
+            const remark = (order.orderRemark || '').trim();
+            const remarkHtml = remark
+                ? `<button type="button" onclick="openOverviewRemarkModal(${orderIndex})" title="${escapeHtml(remark)}" class="block w-full text-left truncate text-[11px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 hover:bg-amber-100"><i class="fa-solid fa-note-sticky mr-1"></i>${escapeHtml(remark)}</button>`
+                : `<button type="button" onclick="openOverviewRemarkModal(${orderIndex})" class="text-[10px] text-slate-400 hover:text-indigo-600"><i class="fa-solid fa-plus mr-0.5"></i>หมายเหตุ</button>`;
+            const t = v => `<td class="ov-t" title="${escapeHtml(v || '')}">${v ? escapeHtml(v) : '<span class="text-slate-300">-</span>'}</td>`;
             return `
-                <tr class="hover:bg-slate-50/80 transition border-b border-slate-100">
-                    <td class="py-3.5 px-4 text-center text-xs font-bold text-slate-400">${runningNo}</td>
-                    <td class="py-3.5 px-4">
-                        <div class="flex items-start gap-2">
-                            ${order.designImageUrl ? `<img src="${escapeHtml(order.designImageUrl)}" class="w-9 h-9 object-cover rounded-lg border border-slate-200 shrink-0" alt="รูปดีไซน์" loading="lazy">` : ''}
-                            <div class="min-w-0">
-                                <p class="font-bold ${moSoTextColorClass(order)} text-xs font-mono">${orderTypeBadgeHtml(order.orderType)}${marketBadgeHtml(order.market)}${orderFlagBadgesHtml(order)}${issueBadgeHtml(order.moSo)}${escapeHtml(order.moSo)}${fullyDyedBadgeHtml}</p>
-                                ${customerLineHtml}
-                                ${salesLineHtml}
-                                ${sqmPiecesLineHtml}
-                                ${buildOverviewRemarkWidgetHtml(order, orderIndex)}
-                            </div>
-                        </div>
-                    </td>
-                    <td class="py-3.5 px-4 text-xs text-slate-600">
-                        <div class="whitespace-nowrap">${dueDateHtml}</div>
-                        ${buildDueDateRescheduleWidgetHtml(order, orderIndex)}
-                    </td>
-                    <td class="py-3.5 px-4">
-                        ${renderStageStepper(effectiveStage)}
-                        ${overviewQcBadgeHtml ? `<div class="mt-1.5">${overviewQcBadgeHtml}</div>` : ''}
-                        ${deadlineWarningHtml ? `<div class="mt-1.5">${deadlineWarningHtml}</div>` : ''}
-                        <div>${qcHistoryButtonHtml}</div>
-                    </td>
-                    <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">${escapeHtml(order.lastUpdated || '-')}</td>
-                    <td class="py-3.5 px-4 text-center">
-                        <div class="flex items-center justify-center gap-1.5">
-                            <button onclick="openOrderDetailModal(${orderIndex})" class="inline-flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-medium px-3 py-1.5 rounded-lg transition">
-                                <i class="fa-solid fa-pen-to-square"></i> แก้ไข
-                            </button>
-                            <button onclick="promptDeleteProductionOrder(${orderIndex})" class="inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-medium px-2.5 py-1.5 rounded-lg transition" title="ลบรายการนี้">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </div>
+                <tr data-ov-row="${orderIndex}">
+                    <td class="ov-s1 text-center text-[11px] font-bold text-slate-400">${runningNo}</td>
+                    <td class="ov-s2"><div class="flex items-center gap-1 min-w-0">
+                        <span class="font-bold ${moSoTextColorClass(order)} text-xs font-mono whitespace-nowrap">${escapeHtml(order.moSo)}</span>${orderFlagBadgesHtml(order)}${issueBadgeHtml(order.moSo)}${fullyDyedBadgeHtml}
+                    </div></td>
+                    <td class="text-center">${order.designImageUrl ? `<img src="${escapeHtml(order.designImageUrl)}" class="w-8 h-8 object-cover rounded border border-slate-200 inline-block" alt="รูปดีไซน์" loading="lazy">` : ''}</td>
+                    ${t(order.customerName)}
+                    ${t(order.customerPO)}
+                    ${t(order.salesName)}
+                    <td class="ov-n">${order.totalSqm ? escapeHtml(String(order.totalSqm)) : '<span class="text-slate-300">-</span>'}</td>
+                    <td class="ov-n">${order.totalPieces ? escapeHtml(String(order.totalPieces)) : '<span class="text-slate-300">-</span>'}</td>
+                    <td class="whitespace-nowrap">${marketBadgeHtml(order.market) || '<span class="text-slate-300">-</span>'}</td>
+                    <td class="whitespace-nowrap text-slate-600">${dueDateHtml}</td>
+                    <td>${buildDueDateRescheduleWidgetHtml(order, orderIndex)}</td>
+                    <td>${overviewStageMiniHtml(effectiveStage)}</td>
+                    <td class="whitespace-nowrap">${qcBadge}${qcHistoryBtn}</td>
+                    <td>${warnHtml || '<span class="text-slate-300">-</span>'}</td>
+                    <td>${remarkHtml}</td>
+                    <td class="whitespace-nowrap text-slate-500">${escapeHtml(order.lastUpdated || '-')}</td>
+                    <td class="text-center whitespace-nowrap">
+                        <button onclick="openOrderDetailModal(${orderIndex})" title="แก้ไข" class="inline-flex items-center justify-center w-7 h-7 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded transition"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="promptDeleteProductionOrder(${orderIndex})" title="ลบรายการ" class="inline-flex items-center justify-center w-7 h-7 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded transition"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 </tr>
             `;
@@ -13918,8 +14033,17 @@
             [{ list: moList, tbody: moTbody, countBadgeId: 'overviewMoCountBadge', emptyId: 'emptyOverviewMoState', emptyTextId: 'emptyOverviewMoStateText', unitLabel: 'M/O' },
              { list: soList, tbody: soTbody, countBadgeId: 'overviewSoCountBadge', emptyId: 'emptyOverviewSoState', emptyTextId: 'emptyOverviewSoStateText', unitLabel: 'S/O' }]
                 .forEach(({ list, tbody, countBadgeId, emptyId, emptyTextId, unitLabel }) => {
+                    const gridKind = unitLabel === 'S/O' ? 'so' : 'mo';
+                    overviewGridEnsureHeader(gridKind);
+                    const fullCount = list.length;
+                    const shown = overviewGridApply(gridKind, list);
+                    overviewGrid[gridKind].rows = shown;
+                    const filtering = overviewGridActiveFilters(gridKind).length > 0;
+                    const clearBtn = document.getElementById(gridKind === 'so' ? 'overviewSoClearBtn' : 'overviewMoClearBtn');
+                    if (clearBtn) clearBtn.classList.toggle('hidden', !filtering);
+                    overviewGridUpdateSortUi(gridKind);
                     const riskCount = list.filter(x => getDeadlineWarning(x.order)).length;
-                    document.getElementById(countBadgeId).textContent = `${list.length} ${unitLabel} ในสายการผลิต${riskCount > 0 ? ` • ${riskCount} รายการเสี่ยงไม่ทันกำหนด` : ''}`;
+                    document.getElementById(countBadgeId).textContent = `${filtering ? `แสดง ${shown.length}/${fullCount} ${unitLabel}` : `${list.length} ${unitLabel} ในสายการผลิต`}${riskCount > 0 ? ` • ${riskCount} รายการเสี่ยงไม่ทันกำหนด` : ''}`;
 
                     const emptyState = document.getElementById(emptyId);
                     if (list.length === 0) {
@@ -13931,8 +14055,15 @@
                         }
                         return;
                     }
+                    if (shown.length === 0) {
+                        tbody.innerHTML = '';
+                        emptyState.classList.remove('hidden');
+                        const emptyStateText = document.getElementById(emptyTextId);
+                        if (emptyStateText) emptyStateText.textContent = 'ไม่พบรายการที่ตรงกับตัวกรอง — กด "ล้างตัวกรอง" ด้านบน';
+                        return;
+                    }
                     emptyState.classList.add('hidden');
-                    tbody.innerHTML = list.map((x, i) => buildOverviewRowHtml(x.order, x.orderIndex, i + 1, today)).join('');
+                    tbody.innerHTML = shown.map((m, i) => buildOverviewRowHtml(m.order, m.orderIndex, i + 1, today)).join('');
                 });
         }
 
