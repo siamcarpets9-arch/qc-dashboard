@@ -301,6 +301,7 @@
         .dn-edit .dn-note.dn-sel { outline: 2px solid #4f46e5; outline-offset: 2px; }
         .dn-handle { position: absolute; left: -2px; top: -17px; height: 16px; padding: 0 7px; background: #4f46e5; color: #fff; border-radius: 4px 4px 0 0; font-size: 10px; line-height: 16px; font-weight: 500; cursor: move; white-space: nowrap; user-select: none; touch-action: none; }
         .ds-print-sheet { page: ds-landscape; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .ds-print-sheet + .ds-print-sheet { break-before: page; page-break-before: always; }
         .ds-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1.5px solid #1e293b; margin-bottom: 3mm; padding-bottom: 1mm; font-size: 13px; color: #0f172a; }
         .ds-head b { font-size: 16px; }
         .print-design-image-wrap { text-align: center; margin: 10px 0 16px; break-inside: avoid; }
@@ -4233,7 +4234,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-139';
+        const APP_BUILD = 'QCDashboard-140';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -6560,8 +6561,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                             ${(order.designNotes || []).length > 0 && designImageDimsCache[order.designImageUrl]
                                 ? designNotesImageHtml(order, designImageDimsCache[order.designImageUrl], 170, 100, 'mm', false)
                                 : `<img src="${escapeHtml(order.designImageUrl)}" alt="รูปดีไซน์">`}
-                            <p class="print-design-image-caption">รูปนี้เป็นรูปเดียวกับที่แผนกดีไซน์อัปโหลด/เห็นในระบบ</p>
+                            <p class="print-design-image-caption">${orderExtraPieceImages(order).length > 0 ? 'ชิ้นที่ 1' + (orderPieceSizeText(order, 1) ? ' (' + escapeHtml(orderPieceSizeText(order, 1)) + ')' : '') + ' — ' : ''}รูปนี้เป็นรูปเดียวกับที่แผนกดีไซน์อัปโหลด/เห็นในระบบ</p>
                         </div>
+                        ${orderExtraPieceImages(order).map(x => `
+                        <div class="print-design-image-wrap" data-wo-piece="${x.n}">
+                            <img src="${escapeHtml(x.url)}" alt="รูปดีไซน์ ชิ้นที่ ${x.n}">
+                            <p class="print-design-image-caption">ชิ้นที่ ${x.n}${x.size ? ' (' + escapeHtml(x.size) + ')' : ''}</p>
+                        </div>`).join('')}
                     ` : ''}
                     ${sizeItems.length > 0 ? `
                         <p class="print-section-title">รายการขนาด (Size)</p>
@@ -9414,6 +9420,60 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 im.src = url;
             });
         }
+        // 2026-11-24: รูปแบบแยกรายชิ้น — M/O ที่มี 2 ชิ้นขึ้นไปและรูปไม่เหมือนกัน ใส่รูปของแต่ละชิ้นได้
+        //   order.designImageUrl = รูปชิ้นที่ 1 (เหมือนเดิม) · order.pieceDesignImages = { '2': url, '3': url, ... }
+        //   จำนวนชิ้น = จำนวนแถว "รายการขนาด" (หรือจำนวนชิ้นในใบวางแผน ถ้ามากกว่า) — ชิ้นที่ n = แถวที่ n
+        function normalizePieceDesignImages(v) {
+            if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { v = {}; } }
+            const out = {};
+            if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+            Object.keys(v).forEach(k => {
+                const n = parseInt(k, 10);
+                const u = typeof v[k] === 'string' ? v[k].trim() : '';
+                if (n >= 2 && n <= 99 && u) out[String(n)] = u;
+            });
+            return out;
+        }
+        function orderPieceCount(order) {
+            if (!order) return 0;
+            const a = Array.isArray(order.sizeItems) ? order.sizeItems.length : 0;
+            const ws = order.planning && order.planning.worksheet;
+            const b = ws && Array.isArray(ws.pieces) ? ws.pieces.length : 0;
+            return Math.max(a, b);
+        }
+        function orderPieceSizeText(order, n) {
+            const it = (Array.isArray(order && order.sizeItems) ? order.sizeItems : [])[n - 1];
+            const ws = order && order.planning && order.planning.worksheet;
+            const pc = ws && Array.isArray(ws.pieces) ? ws.pieces[n - 1] : null;
+            const w = it ? Number(it.width) || 0 : (pc ? Number(pc.w) || 0 : 0);
+            const l = it ? Number(it.length) || 0 : (pc ? Number(pc.l) || 0 : 0);
+            return (w || l) ? `${w.toLocaleString(undefined, { maximumFractionDigits: 2 })}×${l.toLocaleString(undefined, { maximumFractionDigits: 2 })} ม.` : '';
+        }
+        function orderPieceImageUrl(order, n) {
+            if (!order) return '';
+            if (n <= 1) return order.designImageUrl || '';
+            return (order.pieceDesignImages && order.pieceDesignImages[String(n)]) || '';
+        }
+        // ชิ้นที่มีรูปของตัวเอง (ชิ้น 2+) เรียงตามลำดับ [{n, url, size}]
+        function orderExtraPieceImages(order) {
+            const cnt = orderPieceCount(order); const out = [];
+            for (let n = 2; n <= cnt; n++) { const u = orderPieceImageUrl(order, n); if (u) out.push({ n, url: u, size: orderPieceSizeText(order, n) }); }
+            return out;
+        }
+        function renderPieceDesignImagesBlock(order, orderIndex) {
+            const cnt = orderPieceCount(order);
+            if (cnt < 2) return '';
+            const rows = [];
+            for (let n = 2; n <= cnt; n++) {
+                const sz = orderPieceSizeText(order, n);
+                rows.push(renderDesignImageBlock(order, orderIndex, 'piece', n, `รูปแบบ ชิ้นที่ ${n}${sz ? ' (' + sz + ')' : ''}`));
+            }
+            return `<div data-piece-images class="space-y-1.5 mt-1.5">
+                <p class="text-[11px] text-slate-500 px-1"><i class="fa-solid fa-images mr-1"></i>M/O นี้มี ${cnt} ชิ้น — ถ้ารูปแบบแต่ละชิ้นไม่เหมือนกัน เพิ่มรูปของชิ้นที่ 2${cnt > 2 ? '–' + cnt : ''} ได้ที่นี่ (ชิ้นที่ 1 ใช้รูปด้านบน${orderPieceSizeText(order, 1) ? ' · ' + orderPieceSizeText(order, 1) : ''}; ถ้าเหมือนกันไม่ต้องเพิ่ม)</p>
+                ${rows.join('')}
+            </div>`;
+        }
+
         function normalizeDesignNotes(arr) {
             if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch (e) { arr = []; } }
             if (!Array.isArray(arr)) return [];
@@ -9554,7 +9614,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const dims = await designImageDims(order.designImageUrl);
             const sqm = Number(order.totalSqm) || 0;
             const head = `<div class="ds-head"><span><b>${escapeHtml(order.moSo || '')}</b>&nbsp;&nbsp;${escapeHtml(order.customerName || '')}${order.designRef ? '&nbsp;&nbsp;Design: ' + escapeHtml(order.designRef) : ''}</span><span>${order.quality ? escapeHtml(order.quality) + '&nbsp;&nbsp;' : ''}${sqm > 0 ? sqm.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ตร.ม.' : ''}</span></div>`;
-            document.getElementById('printArea').innerHTML = `<div class="ds-print-sheet">${head}<div style="text-align:center;">${designNotesImageHtml(order, dims, 281, 165, 'mm', false)}</div></div>`;
+            const extras = orderExtraPieceImages(order);
+            const cntPieces = orderPieceCount(order);
+            const dimsList = await Promise.all(extras.map(x => designImageDims(x.url)));
+            const pieceTag = (n) => cntPieces >= 2 ? `<span style="margin-left:10px;padding:0 6px;border:1px solid #334155;border-radius:3px;font-weight:700;">ชิ้นที่ ${n}/${cntPieces}</span>` : '';
+            const extraSheets = extras.map((x, ix) => `<div class="ds-print-sheet" data-ds-piece="${x.n}">${head.replace('</span></div>', `${x.size ? '&nbsp;&nbsp;' + escapeHtml(x.size) : ''}${pieceTag(x.n)}</span></div>`)}<div style="text-align:center;"><div class="dn-wrap" style="width:${(() => { const d = dimsList[ix] || { w: 4, h: 3 }; return Math.round(d.w * Math.min(281 / d.w, 165 / d.h) * 100) / 100; })()}mm;height:${(() => { const d = dimsList[ix] || { w: 4, h: 3 }; return Math.round(d.h * Math.min(281 / d.w, 165 / d.h) * 100) / 100; })()}mm;"><img src="${escapeHtml(x.url)}" alt="รูปดีไซน์ ชิ้นที่ ${x.n}"></div></div></div>`).join('');
+            const headFirst = cntPieces >= 2 ? head.replace('</span></div>', `${orderPieceSizeText(order, 1) ? '&nbsp;&nbsp;' + escapeHtml(orderPieceSizeText(order, 1)) : ''}${pieceTag(1)}</span></div>`) : head;
+            document.getElementById('printArea').innerHTML = `<div class="ds-print-sheet" data-ds-piece="1">${headFirst}<div style="text-align:center;">${designNotesImageHtml(order, dims, 281, 165, 'mm', false)}</div></div>${extraSheets}`;
             document.body.classList.add('print-single-mode');
             showToast('กำลังเปิดหน้าต่างพิมพ์แบบดีไซน์... เลือก "Save as PDF" เพื่อบันทึกเป็นไฟล์ PDF', 'fa-print', 'text-sky-400');
             setTimeout(() => window.print(), 300);
@@ -10014,6 +10080,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 totalSqm: Number(raw.totalSqm) || 0,
                 totalPieces: Number(raw.totalPieces) || 0,
                 designImageUrl: raw.designImageUrl || '',
+                pieceDesignImages: normalizePieceDesignImages(raw.pieceDesignImages),   // 2026-11-24: รูปแบบแยกรายชิ้น { '2': url, '3': url } (ชิ้นที่ 1 = designImageUrl)
                 dueDate: normalizeDateString(raw.dueDate),
                 dueDateHistory: dueDateHistory,
                 currentStage: ORDER_STAGES.includes(raw.currentStage) ? raw.currentStage : 'planning',
@@ -12279,7 +12346,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             showToast('กำลังอัปโหลดรูปดีไซน์...', 'fa-spinner', 'text-indigo-400');
             try {
                 const dataUrl = await resizeImageFile(file, 1400, 0.75);
-                const labelPart = itemIndex == null ? target : `${target}_item${Number(itemIndex) + 1}`;
+                const labelPart = itemIndex == null ? target : (target === 'piece' ? `piece${Number(itemIndex)}` : `${target}_item${Number(itemIndex) + 1}`);
                 const payload = {
                     moSo: order.moSo,
                     target: target,
@@ -12329,6 +12396,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (!order) return;
             if (target === 'order') {
                 order.designImageUrl = url;
+            } else if (target === 'piece') {
+                if (!(Number(itemIndex) >= 2)) return;
+                if (!order.pieceDesignImages || typeof order.pieceDesignImages !== 'object') order.pieceDesignImages = {};
+                order.pieceDesignImages[String(Number(itemIndex))] = url;
             } else if (order[target] && order[target].items && order[target].items[itemIndex]) {
                 order[target].items[itemIndex].designImageUrl = url;
             } else {
@@ -12343,6 +12414,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (!order) return;
             if (target === 'order') {
                 order.designImageUrl = '';
+            } else if (target === 'piece') {
+                if (order.pieceDesignImages) delete order.pieceDesignImages[String(Number(itemIndex))];
             } else if (order[target] && order[target].items && order[target].items[itemIndex]) {
                 order[target].items[itemIndex].designImageUrl = '';
             } else {
@@ -12559,6 +12632,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const order = productionOrders[orderIndex];
             if (!order || !Array.isArray(order.sizeItems)) return;
             order.sizeItems.splice(itemIndex, 1);
+            // รูปแบบแยกรายชิ้น: เลื่อนเลขชิ้นตามแถวที่ถูกลบ (ชิ้นที่ itemIndex+1 ถูกลบ → ชิ้นถัดไปเลื่อนขึ้น)
+            if (order.pieceDesignImages && Object.keys(order.pieceDesignImages).length) {
+                const removedN = Number(itemIndex) + 1, shifted = {};
+                Object.keys(order.pieceDesignImages).forEach(k => {
+                    const n = Number(k);
+                    if (n === removedN) return;
+                    shifted[String(n > removedN ? n - 1 : n)] = order.pieceDesignImages[k];
+                });
+                if (removedN === 1 && order.pieceDesignImages['2']) order.designImageUrl = order.pieceDesignImages['2'];   // ชิ้นที่ 2 ขึ้นมาเป็นชิ้นที่ 1 → ใช้รูปของมันเป็นรูปหลัก (ถ้าไม่มีรูปแยก คงรูปหลักเดิม)
+                order.pieceDesignImages = normalizePieceDesignImages(shifted);
+            }
             recomputeOrderSizeTotals(order);
             persistOrderChange(order);
             rerenderOrderViews(orderIndex);
@@ -12624,10 +12708,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         function renderDesignImageBlock(order, orderIndex, target, itemIndex, label) {
             const url = target === 'order'
                 ? (order.designImageUrl || '')
-                : (((order[target].items || [])[itemIndex] || {}).designImageUrl || '');
+                : (target === 'piece'
+                    ? orderPieceImageUrl(order, Number(itemIndex))
+                    : (((order[target].items || [])[itemIndex] || {}).designImageUrl || ''));
             const itemIndexArg = itemIndex == null ? 'null' : itemIndex;
             return `
-                <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-2.5" ${target === 'piece' ? `data-piece-image="${Number(itemIndex)}"` : ''}>
                     ${url
                         ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="shrink-0"><img src="${escapeHtml(url)}" class="w-14 h-14 object-cover rounded-lg border border-slate-200" alt="รูปดีไซน์" loading="lazy"></a>`
                         : `<div class="w-14 h-14 rounded-lg bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-slate-300 shrink-0"><i class="fa-solid fa-image"></i></div>`
@@ -17374,7 +17460,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <td class="py-1.5 pr-2 text-right font-bold ${sumOk ? 'text-emerald-600' : 'text-rose-600'}" data-pw-piece-sum>${f(pc.colorPct + pc.blankPct)}% ${sumOk ? '✓' : ''}</td>
                     <td class="py-1.5 pr-2 text-right">${f(pc.blankArea)}</td>
                     <td class="py-1.5 pr-2 text-right font-semibold" data-pw-piece-basekg>${planningWsFmt(pc.kg, 3)}</td>
-                    <td class="py-1.5 text-right"><label class="px-2 py-1 text-[10px] font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50 cursor-pointer whitespace-nowrap">อ่านจากแบบชิ้นนี้<input type="file" accept="image/*" class="hidden" data-pw-piece-file="${k}" onchange="planningWsReadLegendFromFile(${orderIndex}, this, ${k})"></label></td>
+                    <td class="py-1.5 text-right"><label class="px-2 py-1 text-[10px] font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50 cursor-pointer whitespace-nowrap">อ่านจากแบบชิ้นนี้<input type="file" accept="image/*" class="hidden" data-pw-piece-file="${k}" onchange="planningWsReadLegendFromFile(${orderIndex}, this, ${k})"></label>${orderPieceImageUrl(order, k + 1) ? `<button type="button" data-pw-piece-fromdesign="${k}" onclick="planningWsReadLegendFromDesign(${orderIndex}, ${k})" class="ml-1 px-2 py-1 text-[10px] font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded whitespace-nowrap" title="อ่านจากรูปแบบที่แนบไว้ของชิ้นนี้ใน M/O">อ่านจากรูปที่แนบ</button>` : ''}</td>
                 </tr>`;
             }).join('');
             return `<div class="w-full border border-teal-300 bg-teal-50/30 rounded-md p-3 space-y-1.5" data-pw-piece-panel>
@@ -17774,15 +17860,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 planningWsLegendSetStatus('อ่านจากรูปไม่สำเร็จ: ' + (e.message || e), 'bad');
             }
         }
-        async function planningWsReadLegendFromDesign(orderIndex) {
-            const order = productionOrders[orderIndex]; if (!order || !order.designImageUrl) return;
+        async function planningWsReadLegendFromDesign(orderIndex, pieceIdx) {
+            const order = productionOrders[orderIndex];
+            const designUrl = pieceIdx == null ? (order && order.designImageUrl) : orderPieceImageUrl(order, Number(pieceIdx) + 1);   // pieceIdx เริ่มที่ 0 → ชิ้นที่ pieceIdx+1
+            if (!order || !designUrl) return;
             if (planningWsLegendUi.busy) return;
             // รูปจาก Google Drive อาจโหลดเข้า canvas ไม่ได้ (CORS) → ลอง fetch เป็น blob ก่อน ถ้าไม่ได้ให้เลือกไฟล์จากเครื่องแทน
             try {
                 planningWsLegendSetStatus('กำลังโหลดรูปแบบจากระบบ...', '');
-                const resp = await fetch(order.designImageUrl); if (!resp.ok) throw new Error('http ' + resp.status);
+                const resp = await fetch(designUrl); if (!resp.ok) throw new Error('http ' + resp.status);
                 const blob = await resp.blob(); const url = URL.createObjectURL(blob);
-                await planningWsReadLegendFromImage(orderIndex, url, 'รูปแบบของ Design');
+                await planningWsReadLegendFromImage(orderIndex, url, pieceIdx == null ? 'รูปแบบของ Design' : 'รูปแบบชิ้นที่ ' + (Number(pieceIdx) + 1), pieceIdx == null ? undefined : pieceIdx);
                 setTimeout(() => URL.revokeObjectURL(url), 60000);
             } catch (e) {
                 console.warn('design image fetch blocked:', e);
@@ -22447,7 +22535,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const detailWarningHtml = renderDeadlineWarningBadge(order);
             document.getElementById('orderDetailStepper').innerHTML = renderStageStepper(getEffectiveStage(order)) + (detailWarningHtml ? `<div class="mt-1.5">${detailWarningHtml}</div>` : '');
             const orderSizeItemsHtml = renderOrderSizeItemsBlock(order, orderIndex) + renderCanvasCardHtml(order, orderIndex);
-            const orderDesignImageHtml = renderDesignImageBlock(order, orderIndex, 'order', null, 'รูปดีไซน์ของ M/O นี้ (ถ้ามี)');
+            const orderDesignImageHtml = renderDesignImageBlock(order, orderIndex, 'order', null, orderPieceCount(order) >= 2 ? 'รูปดีไซน์ ชิ้นที่ 1' + (orderPieceSizeText(order, 1) ? ' (' + orderPieceSizeText(order, 1) + ')' : '') + ' — ถ้ามี' : 'รูปดีไซน์ของ M/O นี้ (ถ้ามี)') + renderPieceDesignImagesBlock(order, orderIndex);
             // MERGED (2026-09-16): renderOrderExtraInfoBlock() now includes what used to be the separate
             // renderProductionRequirementsBlock() card as an inner subsection — see its own comment.
             const orderExtraInfoHtml = renderOrderExtraInfoBlock(order, orderIndex);
