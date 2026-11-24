@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -355,6 +353,9 @@
         .ov-grid .ov-rs { display: flex; flex-direction: column; gap: 2px; }
         .ov-grid .ov-rs > div { margin-top: 0 !important; gap: 2px !important; flex-wrap: nowrap; }
         .ov-grid .ov-rs button { font-size: 9px !important; padding: 0 3px !important; line-height: 16px; white-space: nowrap; }
+        .kpi-grid td { height: 30px; }
+        .kpi-grid input.kpi-in { width: 100%; padding: 1px 4px; font-size: 11px; line-height: 18px; border-radius: 4px; }
+        .kpi-grid td.ov-s2 { line-height: 1.15; }
         .ov-grid .ov-qc { display: flex; align-items: center; flex-wrap: wrap; gap: 1px 2px; line-height: 1.15; }
 </style>
 </head>
@@ -1645,7 +1646,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     </div>
                     <div id="kpiDuePeriodSummary" class="px-3 pb-3"></div>
                 </div>
-                <p class="px-1 text-[11px] text-slate-400"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-teal-50 border border-teal-300 align-middle mr-1"></span>ช่องสีเขียวอมฟ้า = เติมอัตโนมัติจากข้อมูลที่มีในระบบ (บันทึกทอ, การโอนงาน, ใบส่งสินค้าใน "รายการรอส่ง") — พิมพ์ทับได้ และเลขที่ INV / เลขที่ใบส่ง ดึงจากใบส่งสินค้า (INVOICE) เลขเดียวกัน</p>
+                <p class="px-1 text-[11px] text-slate-400"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-teal-50 border border-teal-300 align-middle mr-1"></span>ช่องสีเขียวอมฟ้า = เติมอัตโนมัติจากระบบ — สถานที่ทอ: SIAM (ทอเอง) หรือชื่อผู้รับจ้างที่กรอกในแผนกทอ · เริ่มทอ/ทอเสร็จ: จากแผนกทอ (จ้างทอ = วันที่ส่งจ้าง/วันที่รับพรม) · เลขที่ใบส่ง/วันส่งพรม: จาก Delivery Note (INVOICE) ในแท็บ รายการรอส่ง — ช่องอื่นพิมพ์ทับได้ · <b>KPI</b> = วันที่ใน Delivery Note ต้องตรงกับกำหนดส่งใน M/O (ตรง = ผ่าน, เร็ว/ช้า = ไม่ผ่าน, เลยกำหนดแล้วยังไม่ส่ง = ไม่ผ่าน) · คลิกหัวคอลัมน์เพื่อเรียง · ช่องใต้หัวคอลัมน์ใช้กรอง</p>
                 <div id="kpiDueSplitContainer"></div>
             </div>
 
@@ -4232,7 +4233,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-137';
+        const APP_BUILD = 'QCDashboard-138';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -9938,7 +9939,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (!Array.isArray(weaving.dailyLog)) weaving.dailyLog = [];
             if (!Array.isArray(weaving.items)) weaving.items = [];
             weaving.external = Object.assign(
-                { sentDate: '', vendorDueDate: '', qcResult: 'pending', failResolution: '', receivedDate: '' },
+                { vendor: '', sentDate: '', vendorDueDate: '', qcResult: 'pending', failResolution: '', receivedDate: '' },
                 (weaving.external && typeof weaving.external === 'object') ? weaving.external : {}
             );
             let weavingMigrated = false;
@@ -11687,7 +11688,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         </div>
                     </div>
                     <p class="text-[10px] text-slate-500">${escapeHtml(order.customerName || '-')} • กำหนดเสร็จ: ${escapeHtml(order.dueDate || '-')}</p>
-                    <p class="text-[10px] text-slate-500">ส่งผ้า+ไหม: ${escapeHtml(ext.sentDate || '-')}${ext.vendorDueDate ? ` • กำหนดส่ง: ${escapeHtml(ext.vendorDueDate)}` : ''}</p>
+                    <p class="text-[10px] text-slate-500">${ext.vendor ? 'ผู้รับจ้าง: ' + escapeHtml(ext.vendor) + ' • ' : ''}ส่งผ้า+ไหม: ${escapeHtml(ext.sentDate || '-')}${ext.vendorDueDate ? ` • กำหนดส่ง: ${escapeHtml(ext.vendorDueDate)}` : ''}</p>
                     <p class="text-[10px]">${qcBadge}${ext.receivedDate ? ` • ได้รับพรม: ${escapeHtml(ext.receivedDate)}` : ''}</p>
                     ${deadlineWarningHtml ? `<div>${deadlineWarningHtml}</div>` : ''}
                     <button onclick="transferOrderStage(${orderIndex}, 'weaving', '${toStage}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-medium py-1.5 rounded-lg shadow transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-arrow-right"></i> โอนงานไปแผนก${STAGE_LABELS[toStage]}</button>
@@ -15037,7 +15038,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     : (ext.qcResult === 'fail' ? '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark mr-1"></i>QC ไม่ผ่าน</span>' : '<span class="text-slate-400">รอผล QC</span>');
                 mainHtml = `
                     <p class="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold w-fit"><i class="fa-solid fa-truck-ramp-box"></i> จ้างภายนอกทอ</p>
-                    <p class="text-[10px] text-slate-500">ส่งผ้า+ไหม: ${escapeHtml(ext.sentDate || '-')}${ext.vendorDueDate ? ` • กำหนดส่ง: ${escapeHtml(ext.vendorDueDate)}` : ''}</p>
+                    <p class="text-[10px] text-slate-500">${ext.vendor ? 'ผู้รับจ้าง: ' + escapeHtml(ext.vendor) + ' • ' : ''}ส่งผ้า+ไหม: ${escapeHtml(ext.sentDate || '-')}${ext.vendorDueDate ? ` • กำหนดส่ง: ${escapeHtml(ext.vendorDueDate)}` : ''}</p>
                     <p class="text-[10px]">${qcBadge}${ext.receivedDate ? ` • ได้รับพรม: ${escapeHtml(ext.receivedDate)}` : ''}</p>
                 `;
             } else if (stage === 'weaving') {
@@ -15067,7 +15068,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     : (ext.qcResult === 'fail' ? '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark mr-1"></i>QC ไม่ผ่าน</span>' : '<span class="text-slate-400">รอผล QC</span>');
                 mainHtml = `
                     <p class="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold w-fit"><i class="fa-solid fa-truck-ramp-box"></i> รับงานจ้างทอภายนอก (ข้ามแผนกทอ)</p>
-                    <p class="text-[10px] text-slate-500">ส่งผ้า+ไหม: ${escapeHtml(ext.sentDate || '-')}${ext.vendorDueDate ? ` • กำหนดส่ง: ${escapeHtml(ext.vendorDueDate)}` : ''}</p>
+                    <p class="text-[10px] text-slate-500">${ext.vendor ? 'ผู้รับจ้าง: ' + escapeHtml(ext.vendor) + ' • ' : ''}ส่งผ้า+ไหม: ${escapeHtml(ext.sentDate || '-')}${ext.vendorDueDate ? ` • กำหนดส่ง: ${escapeHtml(ext.vendorDueDate)}` : ''}</p>
                     <p class="text-[10px]">${qcBadge}${ext.receivedDate ? ` • ได้รับพรม: ${escapeHtml(ext.receivedDate)}` : ''}</p>
                 `;
             }
@@ -15821,7 +15822,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (!order) return;
             order.weaving.mode = (mode === 'external') ? 'external' : 'internal';
             if (!order.weaving.external || typeof order.weaving.external !== 'object') {
-                order.weaving.external = { sentDate: '', vendorDueDate: '', qcResult: 'pending', failResolution: '', receivedDate: '' };
+                order.weaving.external = { vendor: '', sentDate: '', vendorDueDate: '', qcResult: 'pending', failResolution: '', receivedDate: '' };
             }
             recomputeStagePercent(order, 'weaving');
             persistOrderChange(order);
@@ -15837,7 +15838,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             // Defensive: an M/O saved before this feature existed (or loaded from a stale localStorage
             // cache that hasn't been re-normalized via a Google Sheet sync yet) may not have this object.
             if (!order.weaving.external || typeof order.weaving.external !== 'object') {
-                order.weaving.external = { sentDate: '', vendorDueDate: '', qcResult: 'pending', failResolution: '', receivedDate: '' };
+                order.weaving.external = { vendor: '', sentDate: '', vendorDueDate: '', qcResult: 'pending', failResolution: '', receivedDate: '' };
             }
             order.weaving.external[field] = value;
             recomputeStagePercent(order, 'weaving');
@@ -21925,7 +21926,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (!order || !Array.isArray(order.sizeItems) || !order.sizeItems[itemIndex]) return;
             order.sizeItems[itemIndex].weaveWhere = (value === 'internal' || value === 'external') ? value : '';
             if (order.weaving && order.weaving.mode !== 'external' && getWeavingSplit(order).hasExternal && (!order.weaving.external || typeof order.weaving.external !== 'object')) {
-                order.weaving.external = { sentDate: '', vendorDueDate: '', qcResult: 'pending', failResolution: '', receivedDate: '' };
+                order.weaving.external = { vendor: '', sentDate: '', vendorDueDate: '', qcResult: 'pending', failResolution: '', receivedDate: '' };
             }
             recomputeStagePercent(order, 'weaving');
             persistOrderChange(order);
@@ -21970,7 +21971,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // same convention as every other department's fields.
         function renderWeavingExternalJobHtml(order, orderIndex) {
             const ext = order.weaving.external || {};
+            const vendorOpts = [...new Set(productionOrders.map(o => ((o.weaving || {}).external || {}).vendor).map(v => String(v || '').trim()).filter(Boolean))]
+                .map(v => `<option value="${escapeHtml(v)}"></option>`).join('');
             return `
+                <div class="mb-2 bg-white p-2.5 rounded-xl border border-slate-200">
+                    <label class="block text-[10px] text-slate-500 mb-0.5">จ้างทอที่ไหน (ชื่อผู้รับจ้างทอ — แสดงในช่อง "สถานที่ทอ" ของ KPI วางแผน)</label>
+                    <input type="text" list="weavingVendorList" data-weaving-vendor value="${escapeHtml(ext.vendor || '')}" placeholder="เช่น ชื่อโรงงาน/ผู้รับจ้าง" onchange="updateOrderWeavingExternalField(${orderIndex}, 'vendor', this.value.trim())" class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                    <datalist id="weavingVendorList">${vendorOpts}</datalist>
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2 bg-white p-2.5 rounded-xl border border-slate-200">
                     <div>
                         <label class="block text-[10px] text-slate-500 mb-0.5">ส่งผ้าพร้อมไหมวันที่</label>
@@ -23376,27 +23384,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             renderKpiDueDateReport();
         }
 
-        const KPI_DUE_THEAD_HTML = `
-            <th class="px-2 py-2 text-left">วันรับ</th>
-            <th class="px-2 py-2 text-left">M/O, S/O</th>
-            <th class="px-2 py-2 text-left">ลูกค้า</th>
-            <th class="px-2 py-2 text-left">PROJECT/PO</th>
-            <th class="px-2 py-2 text-left">คุณภาพ</th>
-            <th class="px-2 py-2 text-left">กำหนดส่ง</th>
-            <th class="px-2 py-2 text-right">จำนวนชิ้น</th>
-            <th class="px-2 py-2 text-right">จำนวนสี</th>
-            <th class="px-2 py-2 text-right">M2</th>
-            <th class="px-2 py-2 text-left">GRADE</th>
-            <th class="px-2 py-2 text-left">สถานที่ทอ</th>
-            <th class="px-2 py-2 text-left">เริ่มทอ</th>
-            <th class="px-2 py-2 text-left">ทอเสร็จ</th>
-            <th class="px-2 py-2 text-right">ค้างทอ</th>
-            <th class="px-2 py-2 text-left">วันที่โอน</th>
-            <th class="px-2 py-2 text-left">เลขที่ใบส่ง</th>
-            <th class="px-2 py-2 text-left">วันส่งพรม</th>
-            <th class="px-2 py-2 text-left">เลขที่ INV อ้างอิง</th>
-        `;
-
         // =========================================================================================
         // NEW (2026-10-09): "ให้เอารายการที่มี เติมในช่องว่างของ KPI วางแผนอัตโนมัติ · วันที่ส่งให้เอาแบบสั้นๆ · ใส่เลขที่ invoice ใน
         // Delivery มาใส่ในเลขที่ INV" — ตาราง "ส่งมอบทั้งหมด" (แผนกวางแผน → KPI): ช่องที่ยังว่าง (ไม่มีค่าที่พิมพ์/นำเข้าไว้) เติมให้เองจากข้อมูลที่มี
@@ -23432,21 +23419,41 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 return parts.length ? `<span class="block text-[10px] font-normal text-amber-700" data-kpi-inout>${escapeHtml(parts.join(' · '))}</span>` : '';
             } catch (e) { return ''; }
         }
+        // =========================================================================================
+        // UPDATED (2026-11-24): KPI แผนกวางแผน "ส่งมอบทั้งหมด" — ตารางแบบ Excel + กติกาใหม่
+        //   สถานที่ทอ  = SIAM (ทอเอง) · ถ้าจ้างทอ = ชื่อผู้รับจ้างที่กรอกในแผนกทอ (order.weaving.external.vendor)
+        //   เริ่มทอ    = ทอเอง: วันแรกในบันทึกทอ · จ้างทอ: วันที่ส่งผ้า+ไหมให้ผู้รับจ้าง (sentDate)
+        //   ทอเสร็จ    = ทอเอง: วันที่แผนกทอโอนไปแผนกตกแต่ง · จ้างทอ: วันที่ได้รับพรม (receivedDate) · ทอปนกัน: วันที่ช้ากว่า
+        //   (ตัดคอลัมน์ "วันที่โอน" ออก)
+        //   เลขที่ใบส่ง / วันส่งพรม = เลข INVOICE และวันที่ จาก Delivery Note (แท็บ รายการรอส่ง) — ใช้ค่าจากใบส่งก่อนเสมอ
+        //   KPI = วันที่ใน Delivery Note ตรงกับกำหนดส่งใน M/O หรือไม่ (ตรง = ผ่าน, เร็ว/ช้ากว่า = ไม่ผ่าน)
+        //         ยังไม่มี Delivery Note → รอส่ง · แต่เลยกำหนดแล้วยังไม่ส่ง = ไม่ผ่าน
+        // =========================================================================================
+        function kpiTodayKey() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function kpiVendorName(order) {
+            const ext = (order && order.weaving && order.weaving.external && typeof order.weaving.external === 'object') ? order.weaving.external : {};
+            return String(ext.vendor || '').trim();
+        }
         function kpiDueAutoFill(order) {
             const out = {};
             try {
                 const w = order.weaving || {};
+                const ext = (w.external && typeof w.external === 'object') ? w.external : {};
                 const stage = getEffectiveStage(order);
                 const logs = (Array.isArray(w.dailyLog) ? w.dailyLog : []).filter(l => l && l.date)
                     .map(l => Object.assign({}, l, { _d: normalizeDateString(l.date) })).filter(l => l._d).sort((a, b) => a._d.localeCompare(b._d));
                 const total = Number(order.totalSqm) || 0, woven = Number(w.sqmWoven) || 0;
                 const external = w.mode === 'external';
-                // NEW (2026-10-09): บางชิ้นจ้างทอนอก (sizeItems[].weaveWhere) — ในบริษัท vs นอกบริษัท
+                // บางชิ้นจ้างทอนอก (sizeItems[].weaveWhere) — ในบริษัท vs นอกบริษัท
                 const split = getWeavingSplit(order);
                 const mixed = !external && split.mixed;
-                const extRecv = !!((w.external || {}).receivedDate) && (w.external || {}).qcResult !== 'fail';
+                const extRecv = !!ext.receivedDate && ext.qcResult !== 'fail';
                 const weavingDone = ['finishing', 'ready_to_ship', 'shipped'].includes(stage)
                     || (mixed ? (split.intSqm > 0 ? woven >= split.intSqm - 0.005 : true) && extRecv : (total > 0 && woven >= total - 0.005));
+                const vendor = kpiVendorName(order) || 'จ้างทอนอกบริษัท';
                 // GRADE
                 const lastGrade = [...logs].reverse().find(l => l.grade);
                 if (lastGrade) out.grade = String(lastGrade.grade);
@@ -23457,21 +23464,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         out.grade = (ov && getTuftingGradeTarget(ov) !== null) ? ov : computeTuftingGrade(Object.assign({}, pc, { totalArea: Number(pc.totalArea) || total })).grade;
                     }
                 }
-                // สถานที่ทอ
-                if (external) out.location = 'จ้างทอนอกบริษัท';
-                else {
-                    const looms = [...new Set(logs.map(l => String(l.loom === undefined || l.loom === null ? '' : l.loom).trim()).filter(Boolean))];
-                    const locParts = [];
-                    if (looms.length) locParts.push('เครื่อง ' + looms.join(', '));
-                    else if (mixed) locParts.push('ในบริษัท');
-                    if (mixed) locParts.push('จ้างทอนอก ' + split.extPieces + ' ชิ้น');
-                    if (locParts.length) out.location = locParts.join(' + ');
-                }
-                // เริ่มทอ / ทอเสร็จ / วันที่โอน
-                if (logs.length) out.startDate = logs[0]._d;
-                const wDone = getStageActualDate(order, 'weaving');
-                if (weavingDone) { const fin = wDone || (logs.length ? logs[logs.length - 1]._d : ''); if (fin) out.finishDate = fin; }
-                if (wDone) out.transferDate = wDone;
+                // สถานที่ทอ: SIAM ถ้าไม่ได้ส่งจ้างทอ · จ้างทอ = ชื่อผู้รับจ้าง
+                if (external) out.location = vendor;
+                else if (mixed) out.location = 'SIAM + ' + vendor + ' ' + split.extPieces + ' ชิ้น';
+                else out.location = 'SIAM';
+                // เริ่มทอ / ทอเสร็จ
+                const sentD = normalizeDateString(ext.sentDate) || '';
+                const recvD = normalizeDateString(ext.receivedDate) || '';
+                const firstLog = logs.length ? logs[0]._d : '';
+                const wDone = getStageActualDate(order, 'weaving') || '';
+                let start = '', fin = '';
+                if (external) { start = sentD; fin = recvD; }
+                else if (mixed) {
+                    start = [firstLog, sentD].filter(Boolean).sort()[0] || '';
+                    if (split.intPieces > 0) fin = (wDone && recvD) ? (wDone > recvD ? wDone : recvD) : '';
+                    else fin = recvD;
+                } else { start = firstLog; fin = wDone; }
+                if (start) out.startDate = start;
+                if (fin) out.finishDate = fin;
                 // ค้างทอ (ชิ้น)
                 const pieces = Number(order.totalPieces) || 0;
                 if (mixed) {
@@ -23479,7 +23489,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     const intPending = split.intSqm > 0 ? Math.ceil(split.intPieces * (1 - Math.min(1, woven / split.intSqm)) - 1e-9) : 0;
                     out.pendingQty = weavingDone ? 0 : Math.max(0, intPending) + (extRecv ? 0 : split.extPieces);
                 } else if (!external && total > 0 && pieces > 0) out.pendingQty = weavingDone ? 0 : Math.max(0, Math.ceil(pieces * (1 - Math.min(1, woven / total)) - 1e-9));
-                // เลขที่ INV / วันส่งพรม จากใบส่งสินค้า (Delivery)
+                // เลขที่ใบส่ง / วันส่งพรม จากใบส่งสินค้า (Delivery Note)
                 const invs = kpiShippingInvoicesFor(order);
                 const invNos = [...new Set(invs.map(i => String(i.invNo || '').trim()).filter(Boolean))];
                 if (invNos.length) out.invNo = invNos.join(', ');
@@ -23488,21 +23498,210 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             } catch (e) { console.error('kpiDueAutoFill failed:', e); }
             return out;
         }
-        // ค่าที่แสดง/ส่งออก: ค่าที่พิมพ์เองก่อน ไม่มีค่อยใช้ค่าเติมอัตโนมัติ
+        // ค่าที่แสดง/ส่งออก: ค่าที่พิมพ์เองก่อน ไม่มีค่อยใช้ค่าเติมอัตโนมัติ — ยกเว้น เลขที่ใบส่ง/วันส่งพรม ที่ใช้ค่าจาก Delivery Note ก่อนเสมอ
         function kpiDueEffective(order) {
             const w = order.weaving || {}, fin = order.finishing || {};
             const a = kpiDueAutoFill(order);
             const has = v => v !== '' && v !== null && v !== undefined;
             const pick = (stored, auto) => has(stored) ? { v: stored, auto: false } : (has(auto) ? { v: auto, auto: true } : { v: '', auto: false });
-            const shipped = order.shippedDate || a.shipDateFromInvoice || '';
             return {
                 grade: pick(w.grade, a.grade), location: pick(w.location, a.location), startDate: pick(w.startDate, a.startDate),
                 finishDate: pick(w.finishDate, a.finishDate), pendingQty: pick(w.pendingQty && Number(w.pendingQty) !== 0 ? w.pendingQty : '', a.pendingQty),
-                transferDate: pick(w.transferDate, a.transferDate), invNo: pick(fin.invNo, a.invNo),
-                // NEW (2026-10-12): เลขที่ใบส่ง = เลขเดียวกับ INV ของใบส่งสินค้า (DELIVERY NOTE) ในหน้า Delivery
-                deliveryNoteNo: pick(fin.deliveryNoteNo, a.invNo),
-                shippedDate: { v: shipped, auto: !order.shippedDate && !!a.shipDateFromInvoice }
+                invNo: pick(fin.invNo, a.invNo),
+                deliveryNoteNo: a.invNo ? { v: a.invNo, auto: true, fromInvoice: true } : pick(fin.deliveryNoteNo, ''),
+                shippedDate: a.shipDateFromInvoice
+                    ? { v: a.shipDateFromInvoice, auto: true, fromInvoice: true }
+                    : { v: order.shippedDate || '', auto: false, fromInvoice: false }
             };
+        }
+        // KPI: วันที่ส่งตาม Delivery Note ตรงกับกำหนดส่งใน M/O ไหม
+        function kpiDueStatus(order, e, todayKey) {
+            const due = normalizeDateString(order.dueDate) || '';
+            const ship = normalizeDateString(e.shippedDate.v) || '';
+            if (!due) return { code: 'none', rank: 3, label: 'ไม่มีกำหนดส่ง', note: '', diff: null };
+            if (ship) {
+                const d = planningDiffDays(due, ship);
+                if (d === 0) return { code: 'pass', rank: 2, label: 'ผ่าน', note: 'ตรงกำหนดส่ง', diff: 0 };
+                return { code: 'fail', rank: 0, label: 'ไม่ผ่าน', note: d > 0 ? `ส่งช้า ${d} วัน` : `ส่งก่อน ${-d} วัน`, diff: d };
+            }
+            if (getEffectiveStage(order) === 'shipped') return { code: 'none', rank: 3, label: 'ไม่มีวันส่ง', note: 'ส่งแล้วแต่ยังไม่มี Delivery Note', diff: null };
+            const late = planningDiffDays(due, todayKey || kpiTodayKey());
+            if (late !== null && late > 0) return { code: 'fail', rank: 0, label: 'ไม่ผ่าน', note: `เลยกำหนด ${late} วัน (ยังไม่ส่ง)`, diff: late };
+            return { code: 'wait', rank: 1, label: 'รอส่ง', note: late === 0 ? 'ครบกำหนดวันนี้' : (late === null ? '' : `อีก ${-late} วัน`), diff: late };
+        }
+        function kpiStatusBadgeHtml(st) {
+            const cls = st.code === 'pass' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : st.code === 'fail' ? 'bg-rose-50 text-rose-700 border-rose-200'
+                : st.code === 'wait' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-400 border-slate-200';
+            const icon = st.code === 'pass' ? 'fa-circle-check' : st.code === 'fail' ? 'fa-circle-xmark' : st.code === 'wait' ? 'fa-hourglass-half' : 'fa-minus';
+            return `<span class="inline-flex items-center gap-1 px-1.5 rounded-md text-[10px] font-semibold border whitespace-nowrap ${cls}" data-kpi-status="${st.code}" title="${escapeHtml(st.label + (st.note ? ' — ' + st.note : ''))}"><i class="fa-solid ${icon}"></i>${escapeHtml(st.label)}${st.note && st.code !== 'none' ? `<span class="font-normal opacity-80">· ${escapeHtml(st.note)}</span>` : ''}</span>`;
+        }
+
+        // ---- ตารางแบบ Excel ของ KPI "ส่งมอบทั้งหมด" (เรียง/กรองแต่ละคอลัมน์ · หัวตารางและ # M/O ตรึง) ----------------
+        const KPI_GRID_COLS = [
+            { key: 'no', label: '#', w: 34, cls: 'ov-s1' },
+            { key: 'mo', label: '__MO__', w: 128, cls: 'ov-s2', sort: true, filter: 'text' },
+            { key: 'opened', label: 'วันรับ', w: 84, sort: true, filter: 'date' },
+            { key: 'customer', label: 'ลูกค้า', w: 116, sort: true, filter: 'text' },
+            { key: 'po', label: 'PROJECT/PO', w: 92, sort: true, filter: 'text' },
+            { key: 'quality', label: 'คุณภาพ', w: 88, sort: true, filter: 'text' },
+            { key: 'due', label: 'กำหนดส่ง', w: 86, sort: true, filter: 'date' },
+            { key: 'pieces', label: 'ชิ้น', w: 44, sort: true, filter: 'num' },
+            { key: 'colors', label: 'สี', w: 40, sort: true, filter: 'num' },
+            { key: 'sqm', label: 'M2', w: 60, sort: true, filter: 'num' },
+            { key: 'grade', label: 'GRADE', w: 62, sort: true, filter: 'text' },
+            { key: 'location', label: 'สถานที่ทอ', w: 124, sort: true, filter: 'text' },
+            { key: 'start', label: 'เริ่มทอ', w: 114, sort: true, filter: 'date' },
+            { key: 'finish', label: 'ทอเสร็จ', w: 114, sort: true, filter: 'date' },
+            { key: 'pending', label: 'ค้างทอ', w: 54, sort: true, filter: 'num' },
+            { key: 'dnNo', label: 'เลขที่ใบส่ง', w: 104, sort: true, filter: 'text' },
+            { key: 'ship', label: 'วันส่งพรม', w: 84, sort: true, filter: 'date' },
+            { key: 'invRef', label: 'INV อ้างอิง', w: 100, sort: true, filter: 'text' },
+            { key: 'kpi', label: 'KPI ส่งตามกำหนด', w: 196, sort: true, filter: 'select', options: [['', 'ทั้งหมด'], ['pass', 'ผ่าน'], ['fail', 'ไม่ผ่าน'], ['wait', 'รอส่ง'], ['none', 'ไม่มีข้อมูล']] }
+        ];
+        const kpiGrid = { mo: { sort: '', dir: 1, f: {}, rows: [] }, so: { sort: '', dir: 1, f: {}, rows: [] } };
+        let kpiGridTimer = null;
+        function kpiGridId(kind, part) { return 'kpi' + (kind === 'so' ? 'So' : 'Mo') + part; }
+        function kpiGridShellEnsure() {
+            const c = document.getElementById('kpiDueSplitContainer');
+            if (!c) return false;
+            if (document.getElementById('kpiMoTbody') && document.getElementById('kpiSoTbody')) return true;
+            const section = (kind, label, titleCls, hdrCls) => `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-3">
+                    <div class="px-4 py-2 ${hdrCls} border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                        <h4 class="text-xs font-bold ${titleCls}"><i class="fa-solid fa-tag mr-1"></i> ${label}</h4>
+                        <span class="flex flex-wrap items-center gap-2 text-[11px]">
+                            <span id="${kpiGridId(kind, 'Summary')}" class="text-slate-500"></span>
+                            <button type="button" onclick="kpiGridClear('${kind}')" class="text-[11px] font-semibold px-2 py-0.5 rounded border border-slate-300 text-slate-600 bg-white hover:bg-slate-50"><i class="fa-solid fa-filter-circle-xmark mr-1"></i>ล้างตัวกรอง</button>
+                        </span>
+                    </div>
+                    <div class="overflow-auto" style="max-height:75vh">
+                        <table class="ov-grid kpi-grid" id="${kpiGridId(kind, 'Table')}">
+                            <thead id="${kpiGridId(kind, 'Thead')}"></thead>
+                            <tbody id="${kpiGridId(kind, 'Tbody')}"></tbody>
+                        </table>
+                    </div>
+                </div>`;
+            c.innerHTML = section('mo', 'M/O', 'text-indigo-700', 'bg-indigo-50/60') + section('so', 'S/O', 'text-amber-700', 'bg-amber-50/60');
+            return true;
+        }
+        function kpiGridEnsureHeader(kind) {
+            const thead = document.getElementById(kpiGridId(kind, 'Thead'));
+            if (!thead || thead.dataset.built === '1') return;
+            const label = kind === 'so' ? 'S/O' : 'M/O';
+            const total = KPI_GRID_COLS.reduce((a, c) => a + c.w, 0);
+            const table = thead.closest('table');
+            table.style.width = '100%'; table.style.minWidth = total + 'px';
+            if (!table.querySelector('colgroup')) thead.insertAdjacentHTML('beforebegin', '<colgroup>' + KPI_GRID_COLS.map(c => `<col style="width:${c.w}px">`).join('') + '</colgroup>');
+            const h1 = KPI_GRID_COLS.map(c => `<th data-key="${c.key}" class="${c.cls || ''} ${c.sort ? 'ov-sortable' : ''}" ${c.sort ? `onclick="kpiGridSort('${kind}','${c.key}')" title="คลิกเพื่อเรียง"` : ''}>${c.label === '__MO__' ? label : c.label}${c.sort ? '<span class="ov-arrow">▲▼</span>' : ''}</th>`).join('');
+            const h2 = KPI_GRID_COLS.map(c => {
+                let inner = '';
+                if (c.filter === 'select') inner = `<select data-fkey="${c.key}" onchange="kpiGridFilter('${kind}','${c.key}',this.value)">${c.options.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('')}</select>`;
+                else if (c.filter) inner = `<input type="text" data-fkey="${c.key}" placeholder="${c.filter === 'num' ? '>10' : (c.filter === 'date' ? '2026-12' : 'กรอง…')}" oninput="kpiGridFilter('${kind}','${c.key}',this.value)">`;
+                return `<th class="${c.cls || ''}">${inner}</th>`;
+            }).join('');
+            thead.innerHTML = `<tr class="ov-h1">${h1}</tr><tr class="ov-h2">${h2}</tr>`;
+            thead.dataset.built = '1';
+        }
+        function kpiGridSort(kind, key) {
+            const g = kpiGrid[kind];
+            if (g.sort !== key) { g.sort = key; g.dir = 1; }
+            else if (g.dir === 1) g.dir = -1;
+            else { g.sort = ''; g.dir = 1; }
+            renderKpiDueDateReport();
+        }
+        function kpiGridFilter(kind, key, val) {
+            kpiGrid[kind].f[key] = String(val == null ? '' : val);
+            clearTimeout(kpiGridTimer);
+            kpiGridTimer = setTimeout(renderKpiDueDateReport, 120);
+        }
+        function kpiGridClear(kind) {
+            kpiGrid[kind].f = {};
+            const thead = document.getElementById(kpiGridId(kind, 'Thead'));
+            if (thead) thead.querySelectorAll('input,select').forEach(el => { el.value = ''; });
+            renderKpiDueDateReport();
+        }
+        function kpiGridModel(order, orderIndex, todayKey) {
+            const e = kpiDueEffective(order);
+            const st = kpiDueStatus(order, e, todayKey);
+            const num = v => (v === '' || v === null || v === undefined || !isFinite(Number(v))) ? null : Number(v);
+            const iso = v => normalizeDateString(v) || '';
+            return {
+                order, orderIndex, e, st,
+                v: {
+                    mo: overviewGridMoSortKey(order.moSo), moText: String(order.moSo || ''), opened: iso(order.openDate), customer: String(order.customerName || ''),
+                    po: String(order.customerPO || ''), quality: String(order.quality || ''), due: iso(order.dueDate), pieces: num(order.totalPieces), colors: num(order.colorsCount),
+                    sqm: num(order.totalSqm), grade: String(e.grade.v || ''), location: String(e.location.v || ''), start: iso(e.startDate.v), finish: iso(e.finishDate.v),
+                    pending: num(e.pendingQty.v), dnNo: String(e.deliveryNoteNo.v || ''), ship: iso(e.shippedDate.v), invRef: String(e.invNo.v || ''), kpi: st.rank
+                }
+            };
+        }
+        function kpiGridMatch(m, key, expr, col) {
+            expr = String(expr || '').trim(); if (!expr) return true;
+            const v = m.v;
+            if (col.filter === 'select') return key === 'kpi' ? m.st.code === expr : true;
+            if (col.filter === 'num') {
+                const n = v[key]; let r;
+                if ((r = expr.match(/^(>=|<=|>|<|=)\s*(-?\d+(?:\.\d+)?)$/))) { if (n === null) return false; const x = Number(r[2]); return r[1] === '>' ? n > x : r[1] === '>=' ? n >= x : r[1] === '<' ? n < x : r[1] === '<=' ? n <= x : n === x; }
+                if ((r = expr.match(/^(-?\d+(?:\.\d+)?)\s*[-–~]\s*(-?\d+(?:\.\d+)?)$/))) { if (n === null) return false; return n >= Math.min(Number(r[1]), Number(r[2])) && n <= Math.max(Number(r[1]), Number(r[2])); }
+                return String(n === null ? '' : n).includes(expr);
+            }
+            const sv = key === 'mo' ? v.moText : String(v[key] || '');
+            if (col.filter === 'date') {
+                const r = expr.match(/^(>=|<=|>|<)\s*(\S+)$/);
+                if (r) { if (!sv) return false; return r[1] === '>' ? sv > r[2] : r[1] === '>=' ? sv >= r[2] : r[1] === '<' ? sv < r[2] : sv <= r[2]; }
+            }
+            return sv.toLowerCase().includes(expr.toLowerCase());
+        }
+        function kpiGridApply(kind, list) {
+            const g = kpiGrid[kind];
+            const today = kpiTodayKey();
+            let models = list.map(x => kpiGridModel(x.order, x.orderIndex, today));
+            Object.keys(g.f).filter(k => String(g.f[k]).trim() !== '').forEach(key => {
+                const col = KPI_GRID_COLS.find(c => c.key === key); if (!col) return;
+                models = models.filter(m => kpiGridMatch(m, key, g.f[key], col));
+            });
+            if (g.sort) models = models.map((m, i) => ({ m, i })).sort((x, y) => overviewGridCompare(x.m, y.m, g.sort, g.dir) || (x.i - y.i)).map(x => x.m);
+            return models;
+        }
+        function kpiGridUpdateSortUi(kind) {
+            const thead = document.getElementById(kpiGridId(kind, 'Thead')); if (!thead) return;
+            const g = kpiGrid[kind];
+            thead.querySelectorAll('tr.ov-h1 th').forEach(th => {
+                const on = g.sort && th.dataset.key === g.sort;
+                th.classList.toggle('ov-active', !!on);
+                const ar = th.querySelector('.ov-arrow'); if (ar) ar.textContent = on ? (g.dir === 1 ? '▲' : '▼') : '▲▼';
+            });
+        }
+        function kpiGridRowHtml(m, no) {
+            const order = m.order, orderIndex = m.orderIndex, e = m.e;
+            const f = path => `updateOrderField(${orderIndex}, '${path}', this.value)`;
+            const baseCls = 'bg-white border-slate-200', autoCls = 'bg-teal-50 border-teal-200 text-teal-700';
+            const cls = x => x.auto ? autoCls : baseCls;
+            const tip = (x, why) => x.auto ? ` title="เติมอัตโนมัติจาก${why} — พิมพ์ทับได้"` : '';
+            const t = v => `<td class="ov-t" title="${escapeHtml(v || '')}">${v ? escapeHtml(v) : '<span class="text-slate-300">-</span>'}</td>`;
+            const n = (v, d) => `<td class="ov-n">${v === null || v === 0 || v === undefined ? '<span class="text-slate-300">-</span>' : (d ? Number(v).toFixed(d) : escapeHtml(String(v)))}</td>`;
+            const d = v => { const s = kpiShortDate(v); return `<td class="whitespace-nowrap">${s ? escapeHtml(s) : '<span class="text-slate-300">-</span>'}</td>`; };
+            const dnCell = e.deliveryNoteNo.fromInvoice
+                ? `<td class="ov-t text-teal-700 font-semibold" data-kpi-field="deliveryNoteNo" data-auto="1" title="เลขที่ใบส่งสินค้า (INVOICE) จาก Delivery Note ในแท็บ รายการรอส่ง">${escapeHtml(e.deliveryNoteNo.v)}</td>`
+                : `<td><input type="text" value="${escapeHtml(e.deliveryNoteNo.v)}" data-kpi-field="deliveryNoteNo" data-auto="0" onchange="${f('finishing.deliveryNoteNo')}" placeholder="-" class="kpi-in border ${baseCls}"></td>`;
+            const shipCell = e.shippedDate.fromInvoice
+                ? `<td class="whitespace-nowrap text-teal-700 font-semibold" data-kpi-field="shippedDate" title="วันที่ส่งตาม Delivery Note">${escapeHtml(kpiShortDate(e.shippedDate.v) || '-')}</td>`
+                : `<td class="whitespace-nowrap" data-kpi-field="shippedDate">${e.shippedDate.v ? escapeHtml(kpiShortDate(e.shippedDate.v)) : '<span class="text-slate-300">-</span>'}</td>`;
+            return `<tr data-kpi-row="${orderIndex}">
+                <td class="ov-s1 text-center text-[11px] font-bold text-slate-400">${no}</td>
+                <td class="ov-s2"><div class="flex items-center flex-wrap gap-x-1 min-w-0"><span class="font-bold ${moSoTextColorClass(order)} text-xs font-mono whitespace-nowrap">${escapeHtml(order.moSo)}</span></div>${kpiInOutBadgeHtml(order)}</td>
+                ${d(order.openDate)}${t(order.customerName)}${t(order.customerPO)}${t(order.quality)}${d(order.dueDate)}
+                ${n(m.v.pieces)}${n(m.v.colors)}${n(m.v.sqm, 2)}
+                <td><input type="text" value="${escapeHtml(e.grade.v)}" data-kpi-field="grade" data-auto="${e.grade.auto ? 1 : 0}"${tip(e.grade, 'บันทึกทอ/ใบวางแผน')} onchange="${f('weaving.grade')}" class="kpi-in border ${cls(e.grade)}"></td>
+                <td><input type="text" value="${escapeHtml(e.location.v)}" data-kpi-field="location" data-auto="${e.location.auto ? 1 : 0}"${tip(e.location, 'แผนกทอ (SIAM หรือผู้รับจ้างทอ)')} onchange="${f('weaving.location')}" class="kpi-in border ${cls(e.location)}"></td>
+                <td><input type="date" value="${escapeHtml(e.startDate.v)}" data-kpi-field="startDate" data-auto="${e.startDate.auto ? 1 : 0}"${tip(e.startDate, 'แผนกทอ (วันแรกที่ทอ / วันที่ส่งจ้างทอ)')} onchange="${f('weaving.startDate')}" class="kpi-in border ${cls(e.startDate)}"></td>
+                <td><input type="date" value="${escapeHtml(e.finishDate.v)}" data-kpi-field="finishDate" data-auto="${e.finishDate.auto ? 1 : 0}"${tip(e.finishDate, 'แผนกทอ (วันที่โอนไปแผนกตกแต่ง / วันที่รับพรมจากผู้รับจ้าง)')} onchange="${f('weaving.finishDate')}" class="kpi-in border ${cls(e.finishDate)}"></td>
+                <td><input type="number" step="1" value="${escapeHtml(String(e.pendingQty.v))}" data-kpi-field="pendingQty" data-auto="${e.pendingQty.auto ? 1 : 0}"${tip(e.pendingQty, 'จำนวนชิ้น × สัดส่วน ตร.ม. ที่ยังไม่ได้ทอ')} onchange="updateOrderField(${orderIndex}, 'weaving.pendingQty', Number(this.value))" class="kpi-in border ${cls(e.pendingQty)} text-right"></td>
+                ${dnCell}${shipCell}
+                <td><input type="text" value="${escapeHtml(e.invNo.v)}" data-kpi-field="invNo" data-auto="${e.invNo.auto ? 1 : 0}"${tip(e.invNo, 'ใบส่งสินค้า (INVOICE) ในแท็บ รายการรอส่ง')} onchange="${f('finishing.invNo')}" placeholder="-" class="kpi-in border ${cls(e.invNo)}"></td>
+                <td>${kpiStatusBadgeHtml(m.st)}</td>
+            </tr>`;
         }
 
         function renderKpiDueDateReport() {
@@ -23526,49 +23725,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 ]);
             }
 
-            const f = (orderIndex, path) => `updateOrderField(${orderIndex}, '${path}', this.value)`;
-            const baseCls = 'bg-slate-50 border-slate-200';
-            const autoCls = 'bg-teal-50 border-teal-200 text-teal-700';
-            const rowHtml = ({ order, orderIndex }) => {
-                const fin = order.finishing || {};
-                const e = kpiDueEffective(order);
-                const cls = (x) => x.auto ? autoCls : baseCls;
-                const tip = (x, why) => x.auto ? ` title="เติมอัตโนมัติจาก${why} — พิมพ์ทับได้"` : '';
-                return `
-                    <tr class="hover:bg-slate-50/80">
-                        <td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(kpiShortDate(order.openDate) || '-')}</td>
-                        <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${orderTypeBadgeHtml(order.orderType)}${escapeHtml(order.moSo)}${kpiInOutBadgeHtml(order)}</td>
-                        <td class="px-2 py-1.5">${escapeHtml(order.customerName || '-')}</td>
-                        <td class="px-2 py-1.5">${escapeHtml(order.customerPO || '-')}</td>
-                        <td class="px-2 py-1.5">${escapeHtml(order.quality || '-')}</td>
-                        <td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(kpiShortDate(order.dueDate) || '-')}</td>
-                        <td class="px-2 py-1.5 text-right">${order.totalPieces || 0}</td>
-                        <td class="px-2 py-1.5 text-right">${order.colorsCount || 0}</td>
-                        <td class="px-2 py-1.5 text-right">${(Number(order.totalSqm) || 0).toFixed(2)}</td>
-                        <td class="px-2 py-1.5"><input type="text" value="${escapeHtml(e.grade.v)}" data-kpi-field="grade" data-auto="${e.grade.auto ? 1 : 0}"${tip(e.grade, 'บันทึกทอ/ใบวางแผน')} onchange="${f(orderIndex, 'weaving.grade')}" class="w-16 px-1.5 py-1 border ${cls(e.grade)} rounded text-xs"></td>
-                        <td class="px-2 py-1.5"><input type="text" value="${escapeHtml(e.location.v)}" data-kpi-field="location" data-auto="${e.location.auto ? 1 : 0}"${tip(e.location, 'บันทึกทอ')} onchange="${f(orderIndex, 'weaving.location')}" class="w-36 px-1.5 py-1 border ${cls(e.location)} rounded text-xs"></td>
-                        <td class="px-2 py-1.5"><input type="date" value="${e.startDate.v}" data-kpi-field="startDate" data-auto="${e.startDate.auto ? 1 : 0}"${tip(e.startDate, 'บันทึกทอ (วันแรกที่ทอ)')} onchange="${f(orderIndex, 'weaving.startDate')}" class="px-1.5 py-1 border ${cls(e.startDate)} rounded text-xs"></td>
-                        <td class="px-2 py-1.5"><input type="date" value="${e.finishDate.v}" data-kpi-field="finishDate" data-auto="${e.finishDate.auto ? 1 : 0}"${tip(e.finishDate, 'การทอครบ/โอนออกจากแผนกทอ')} onchange="${f(orderIndex, 'weaving.finishDate')}" class="px-1.5 py-1 border ${cls(e.finishDate)} rounded text-xs"></td>
-                        <td class="px-2 py-1.5"><input type="number" step="1" value="${e.pendingQty.v}" data-kpi-field="pendingQty" data-auto="${e.pendingQty.auto ? 1 : 0}"${tip(e.pendingQty, 'จำนวนชิ้น × สัดส่วน ตร.ม. ที่ยังไม่ได้ทอ')} onchange="updateOrderField(${orderIndex}, 'weaving.pendingQty', Number(this.value))" class="w-14 px-1.5 py-1 border ${cls(e.pendingQty)} rounded text-xs text-right"></td>
-                        <td class="px-2 py-1.5"><input type="date" value="${e.transferDate.v}" data-kpi-field="transferDate" data-auto="${e.transferDate.auto ? 1 : 0}"${tip(e.transferDate, 'วันที่โอนออกจากแผนกทอ')} onchange="${f(orderIndex, 'weaving.transferDate')}" class="px-1.5 py-1 border ${cls(e.transferDate)} rounded text-xs"></td>
-                        <td class="px-2 py-1.5"><input type="text" value="${escapeHtml(e.deliveryNoteNo.v)}" data-kpi-field="deliveryNoteNo" data-auto="${e.deliveryNoteNo.auto ? 1 : 0}"${tip(e.deliveryNoteNo, 'ใบส่งสินค้า (เลขเดียวกับ INV) ในแท็บ รายการรอส่ง')} onchange="${f(orderIndex, 'finishing.deliveryNoteNo')}" class="w-28 px-1.5 py-1 border ${cls(e.deliveryNoteNo)} rounded text-xs"></td>
-                        <td class="px-2 py-1.5 whitespace-nowrap${e.shippedDate.auto ? ' text-teal-700' : ''}" data-kpi-field="shippedDate"${tip(e.shippedDate, 'วันที่ส่งตามใบส่งสินค้า')}>${escapeHtml(kpiShortDate(e.shippedDate.v) || '-')}</td>
-                        <td class="px-2 py-1.5"><input type="text" value="${escapeHtml(e.invNo.v)}" data-kpi-field="invNo" data-auto="${e.invNo.auto ? 1 : 0}"${tip(e.invNo, 'ใบส่งสินค้า (INVOICE) ในแท็บ รายการรอส่ง')} onchange="${f(orderIndex, 'finishing.invNo')}" placeholder="เลขที่ INV" class="w-28 px-1.5 py-1 border ${cls(e.invNo)} rounded text-xs"></td>
-                    </tr>
-                `;
-            };
-
-            const moList = list.filter(({ order }) => (order.orderType || detectOrderTypeFromMoSo(order.moSo)) !== 'SO');
-            const soList = list.filter(({ order }) => (order.orderType || detectOrderTypeFromMoSo(order.moSo)) === 'SO');
-            // NEW (2026-09-17): "เลขที่ INV อ้างอิง" column — a reference/document number (not a billing
-            // amount), entered by staff once the shipment is invoiced. Stored at order.finishing.invNo,
-            // same convention as deliveryNoteNo right next to it: kept local-only (localStorage + this
-            // report's own Excel export/import below), never added to the Apps Script/Google Sheet
-            // schema — same reasoning as the billing fields already excluded there (see the "ใบส่งของ" /
-            // "ใบ Mark & Nos" comment above). Per the user's own request, this links the ship date
-            // (วันส่งพรม, already reading order.shippedDate live) together with this reference number in
-            // one place: the "แผนกวางแผน" KPI "ส่งมอบทั้งหมด" report.
-            renderSplitOrderTypeTables('kpiDueSplitContainer', KPI_DUE_THEAD_HTML, moList.map(rowHtml).join(''), soList.map(rowHtml).join(''), moList.length, soList.length, 18);
+            if (!kpiGridShellEnsure()) return;
+            const isSo = ({ order }) => (order.orderType || detectOrderTypeFromMoSo(order.moSo)) === 'SO';
+            const lists = { mo: list.filter(x => !isSo(x)), so: list.filter(isSo) };
+            ['mo', 'so'].forEach(kind => {
+                kpiGridEnsureHeader(kind);
+                const models = kpiGridApply(kind, lists[kind]);
+                kpiGrid[kind].rows = models;
+                const tbody = document.getElementById(kpiGridId(kind, 'Tbody'));
+                if (tbody) tbody.innerHTML = models.length ? models.map((m, i) => kpiGridRowHtml(m, i + 1)).join('')
+                    : `<tr><td colspan="${KPI_GRID_COLS.length}" class="text-center text-slate-400 py-6 text-xs">ไม่มีรายการ</td></tr>`;
+                const pass = models.filter(m => m.st.code === 'pass').length, fail = models.filter(m => m.st.code === 'fail').length, wait = models.filter(m => m.st.code === 'wait').length;
+                const pct = (pass + fail) > 0 ? (pass / (pass + fail) * 100).toFixed(1) + '%' : '-';
+                const filtered = models.length !== lists[kind].length;
+                const sum = document.getElementById(kpiGridId(kind, 'Summary'));
+                if (sum) sum.innerHTML = `${models.length} รายการ${filtered ? ` (กรองจาก ${lists[kind].length})` : ''} · <span class="text-emerald-700 font-semibold">ผ่าน ${pass}</span> · <span class="text-rose-700 font-semibold">ไม่ผ่าน ${fail}</span> · <span class="text-amber-700 font-semibold">รอส่ง ${wait}</span> · KPI <span class="font-bold text-slate-700" data-kpi-pct>${pct}</span>`;
+                kpiGridUpdateSortUi(kind);
+            });
         }
 
         // ---- 3-4. ปริมาณไหมเหลือจากการทอ + Surplus ต่อ M/O -------------------------------------------
@@ -27217,25 +27390,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             { key: 'startDate', label: 'เริ่มทอ', type: 'date' },
             { key: 'finishDate', label: 'ทอเสร็จ', type: 'date' },
             { key: 'pendingQty', label: 'ค้างทอ', type: 'number' },
-            { key: 'transferDate', label: 'วันที่โอน', type: 'date' },
             { key: 'deliveryNoteNo', label: 'เลขที่ใบส่ง' },
             { key: 'shippedDate', label: 'วันส่งพรม' },
-            { key: 'invNo', label: 'เลขที่ INV อ้างอิง' }
+            { key: 'invNo', label: 'เลขที่ INV อ้างอิง' },
+            { key: 'kpi', label: 'KPI ส่งตามกำหนด' },
+            { key: 'kpiNote', label: 'หมายเหตุ KPI' }
         ];
 
         function exportKpiDueDateReport() {
-            const flatRows = productionOrders.map(order => {
-                const fin = order.finishing || {};
-                const e = kpiDueEffective(order); // ค่าที่พิมพ์เอง + ช่องที่เติมอัตโนมัติ (เหมือนที่เห็นบนหน้าจอ)
-                return {
-                    moSo: order.moSo, customerName: order.customerName, customerPO: order.customerPO,
-                    quality: order.quality, dueDate: order.dueDate, totalPieces: order.totalPieces,
-                    colorsCount: order.colorsCount, totalSqm: order.totalSqm,
-                    grade: e.grade.v, location: e.location.v, startDate: e.startDate.v, finishDate: e.finishDate.v,
-                    pendingQty: e.pendingQty.v, transferDate: e.transferDate.v, deliveryNoteNo: e.deliveryNoteNo.v,
-                    shippedDate: kpiShortDate(e.shippedDate.v), invNo: e.invNo.v
-                };
-            });
+            renderKpiDueDateReport();
+            // ส่งออกตามที่เห็นบนหน้าจอ (ผ่านการค้นหา/กรอง/เรียงแล้ว): M/O ก่อน แล้วตามด้วย S/O
+            const models = [...kpiGrid.mo.rows, ...kpiGrid.so.rows];
+            if (!models.length) { showToast('ไม่มีรายการให้ส่งออก', 'fa-circle-info', 'text-amber-400'); return; }
+            const flatRows = models.map(({ order, e, st }) => ({
+                moSo: order.moSo, customerName: order.customerName, customerPO: order.customerPO,
+                quality: order.quality, dueDate: order.dueDate, totalPieces: order.totalPieces,
+                colorsCount: order.colorsCount, totalSqm: order.totalSqm,
+                grade: e.grade.v, location: e.location.v, startDate: e.startDate.v, finishDate: e.finishDate.v,
+                pendingQty: e.pendingQty.v, deliveryNoteNo: e.deliveryNoteNo.v,
+                shippedDate: kpiShortDate(e.shippedDate.v), invNo: e.invNo.v,
+                kpi: st.label, kpiNote: st.note
+            }));
             exportFlatRowsToExcel('รายงานกำหนดส่งตามแผน.xlsx', 'กำหนดส่ง', PLANNING_DUE_COLUMNS, flatRows);
         }
 
@@ -27253,14 +27428,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     const order = productionOrders[orderIndex];
                     if (!order.weaving) order.weaving = {};
                     if (!order.finishing) order.finishing = {};
-                    if (r.grade !== '') order.weaving.grade = r.grade;
-                    if (r.location !== '') order.weaving.location = r.location;
-                    if (r.startDate !== '') order.weaving.startDate = r.startDate;
-                    if (r.finishDate !== '') order.weaving.finishDate = r.finishDate;
-                    if (r.pendingQty !== '') order.weaving.pendingQty = r.pendingQty;
-                    if (r.transferDate !== '') order.weaving.transferDate = r.transferDate;
-                    if (r.deliveryNoteNo !== '') order.finishing.deliveryNoteNo = r.deliveryNoteNo;
-                    if (r.invNo !== '') order.finishing.invNo = r.invNo;
+                    // เก็บเฉพาะค่าที่ต่างจากที่ระบบเติมให้อยู่แล้ว (กันค่าอัตโนมัติ เช่น SIAM ถูกล็อกเป็นค่าที่พิมพ์เอง)
+                    const eff = kpiDueEffective(order);
+                    const diff = (val, cur) => val !== '' && val !== undefined && String(val) !== String(cur);
+                    if (diff(r.grade, eff.grade.v)) order.weaving.grade = r.grade;
+                    if (diff(r.location, eff.location.v)) order.weaving.location = r.location;
+                    if (diff(r.startDate, eff.startDate.v)) order.weaving.startDate = r.startDate;
+                    if (diff(r.finishDate, eff.finishDate.v)) order.weaving.finishDate = r.finishDate;
+                    if (diff(r.pendingQty, eff.pendingQty.v)) order.weaving.pendingQty = r.pendingQty;
+                    if (diff(r.deliveryNoteNo, eff.deliveryNoteNo.v) && !eff.deliveryNoteNo.fromInvoice) order.finishing.deliveryNoteNo = r.deliveryNoteNo;
+                    if (diff(r.invNo, eff.invNo.v)) order.finishing.invNo = r.invNo;
                     persistOrderChange(order);
                     matched++;
                 });
@@ -27453,7 +27630,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             { key: 'scrapSqm', label: 'เศษผ้า / ตร.ม.', type: 'number' },
             { key: 'qty', label: 'จำนวน', type: 'number' },
             { key: 'unit', label: 'หน่วย' },
-            { key: 'transferDate', label: 'วันที่โอน', type: 'date' },
             { key: 'note', label: 'หมายเหตุ' }
         ];
 
