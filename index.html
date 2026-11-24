@@ -4233,7 +4233,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-138';
+        const APP_BUILD = 'QCDashboard-139';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -16080,7 +16080,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 planned: !!raw.planned,
                 savedAt: raw.savedAt || '',
                 piecesOn: !!raw.piecesOn,
-                pieces: (Array.isArray(raw.pieces) ? raw.pieces : []).map(p => ({ w: Number(p.w) || 0, l: Number(p.l) || 0, qty: Number(p.qty) || 1 })),
+                pieces: (Array.isArray(raw.pieces) ? raw.pieces : []).map(p => ({ w: Number(p.w) || 0, l: Number(p.l) || 0, qty: Number(p.qty) || 1, blankPct: Math.min(100, Math.max(0, Number(p.blankPct) || 0)) })),
+                piecePctOn: !!raw.piecePctOn,   // 2026-11-24: แยก % สี + % พื้นที่ว่าง รายชิ้น (ตามแบบของแต่ละชิ้น)
                 gradeManual: !!raw.gradeManual,
                 gradeOverride: { weaving: ov.weaving || '', design: ov.design || '', finishing: ov.finishing || '' },
                 colorRows: (Array.isArray(raw.colorRows) ? raw.colorRows : []).map(r => ({
@@ -16089,6 +16090,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     technique: PLANNING_WS_TECHNIQUES.some(t => t.key === r.technique) ? r.technique : PLANNING_WS_TECHNIQUES[0].key,
                     areaMode: r.areaMode === 'sqm' ? 'sqm' : 'pct',
                     value: Number(r.value) || 0,
+                    piecePct: (Array.isArray(r.piecePct) ? r.piecePct : []).map(v => Math.min(100, Math.max(0, Number(v) || 0))),   // 2026-11-24: % ของสีนี้ในแต่ละชิ้น (ใช้เมื่อเปิดโหมดแยกรายชิ้น)
                     quality: r.quality || '',
                     lot: r.lot || '',   // 2026-11-16: LOT ไหมของแถวสี (ส่งต่อไปแผนสั่งย้อม)
                     family: String(r.family || ''),   // 2026-11-18: สเปคไหม (WO 380/1 / Bamboo / Nylon…) — ว่าง = ตามคุณภาพที่เลือก
@@ -16218,21 +16220,35 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         // ---- คำนวณน้ำหนักไหมสั่งย้อมจากแถวสี ----
+        // 2026-11-24: โหมดแยก % สี/% พื้นที่ว่าง รายชิ้น — "พื้นที่ว่างมีในการคำนวณด้วย คำนวณการย้อมแยกกัน ถ้าสีเดียวกันค่อยมารวมย้อมกัน"
+        //   แต่ละชิ้นมีตารางสี (% ต่อสี + % ว่าง X) ของตัวเองตามแบบ: พื้นที่สีของชิ้น = กว้าง×ยาว×จำนวน × %สี ของชิ้นนั้น
+        //   น้ำหนักไหมคำนวณแยกชิ้น แล้วรวมต่อรหัสสี (แถวสีเดียวกัน) ก่อนบวกเผื่อ/ปัดทศนิยม → ยอดสั่งย้อมต่อสี
+        function planningWsPerPiece(ws) { return !!(ws && ws.piecesOn && ws.piecePctOn && Array.isArray(ws.pieces) && ws.pieces.length > 0); }
+        function planningWsPieceGross(p) { return (Number(p.w) || 0) * (Number(p.l) || 0) * (Number(p.qty) || 0); }
+        function planningWsPiecePctArr(r, n) { const a = Array.isArray(r.piecePct) ? r.piecePct : []; const out = []; for (let i = 0; i < n; i++) out.push(Math.max(0, Number(a[i]) || 0)); return out; }
         function planningWsComputeColors(order) {
             const ws = planningWsGet(order);
             const total = planningWsTotalArea(order);
             const allowance = Number(ws.allowancePct) || 0;
+            const perPiece = planningWsPerPiece(ws);
+            const pcs = perPiece ? ws.pieces.map(p => ({ gross: planningWsPieceGross(p), blankPct: Number(p.blankPct) || 0 })) : [];
             const rows = ws.colorRows.map((r, i) => {
                 const q = planningWsRowQuality(r);
                 const gsm = planningWsQualityGsm(q);
                 const kgPerSqm = gsm / 1000;
-                const area = r.areaMode === 'sqm' ? (Number(r.value) || 0) : total * (Number(r.value) || 0) / 100;
+                let pieceAreas = null, area;
+                if (perPiece && r.areaMode !== 'sqm') {
+                    const arr = planningWsPiecePctArr(r, pcs.length);
+                    pieceAreas = pcs.map((p, k) => p.gross * arr[k] / 100);
+                    area = pieceAreas.reduce((a, b) => a + b, 0);
+                } else area = r.areaMode === 'sqm' ? (Number(r.value) || 0) : total * (Number(r.value) || 0) / 100;
                 const kg = area * kgPerSqm;
                 const rowAllow = (r.allowancePct === '' || r.allowancePct === undefined) ? allowance : (Number(r.allowancePct) || 0);
                 const dec = (r.roundDec === '' || r.roundDec === undefined) ? ws.roundDec : r.roundDec;
                 const rawNetKg = kg * (1 + rowAllow / 100);
-                // netKg = ยอดสั่งย้อมของแถวนี้ (รวมเผื่อ และปัดทศนิยมตามที่ตั้ง) — ผลรวมของใบใช้ค่านี้ ไม่ใช่ค่าก่อนปัด
-                return { row: r, index: i, quality: q, kgPerSqm, area, kg, allowance: rowAllow, dec, rawNetKg, netKg: planningWsRoundBy(rawNetKg, dec, ws.roundMode) };
+                const pctEff = r.areaMode === 'sqm' ? null : (perPiece ? (total > 0 ? area / total * 100 : 0) : (Number(r.value) || 0));
+                // netKg = ยอดสั่งย้อมของแถวนี้ (รวมเผื่อ และปัดทศนิยมตามที่ตั้ง) — ผลรวมของใบใช้ค่านี้ ไม่ใช้น้ำหนักฐานรวมแล้วค่อยบวกเผื่อ (กันยอดไม่ตรงกับตารางตอนปัด)
+                return { row: r, index: i, quality: q, kgPerSqm, area, kg, allowance: rowAllow, dec, rawNetKg, netKg: planningWsRoundBy(rawNetKg, dec, ws.roundMode), pieceAreas, pieceKg: pieceAreas ? pieceAreas.map(a => a * kgPerSqm) : null, pctEff };
             });
             const baseKg = rows.reduce((s, x) => s + x.kg, 0);
             const areaSum = rows.reduce((s, x) => s + x.area, 0);
@@ -16243,7 +16259,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 g.count++; g.kg += x.kg; g.netKg += x.netKg;
             });
             const netKg = rows.reduce((s, x) => s + x.netKg, 0);
-            return { rows, total, allowance, defaultDec: ws.roundDec, roundMode: ws.roundMode, baseKg, netKg, areaSum, pctSum, groups: Object.keys(groups).map(k => groups[k]) };
+            const pieces = perPiece ? pcs.map((p, k) => {
+                const colorPct = ws.colorRows.reduce((s, r) => s + (r.areaMode === 'sqm' ? 0 : planningWsPiecePctArr(r, pcs.length)[k]), 0);
+                const colorArea = rows.reduce((s, x) => s + (x.pieceAreas ? x.pieceAreas[k] : 0), 0);
+                const kg = rows.reduce((s, x) => s + (x.pieceKg ? x.pieceKg[k] : 0), 0);
+                return { index: k, gross: p.gross, blankPct: p.blankPct, blankArea: p.gross * p.blankPct / 100, colorPct, colorArea, kg, ok: Math.abs(colorPct + p.blankPct - 100) < 0.05 };
+            }) : [];
+            const blankAreaTotal = pieces.reduce((s, x) => s + x.blankArea, 0);
+            const blankPctEff = perPiece ? (total > 0 ? blankAreaTotal / total * 100 : 0) : (Number(ws.blankPct) || 0);
+            return { rows, total, allowance, defaultDec: ws.roundDec, roundMode: ws.roundMode, baseKg, netKg, areaSum, pctSum, groups: Object.keys(groups).map(k => groups[k]), perPiece, pieces, blankAreaTotal, blankPctEff };
         }
 
 
@@ -16455,7 +16479,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 if (!code && !(x.netKg > 0)) return;
                 const e = slot(code || '(ไม่มีรหัส)');
                 e.aiKg = (e.aiKg || 0) + x.netKg; e.aiBase = (e.aiBase || 0) + x.kg;
-                if (x.row.areaMode === 'pct') e.aiPct = (e.aiPct || 0) + (Number(x.row.value) || 0);
+                if (x.row.areaMode === 'pct') e.aiPct = (e.aiPct || 0) + (x.pctEff !== null && x.pctEff !== undefined ? x.pctEff : (Number(x.row.value) || 0));
                 if (!e.aiYarn && x.row.yarn) e.aiYarn = x.row.yarn;
             });
             excelColors.forEach(x => {
@@ -16793,17 +16817,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     </div>
                     ${ws.pieces.length === 0 ? '<p class="text-[11px] text-slate-400">ยังไม่มีชิ้น — กด "+ เพิ่มชิ้น"</p>' : `
                     <table class="w-full text-xs">
-                        <thead><tr class="text-[10px] text-slate-500 text-left"><th class="py-1 w-10">ชิ้น</th><th>กว้าง (ม.)</th><th>ยาว (ม.)</th><th>จำนวน</th><th class="text-right">ตร.ม.</th><th class="w-8"></th></tr></thead>
+                        <thead><tr class="text-[10px] text-slate-500 text-left"><th class="py-1 w-10">ชิ้น</th><th>กว้าง (ม.)</th><th>ยาว (ม.)</th><th>จำนวน</th>${ws.piecePctOn ? '<th>% ว่าง (X)</th>' : ''}<th class="text-right">ตร.ม.</th><th class="w-8"></th></tr></thead>
                         <tbody>${ws.pieces.map((p, i) => `
                             <tr class="border-t border-slate-100">
                                 <td class="py-1 text-slate-500">${i + 1}</td>
                                 <td><input type="number" min="0" step="0.01" value="${p.w || ''}" onchange="planningWsPieceField(${orderIndex}, ${i}, 'w', this.value)" class="w-20 p-1 border border-slate-300 rounded"></td>
                                 <td><input type="number" min="0" step="0.01" value="${p.l || ''}" onchange="planningWsPieceField(${orderIndex}, ${i}, 'l', this.value)" class="w-20 p-1 border border-slate-300 rounded"></td>
                                 <td><input type="number" min="1" step="1" value="${p.qty || ''}" onchange="planningWsPieceField(${orderIndex}, ${i}, 'qty', this.value)" class="w-16 p-1 border border-slate-300 rounded"></td>
+                                ${ws.piecePctOn ? `<td><input type="number" min="0" max="100" step="0.01" value="${p.blankPct || ''}" placeholder="0" data-pw-piece-blank="${i}" onchange="planningWsPieceField(${orderIndex}, ${i}, 'blankPct', this.value)" class="w-16 p-1 border border-slate-300 rounded"></td>` : ''}
                                 <td class="text-right font-medium">${planningWsFmt((Number(p.w) || 0) * (Number(p.l) || 0) * (Number(p.qty) || 0), 2)}</td>
                                 <td class="text-right"><button type="button" onclick="planningWsRemovePiece(${orderIndex}, ${i})" class="text-slate-400 hover:text-rose-600 px-1" title="ลบชิ้นนี้">✕</button></td>
                             </tr>`).join('')}</tbody>
-                        <tfoot><tr class="border-t border-slate-200"><td colspan="4" class="py-1 font-semibold text-slate-700 text-right">รวมพื้นที่</td><td class="text-right font-bold text-slate-900">${planningWsFmt(sum, 2)}</td><td></td></tr></tfoot>
+                        <tfoot><tr class="border-t border-slate-200"><td colspan="${ws.piecePctOn ? 5 : 4}" class="py-1 font-semibold text-slate-700 text-right">รวมพื้นที่</td><td class="text-right font-bold text-slate-900">${planningWsFmt(sum, 2)}</td><td></td></tr></tfoot>
                     </table>`}
                 </div>`;
         }
@@ -16913,8 +16938,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         function planningWsSection2Html(order, orderIndex) {
             const ws = planningWsGet(order);
             const c = planningWsComputeColors(order);
-            const blankPct = Number(ws.blankPct) || 0;
-            const pctOk = Math.abs(c.pctSum + blankPct - 100) < 0.05;
+            const blankPct = c.perPiece ? c.blankPctEff : (Number(ws.blankPct) || 0);
+            const pctOk = c.perPiece ? c.pieces.every(pc => pc.ok) : Math.abs(c.pctSum + blankPct - 100) < 0.05;
             const sd = planningWsSiamDiff(order, c);
             const rowsHtml = c.rows.map((x, i) => {
                 const r = x.row;
@@ -16938,8 +16963,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         <td class="py-2 pr-2 min-w-[150px]">
                             <div class="flex items-center gap-1">
                                 <label class="flex items-center gap-1 text-[10px] text-slate-500 whitespace-nowrap"><input type="checkbox" ${r.areaMode === 'sqm' ? 'checked' : ''} onchange="planningWsRowField(${orderIndex}, '${r.id}', 'areaMode', this.checked ? 'sqm' : 'pct')"> ตร.ม.</label>
-                                <input type="number" min="0" step="0.01" value="${r.value || ''}" placeholder="0" onchange="planningWsRowField(${orderIndex}, '${r.id}', 'value', this.value)" class="w-20 p-1.5 border border-slate-300 rounded bg-white text-xs">
-                                <span class="text-[10px] text-slate-500">${r.areaMode === 'sqm' ? 'ตร.ม.' : '%'}</span>
+                                ${(c.perPiece && r.areaMode !== 'sqm')
+                                    ? `<div class="flex gap-1" data-pw-piece-pcts>${c.pieces.map((pc, k) => `<div><span class="block text-[9px] text-slate-400 text-center">ชิ้น ${k + 1} %</span><input type="number" min="0" max="100" step="0.01" value="${(Number((r.piecePct || [])[k]) || '') }" placeholder="0" data-pw-piece-pct="${k}" onchange="planningWsRowPiecePct(${orderIndex}, '${r.id}', ${k}, this.value)" class="w-16 p-1.5 border border-slate-300 rounded bg-white text-xs"></div>`).join('')}</div>`
+                                    : `<input type="number" min="0" step="0.01" value="${r.value || ''}" placeholder="0" onchange="planningWsRowField(${orderIndex}, '${r.id}', 'value', this.value)" class="w-20 p-1.5 border border-slate-300 rounded bg-white text-xs">
+                                <span class="text-[10px] text-slate-500">${r.areaMode === 'sqm' ? 'ตร.ม.' : '%'}</span>`}
                             </div>
                         </td>
                         <td class="py-2 pr-2 min-w-[170px]">
@@ -16947,7 +16974,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         </td>
                         <td class="py-2 pr-2 text-right whitespace-nowrap font-medium text-slate-700">${x.kgPerSqm > 0 ? planningWsFmt(x.kgPerSqm, 3) : '-'}</td>
                         <td class="py-2 pr-2 text-right whitespace-nowrap text-slate-700">${x.area > 0 ? planningWsFmt(x.area, 2) : '-'}</td>
-                        <td class="py-2 pr-2 text-right whitespace-nowrap font-semibold text-slate-900" data-pw-row-kg>${x.kg > 0 ? planningWsFmt(x.kg, 3) : '-'}</td>
+                        <td class="py-2 pr-2 text-right whitespace-nowrap font-semibold text-slate-900" data-pw-row-kg>${x.kg > 0 ? planningWsFmt(x.kg, 3) : '-'}${x.pieceKg ? `<div class="text-[9px] font-normal text-slate-500 leading-tight whitespace-normal" data-pw-piece-kg>${x.pieceKg.map((v, k) => `ชิ้น ${k + 1}: ${planningWsFmt(v, 3)}`).join('<br>')}</div>` : ''}</td>
                         <td class="py-2 pr-2 whitespace-nowrap">
                             <div class="flex items-center gap-1"><input type="number" min="0" step="0.5" data-pw-row-allow value="${r.allowancePct === '' ? '' : r.allowancePct}" placeholder="${planningWsFmt(c.allowance, 1)}" title="เผื่อ % ของสีนี้ (เว้นว่าง = ใช้ค่ารวม ${planningWsFmt(c.allowance, 1)}%)" onchange="planningWsRowField(${orderIndex}, '${r.id}', 'allowancePct', this.value)" class="w-16 p-1.5 border ${r.allowancePct === '' ? 'border-slate-300' : 'border-teal-400 bg-teal-50/40'} rounded bg-white text-xs"><span class="text-[10px] text-slate-500">%</span></div>
                         </td>
@@ -16978,7 +17005,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                             <h3 class="font-bold text-sm text-slate-900">2) คำนวณน้ำหนักไหมสั่งย้อม</h3>
                             <p class="text-[10px] text-slate-500">ระบุสี/ส่วนพื้นที่ แล้วเลือก "คุณภาพ" ให้ AI คำนวณน้ำหนักไหมให้ (สูตร Stitch/Row/Pile Height/Tex/จำนวนเส้นไหม อ้างอิงจาก Tufting Spec ของฝ่ายผลิต) — เลือก "ทำพรมเฉพาะ" เพื่อกำหนดเกรด</p>
                         </div>
-                        <button type="button" onclick="planningWsAddRow(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50">+ เพิ่มแถวสี</button>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button type="button" data-pw-piecepct-toggle onclick="planningWsTogglePiecePct(${orderIndex})" title="ใช้เมื่อ M/O มีหลายชิ้นและแบบแต่ละชิ้นมี % สี/% พื้นที่ว่างไม่เท่ากัน" class="px-3 py-1.5 text-xs font-semibold rounded border ${c.perPiece ? 'bg-teal-700 text-white border-teal-700 hover:bg-teal-800' : 'text-teal-700 border-teal-600 bg-white hover:bg-teal-50'}">${c.perPiece ? '✓ แยก % สีรายชิ้น (เปิดอยู่)' : 'แยก % สี/พื้นที่ว่าง รายชิ้น'}</button>
+                            <button type="button" onclick="planningWsAddRow(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50">+ เพิ่มแถวสี</button>
+                        </div>
                     </div>
                     ${planningWsLegendPanelHtml(order, orderIndex)}
                     <div class="flex flex-wrap items-end gap-2">
@@ -16998,12 +17028,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         </table>
                     </div>`}
                     <div class="flex flex-wrap gap-2 items-stretch">
+                        ${c.perPiece ? planningWsPiecePanelHtml(order, orderIndex, c) : `
                         <div class="border-t-4 ${pctOk ? 'border-emerald-500' : 'border-rose-500'} border-x border-b border-slate-200 rounded-md px-3 py-2 min-w-[120px]"><p class="text-[10px] text-slate-500">รวม % ที่กรอก</p><p id="pwPctSum" class="text-lg font-bold ${pctOk ? 'text-emerald-600' : 'text-rose-600'}">${planningWsFmt(c.pctSum, 2)}%</p>${blankPct > 0 ? `<p class="text-[10px] text-slate-500" data-pw-blank>+ พื้นที่ว่าง (X) ${planningWsFmt(blankPct, 2)}% ไม่คำนวณ</p>` : ''}</div>
                         <div class="min-w-[170px]" data-pw-blank-card>
                             <label class="block text-[10px] text-slate-500">% พื้นที่ว่าง (พรมวงรี/ไม่เต็มสี่เหลี่ยม)</label>
                             <div class="flex items-center gap-1"><input id="pwBlankPct" type="number" min="0" max="100" step="0.01" value="${blankPct > 0 ? blankPct : ''}" placeholder="0" onchange="planningWsSetBlank(${orderIndex}, this.value)" class="w-20 p-2 text-sm font-semibold border ${blankPct > 0 ? 'border-teal-400 bg-teal-50/40' : 'border-slate-300'} rounded bg-white"><span class="text-[10px] text-slate-500">%</span>
                                 <button type="button" data-pw-blank-fill onclick="planningWsFillBlank(${orderIndex})" ${Math.abs(100 - c.pctSum - blankPct) < 0.005 ? 'disabled' : ''} title="ใส่ 100 − รวม % ที่กรอก เป็นพื้นที่ว่าง" class="px-2 py-1.5 text-[10px] font-semibold rounded border ${Math.abs(100 - c.pctSum - blankPct) < 0.005 ? 'border-slate-200 text-slate-300 cursor-not-allowed' : 'border-teal-600 text-teal-700 hover:bg-teal-50'} bg-white whitespace-nowrap">เติมส่วนที่เหลือ</button></div>
                             <p class="text-[9px] text-slate-400 mt-0.5" data-pw-blank-hint>${blankPct > 0 && c.total > 0 ? `ว่าง ≈ ${planningWsFmt(c.total * blankPct / 100, 2)} ตร.ม. ไม่คิดน้ำหนักไหม · ` : ''}รวมสี + ว่าง = ${planningWsFmt(c.pctSum + blankPct, 2)}%</p></div>
+`}
                         <div class="min-w-[110px]"><label class="block text-[10px] text-slate-500">บวกเผื่อ (%)</label>
                             <input id="pwAllowance" type="number" min="0" step="0.5" value="${ws.allowancePct}" onchange="planningWsSetAllowance(${orderIndex}, this.value)" class="w-full p-2 text-sm font-semibold border border-slate-300 rounded bg-white"><p class="text-[9px] text-slate-400 mt-0.5">ค่าตั้งต้นทุกสี (แก้รายสีได้ในตาราง)</p></div>
                         <div class="min-w-[150px]"><label class="block text-[10px] text-slate-500">ปัดทศนิยมยอดสั่งย้อม</label>
@@ -17161,21 +17193,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             }
         }
         function planningWsAddPiece(orderIndex) {
-            planningWsMutate(orderIndex, (ws, order) => { ws.pieces.push({ w: 0, l: 0, qty: 1 }); planningWsSyncPiecesArea(order, ws); });
+            planningWsMutate(orderIndex, (ws, order) => { ws.pieces.push({ w: 0, l: 0, qty: 1, blankPct: 0 }); planningWsSyncPiecesArea(order, ws); planningWsSyncValues(order, ws); });
         }
         function planningWsRemovePiece(orderIndex, i) {
-            planningWsMutate(orderIndex, (ws, order) => { ws.pieces.splice(i, 1); planningWsSyncPiecesArea(order, ws); });
+            planningWsMutate(orderIndex, (ws, order) => { ws.pieces.splice(i, 1); ws.colorRows.forEach(r => { if (Array.isArray(r.piecePct)) r.piecePct.splice(i, 1); }); if (ws.pieces.length === 0) ws.piecePctOn = false; planningWsSyncPiecesArea(order, ws); planningWsSyncValues(order, ws); });
         }
         function planningWsPieceField(orderIndex, i, field, value) {
             planningWsMutate(orderIndex, (ws, order) => {
                 if (!ws.pieces[i]) return;
-                ws.pieces[i][field] = Math.max(0, Number(value) || 0);
+                ws.pieces[i][field] = field === 'blankPct' ? Math.min(100, Math.max(0, Number(value) || 0)) : Math.max(0, Number(value) || 0);
                 planningWsSyncPiecesArea(order, ws);
+                planningWsSyncValues(order, ws);
             });
         }
         function planningWsPiecesFromSales(orderIndex) {
             planningWsMutate(orderIndex, (ws, order) => {
-                ws.pieces = (order.sizeItems || []).filter(it => it.width || it.length).map(it => ({ w: Number(it.width) || 0, l: Number(it.length) || 0, qty: Number(it.qty) || 1 }));
+                ws.pieces = (order.sizeItems || []).filter(it => it.width || it.length).map(it => ({ w: Number(it.width) || 0, l: Number(it.length) || 0, qty: Number(it.qty) || 1, blankPct: Math.min(100, Math.max(0, Number(it.voidPercent) || 0)) }));
                 planningWsSyncPiecesArea(order, ws);
             });
         }
@@ -17191,7 +17224,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const tech = technique || PLANNING_WS_TECHNIQUES[0].key;
             let quality = guess;
             if (quality && planningWsFindQuality(quality).type !== planningWsTechniqueType(tech) && planningWsFindQuality(quality).type !== 'manual') quality = '';
-            return { id: 'pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), code: '', yarn: '', stipple: false, technique: tech, areaMode: 'pct', value: 0, quality, lot: '', allowancePct: '', roundDec: '', ocr: '', family: '', ph: '', orderKg: '' };
+            return { id: 'pw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), code: '', yarn: '', stipple: false, technique: tech, areaMode: 'pct', value: 0, piecePct: [], quality, lot: '', allowancePct: '', roundDec: '', ocr: '', family: '', ph: '', orderKg: '' };
         }
         // จำนวนสีเปลี่ยน -> เกรดทอใช้ "จำนวนสีสูงสุด" ด้วย จึงยกให้ไม่ต่ำกว่าจำนวนสี (ไม่เคยลดค่าที่กรอก/นำเข้าไว้)
         function planningWsSyncColorCount(order, ws) {
@@ -17213,6 +17246,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 const each = planningWsRound(100 / n, 2);
                 ws.blankPct = 0;
                 ws.colorRows.forEach((r, i) => { r.areaMode = 'pct'; r.value = i === n - 1 ? planningWsRound(100 - each * (n - 1), 2) : each; });
+                if (planningWsPerPiece(ws)) { ws.pieces.forEach(p => { p.blankPct = 0; }); ws.colorRows.forEach(r => { r.piecePct = ws.pieces.map(() => r.value); }); }
                 planningWsSyncColorCount(order, ws);
             });
         }
@@ -17276,6 +17310,125 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 ws.blankPct = planningWsRound(Math.min(100, Math.max(0, 100 - c.pctSum)), 2);
             });
         }
+        // ---- 2026-11-24: แยก % สี + % พื้นที่ว่าง รายชิ้น ----
+        // r.value / ws.blankPct ถูกคำนวณย้อนกลับเป็น % รวมทั้งใบ (ถ่วงด้วยพื้นที่แต่ละชิ้น) เพื่อให้ส่วนอื่นและโหมดปกติยังใช้ได้
+        function planningWsSyncValues(order, ws) {
+            if (!planningWsPerPiece(ws)) return;
+            const total = planningWsTotalArea(order), n = ws.pieces.length;
+            const gross = ws.pieces.map(planningWsPieceGross);
+            ws.colorRows.forEach(r => {
+                if (r.areaMode === 'sqm') return;
+                const arr = planningWsPiecePctArr(r, n);
+                r.piecePct = arr;
+                const area = gross.reduce((s, g, k) => s + g * arr[k] / 100, 0);
+                r.value = total > 0 ? planningWsRound(area / total * 100, 2) : 0;
+            });
+            const ba = gross.reduce((s, g, k) => s + g * (Number(ws.pieces[k].blankPct) || 0) / 100, 0);
+            ws.blankPct = total > 0 ? planningWsRound(ba / total * 100, 2) : 0;
+        }
+        function planningWsTogglePiecePct(orderIndex) {
+            planningWsMutate(orderIndex, (ws, order) => {
+                if (ws.piecePctOn) { planningWsSyncValues(order, ws); ws.piecePctOn = false; return; }   // ปิด: คืนเป็น % รวมทั้งใบ
+                if (!ws.piecesOn) ws.piecesOn = true;
+                if (ws.pieces.length === 0) {
+                    ws.pieces = (order.sizeItems || []).filter(it => it.width || it.length).map(it => ({ w: Number(it.width) || 0, l: Number(it.length) || 0, qty: Number(it.qty) || 1, blankPct: Math.min(100, Math.max(0, Number(it.voidPercent) || 0)) }));
+                }
+                if (ws.pieces.length === 0) { showToast('ใส่ขนาดแต่ละชิ้นใน "แยกพื้นที่เป็นรายชิ้น" ก่อน แล้วกดอีกครั้ง', 'fa-circle-info', 'text-amber-400'); return; }
+                planningWsSyncPiecesArea(order, ws);
+                ws.piecePctOn = true;
+                // เริ่มต้น: ทุกชิ้นใช้ % เดิมของใบ (แก้รายชิ้นตามแบบต่อได้)
+                ws.colorRows.forEach(r => { if (!Array.isArray(r.piecePct) || r.piecePct.length === 0) r.piecePct = ws.pieces.map(() => r.areaMode === 'sqm' ? 0 : (Number(r.value) || 0)); });
+                ws.pieces.forEach(p => { if (!(Number(p.blankPct) > 0)) p.blankPct = Number(ws.blankPct) || 0; });
+                planningWsSyncValues(order, ws);
+            });
+        }
+        function planningWsRowPiecePct(orderIndex, rowId, k, raw) {
+            planningWsMutate(orderIndex, (ws, order) => {
+                const row = ws.colorRows.find(r => r.id === rowId); if (!row) return;
+                const arr = planningWsPiecePctArr(row, ws.pieces.length);
+                arr[k] = Math.min(100, Math.max(0, Number(raw) || 0));
+                row.piecePct = arr;
+                planningWsSyncValues(order, ws);
+            });
+        }
+        function planningWsPieceBlankFill(orderIndex, k) {
+            planningWsMutate(orderIndex, (ws, order) => {
+                if (!ws.pieces[k]) return;
+                const sum = ws.colorRows.reduce((s, r) => s + (r.areaMode === 'sqm' ? 0 : planningWsPiecePctArr(r, ws.pieces.length)[k]), 0);
+                ws.pieces[k].blankPct = planningWsRound(Math.min(100, Math.max(0, 100 - sum)), 2);
+                planningWsSyncValues(order, ws);
+            });
+        }
+        function planningWsPiecePanelHtml(order, orderIndex, c) {
+            const ws = planningWsGet(order);
+            const f = v => planningWsFmt(v, 2);
+            const rows = c.pieces.map((pc, k) => {
+                const p = ws.pieces[k];
+                const sumOk = pc.ok;
+                return `<tr class="border-t border-slate-100 align-middle" data-pw-piece-row="${k}">
+                    <td class="py-1.5 pr-2 font-semibold text-slate-700">ชิ้น ${k + 1}</td>
+                    <td class="py-1.5 pr-2 text-slate-600 whitespace-nowrap">${p.w || 0} × ${p.l || 0}${(Number(p.qty) || 1) > 1 ? ` × ${p.qty}` : ''}</td>
+                    <td class="py-1.5 pr-2 text-right">${f(pc.gross)}</td>
+                    <td class="py-1.5 pr-2 text-right" data-pw-piece-colorpct>${f(pc.colorPct)}%</td>
+                    <td class="py-1.5 pr-2"><div class="flex items-center gap-1"><input type="number" min="0" max="100" step="0.01" value="${pc.blankPct > 0 ? pc.blankPct : ''}" placeholder="0" data-pw-piece-blank="${k}" onchange="planningWsPieceField(${orderIndex}, ${k}, 'blankPct', this.value)" class="w-16 p-1.5 text-xs font-semibold border ${pc.blankPct > 0 ? 'border-teal-400 bg-teal-50/40' : 'border-slate-300'} rounded bg-white"><button type="button" data-pw-piece-fill="${k}" onclick="planningWsPieceBlankFill(${orderIndex}, ${k})" ${Math.abs(100 - pc.colorPct - pc.blankPct) < 0.005 ? 'disabled' : ''} title="ใส่ 100 − รวม % สีของชิ้นนี้ เป็นพื้นที่ว่าง" class="px-1.5 py-1 text-[10px] font-semibold rounded border ${Math.abs(100 - pc.colorPct - pc.blankPct) < 0.005 ? 'border-slate-200 text-slate-300 cursor-not-allowed' : 'border-teal-600 text-teal-700 hover:bg-teal-50'} bg-white whitespace-nowrap">เติม</button></div></td>
+                    <td class="py-1.5 pr-2 text-right font-bold ${sumOk ? 'text-emerald-600' : 'text-rose-600'}" data-pw-piece-sum>${f(pc.colorPct + pc.blankPct)}% ${sumOk ? '✓' : ''}</td>
+                    <td class="py-1.5 pr-2 text-right">${f(pc.blankArea)}</td>
+                    <td class="py-1.5 pr-2 text-right font-semibold" data-pw-piece-basekg>${planningWsFmt(pc.kg, 3)}</td>
+                    <td class="py-1.5 text-right"><label class="px-2 py-1 text-[10px] font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50 cursor-pointer whitespace-nowrap">อ่านจากแบบชิ้นนี้<input type="file" accept="image/*" class="hidden" data-pw-piece-file="${k}" onchange="planningWsReadLegendFromFile(${orderIndex}, this, ${k})"></label></td>
+                </tr>`;
+            }).join('');
+            return `<div class="w-full border border-teal-300 bg-teal-50/30 rounded-md p-3 space-y-1.5" data-pw-piece-panel>
+                <p class="text-xs font-bold text-teal-900">ตรวจ % สี / พื้นที่ว่าง รายชิ้น <span class="font-normal text-slate-500">— น้ำหนักไหมคำนวณแยกชิ้น แล้วรวมต่อรหัสสีเดียวกันเป็นยอดสั่งย้อม (เผื่อ/ปัดทศนิยมคิดหลังรวม)</span></p>
+                <div class="overflow-x-auto"><table class="w-full text-xs">
+                    <thead><tr class="text-[10px] text-slate-500 text-left"><th class="pb-1">ชิ้น</th><th class="pb-1">ขนาด (ม.)</th><th class="pb-1 text-right">พื้นที่รวม (ตร.ม.)</th><th class="pb-1 text-right">รวม % สี</th><th class="pb-1">% ว่าง (X)</th><th class="pb-1 text-right">รวมสี+ว่าง</th><th class="pb-1 text-right">พื้นที่ว่าง (ตร.ม.)</th><th class="pb-1 text-right">น้ำหนักไหมฐาน (กก.)</th><th></th></tr></thead>
+                    <tbody>${rows}</tbody>
+                    <tfoot><tr class="border-t border-slate-300 font-semibold text-slate-700"><td class="py-1.5" colspan="2">รวมทั้งใบ</td><td class="text-right">${f(c.pieces.reduce((s, x) => s + x.gross, 0))}</td><td class="text-right" id="pwPctSum">${f(c.pctSum)}%</td><td class="text-right text-slate-500" colspan="2" data-pw-blank>ว่างรวม ${f(c.blankPctEff)}%</td><td class="text-right" data-pw-blank-total>${f(c.blankAreaTotal)}</td><td class="text-right" id="pwBaseKgPieces">${planningWsFmt(c.baseKg, 3)}</td><td></td></tr></tfoot>
+                </table></div>
+                <p class="text-[10px] text-slate-500">พื้นที่ว่างไม่คิดน้ำหนักไหม • ปุ่ม "อ่านจากแบบชิ้นนี้" อ่านตารางสีของแบบแต่ละชิ้นเข้าคอลัมน์ % ของชิ้นนั้น (รหัสสี+ชนิดไหม+เทคนิคเดียวกันใช้แถวเดิมร่วมกัน)</p>
+            </div>`;
+        }
+        // อ่านตารางสีของแบบ "ชิ้นที่ k" เข้าคอลัมน์ % ของชิ้นนั้น — แถวสีที่มีอยู่แล้ว (รหัส+ชนิดไหม+เทคนิคเดียวกัน) ใช้ร่วมกัน แถวใหม่เพิ่มต่อท้าย
+        function planningWsApplyLegendToPiece(orderIndex, k, parsed, sourceLabel) {
+            const order = productionOrders[orderIndex]; if (!order) return false;
+            const ws = planningWsGet(order);
+            if (!planningWsPerPiece(ws) || !ws.pieces[k]) { planningWsLegendSetStatus('เปิดโหมด "แยก % สี/พื้นที่ว่าง รายชิ้น" และใส่ขนาดชิ้นก่อน', 'bad'); return false; }
+            if (!parsed.rows.length) { planningWsLegendSetStatus('อ่านตารางสี (รหัสสี + %) จากแบบชิ้นที่ ' + (k + 1) + ' ไม่ได้ — ลองเลือกไฟล์รูปที่ชัดขึ้น หรือใช้ "วางข้อความตารางสี"', 'bad'); return false; }
+            const n = ws.pieces.length;
+            const guess = planningWsGuessQuality(order.quality), gq = guess ? planningWsFindQuality(guess) : null;
+            const defTech = gq && gq.type === 'loop' ? 'Loop' : 'Cut';
+            const known = planningWsCatalogKnown(); const fixedRows = []; let nFixed = 0, nCheck = 0;
+            parsed.rows.forEach(p => {
+                const f = planningWsFixCode(p.code, known);
+                const tech = p.technique || defTech;
+                const key = normalizeDyeColorCodeKey(f.code) + '|' + (p.yarn || '') + '|' + tech;
+                const ex = fixedRows.find(x => x.key === key);
+                if (ex) { ex.pct += p.pct; return; }
+                fixedRows.push({ key, code: f.code || p.code, ocr: f.ocr, yarn: p.yarn || '', technique: tech, pct: p.pct });
+            });
+            fixedRows.forEach(x => { if (/^fixed:/.test(x.ocr)) nFixed++; else if (/^check/.test(x.ocr)) nCheck++; });
+            ws.colorRows.forEach(r => { const a = planningWsPiecePctArr(r, n); a[k] = 0; r.piecePct = a; });
+            const rowKey = r => normalizeDyeColorCodeKey(r.code) + '|' + (r.yarn || '') + '|' + r.technique;
+            fixedRows.forEach(p => {
+                let row = ws.colorRows.find(r => rowKey(r) === p.key);
+                if (!row) {
+                    row = planningWsNewRow(order, p.technique);
+                    row.code = p.code; row.ocr = p.ocr || ''; row.yarn = p.yarn; row.areaMode = 'pct'; row.piecePct = new Array(n).fill(0);
+                    ws.colorRows.push(row);
+                }
+                const a = planningWsPiecePctArr(row, n); a[k] = planningWsRound(p.pct, 2); row.piecePct = a;
+            });
+            ws.pieces[k].blankPct = Math.min(100, parsed.blankPct || 0);
+            planningWsSyncColorCount(order, ws);
+            planningWsSyncValues(order, ws);
+            const sum = parsed.rows.reduce((s, r) => s + r.pct, 0), total = planningWsRound(sum + (parsed.blankPct || 0), 2);
+            const warn = Math.abs(total - 100) > 0.6;
+            planningWsLegendUi.status = `ชิ้น ${k + 1}: อ่านได้ ${fixedRows.length} สี${parsed.blankPct ? ` • พื้นที่ว่าง (X) ${parsed.blankPct}%` : ''} • รวม ${total}%${warn ? ' — ยังไม่ครบ 100% ตรวจเทียบกับแบบ' : ' ✓'}${nFixed ? ` • แก้รหัสจากคลัง ${nFixed}` : ''}${nCheck ? ` / ควรตรวจ ${nCheck}` : ''} • จาก ${sourceLabel}`;
+            planningWsLegendUi.tone = warn ? 'bad' : 'ok';
+            persistOrderChange(order); rerenderOrderViews(orderIndex);
+            showToast(`อ่านแบบชิ้นที่ ${k + 1} แล้ว ${fixedRows.length} สี`, 'fa-wand-magic-sparkles', 'text-teal-400');
+            return true;
+        }
+
         function planningWsSetAllowance(orderIndex, raw) {
             planningWsMutate(orderIndex, (ws) => { ws.allowancePct = Math.max(0, Number(raw) || 0); });
         }
@@ -17520,7 +17673,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         function planningWsLegendFromText(orderIndex) {
             const ta = document.getElementById('pwLegendText'); const txt = ta ? ta.value : planningWsLegendUi.text;
             planningWsLegendUi.text = txt;
-            planningWsApplyLegend(orderIndex, planningWsParseLegend(txt), 'ข้อความที่วาง');
+            const ordT = productionOrders[orderIndex], sel = document.getElementById('pwLegendPiece');
+            if (ordT && planningWsPerPiece(planningWsGet(ordT)) && sel) planningWsApplyLegendToPiece(orderIndex, Number(sel.value) || 0, planningWsParseLegend(txt), 'ข้อความที่วาง');
+            else planningWsApplyLegend(orderIndex, planningWsParseLegend(txt), 'ข้อความที่วาง');
         }
         // ---- OCR (Tesseract.js จาก CDN เมื่อกดใช้ครั้งแรก) ----
         const PW_TESS_VER = '4.1.4', PW_TESS_CORE = '4.0.4';
@@ -17603,7 +17758,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             }
             return bestParsed;
         }
-        async function planningWsReadLegendFromImage(orderIndex, src, label) {
+        async function planningWsReadLegendFromImage(orderIndex, src, label, pieceIdx) {
             if (planningWsLegendUi.busy) return;
             planningWsLegendUi.busy = true;
             try {
@@ -17611,7 +17766,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 const img = await planningWsLoadImage(src);
                 const parsed = await planningWsOcrLegend(img);
                 planningWsLegendUi.busy = false;
-                planningWsApplyLegend(orderIndex, parsed, label);
+                if (pieceIdx !== undefined && pieceIdx !== null) planningWsApplyLegendToPiece(orderIndex, pieceIdx, parsed, label);
+                else planningWsApplyLegend(orderIndex, parsed, label);
             } catch (e) {
                 console.error('Legend OCR failed:', e);
                 planningWsLegendUi.busy = false;
@@ -17633,26 +17789,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 planningWsLegendSetStatus('ดึงรูปแบบจากระบบมาอ่านไม่ได้ (เบราว์เซอร์บล็อกรูปจาก Google Drive) — กด "เลือกไฟล์รูปแบบจากเครื่อง" แล้วเลือกไฟล์แบบเดียวกันแทน', 'bad');
             }
         }
-        function planningWsReadLegendFromFile(orderIndex, input) {
+        function planningWsReadLegendFromFile(orderIndex, input, pieceIdx) {
             const f = input.files && input.files[0]; if (!f) return;
             const url = URL.createObjectURL(f);
-            planningWsReadLegendFromImage(orderIndex, url, f.name).finally(() => { setTimeout(() => URL.revokeObjectURL(url), 60000); input.value = ''; });
+            planningWsReadLegendFromImage(orderIndex, url, f.name, pieceIdx).finally(() => { setTimeout(() => URL.revokeObjectURL(url), 60000); input.value = ''; });
         }
         function planningWsLegendPanelHtml(order, orderIndex) {
             const ui = planningWsLegendUi;
+            const pp = planningWsPerPiece(planningWsGet(order));
             const tone = ui.tone === 'bad' ? 'text-rose-600' : (ui.tone === 'ok' ? 'text-emerald-700' : 'text-slate-600');
             return `
                     <div class="border border-dashed border-teal-300 bg-teal-50/40 rounded-md p-3 space-y-2" data-pw-legend>
                         <div class="flex flex-wrap items-center gap-2">
                             <p class="text-xs font-bold text-teal-900 mr-1"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> สร้างแถวสีอัตโนมัติจากรูปแบบ</p>
-                            ${order.designImageUrl ? `<button type="button" onclick="planningWsReadLegendFromDesign(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded">อ่านจากรูปแบบของ Design นี้</button>` : ''}
-                            <label class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50 cursor-pointer">เลือกไฟล์รูปแบบจากเครื่อง<input type="file" accept="image/*" class="hidden" data-pw-legend-file onchange="planningWsReadLegendFromFile(${orderIndex}, this)"></label>
+                            ${!pp && order.designImageUrl ? `<button type="button" onclick="planningWsReadLegendFromDesign(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded">อ่านจากรูปแบบของ Design นี้</button>` : ''}
+                            ${pp ? '<span class="text-[11px] text-teal-800 font-semibold">โหมดแยกรายชิ้น: กด "อ่านจากแบบชิ้นนี้" ในตารางตรวจรายชิ้นด้านล่าง (ทีละชิ้น)</span>' : `<label class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50 cursor-pointer">เลือกไฟล์รูปแบบจากเครื่อง<input type="file" accept="image/*" class="hidden" data-pw-legend-file onchange="planningWsReadLegendFromFile(${orderIndex}, this)"></label>`}
                             <button type="button" onclick="openPlanningWsCodeLibrary(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-300 rounded bg-white hover:bg-slate-50" data-pw-lib-open title="คลังรหัสสี: ใช้แก้รหัสที่ OCR อ่านผิด"><i class="fa-solid fa-palette mr-1"></i>คลังรหัสสี (${planningWsCatalogCount()})</button>
                             <button type="button" onclick="planningWsCatalogSaveFromWorksheet(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-300 rounded bg-white hover:bg-slate-50" data-pw-lib-save-ws title="บันทึกรหัสสีที่ตรวจแล้วของใบนี้เข้าคลัง">บันทึกรหัสสีของใบนี้เข้าคลัง</button>
                             <button type="button" onclick="planningWsLegendToggleText()" class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50">${ui.textOpen ? 'ซ่อนช่องวางข้อความ' : 'วางข้อความตารางสี'}</button>
                         </div>
                         <p class="text-[10px] text-slate-500">อ่านรหัสสี + % จากตารางสีของแบบ แล้วสร้างแถวสีให้ — ช่อง X = พื้นที่ว่าง (ไม่คำนวณ) • รหัสสี+ชนิดไหมเดียวกันรวมเป็น 1 แถว • Cut / Loop แยกแถว (ความสูง mm ไม่นับ) • ชนิดไหมต่างกัน (WOOL/VISCOSE) แยกแถว • ตรวจรหัสสีที่อ่านได้อีกครั้งก่อนสั่งย้อม</p>
-                        ${ui.textOpen ? `<div class="space-y-1"><textarea id="pwLegendText" rows="6" placeholder="วางตารางสีทีละบรรทัด เช่น&#10;0.72% CC153 16C / WOOL&#10;4806 Cut 11mm 3.96%&#10;97.42% DK.BLUE / CUT&#10;2.58% X" class="w-full p-2 text-xs font-mono border border-slate-300 rounded bg-white">${escapeHtml(ui.text)}</textarea><button type="button" onclick="planningWsLegendFromText(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded">แปลงเป็นแถวสี</button></div>` : ''}
+                        ${ui.textOpen ? `<div class="space-y-1">${pp ? `<label class="text-[11px] text-slate-600">ใส่ข้อความเข้า: <select id="pwLegendPiece" class="p-1 border border-slate-300 rounded bg-white text-xs">${planningWsGet(order).pieces.map((_, k) => `<option value="${k}">ชิ้น ${k + 1}</option>`).join('')}</select></label>` : ''}<textarea id="pwLegendText" rows="6" placeholder="วางตารางสีทีละบรรทัด เช่น&#10;0.72% CC153 16C / WOOL&#10;4806 Cut 11mm 3.96%&#10;97.42% DK.BLUE / CUT&#10;2.58% X" class="w-full p-2 text-xs font-mono border border-slate-300 rounded bg-white">${escapeHtml(ui.text)}</textarea><button type="button" onclick="planningWsLegendFromText(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded">แปลงเป็นแถวสี</button></div>` : ''}
                         <p id="pwLegendStatus" class="text-[11px] ${tone}">${escapeHtml(ui.status)}</p>
                         ${planningWsCatalogDatalistHtml()}
                     </div>`;
