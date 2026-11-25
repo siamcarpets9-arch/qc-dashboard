@@ -4234,7 +4234,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-140';
+        const APP_BUILD = 'QCDashboard-141';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -5922,7 +5922,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         //   { id, invNo, shipDate (YYYY-MM-DD), shipVia, reference, consigneeName, consigneeAddress,
         //     packNote, createdAt,
         //     items: [{ id, moSo, marks, measurement, note }]   // one row per M/O, S/O; ROLL NO. = row order
-        //     boxes: [{ id, moSo, range, dim, desc, reference }] } // one MARKS & NOS label page per box
+        //     boxes: [{ id, moSo, range, dim, desc, reference, piece }] } // one MARKS & NOS label page per box
         // M/O, S/O are referenced by their moSo text (same convention as findOrderByMoSo() callers
         // elsewhere); the per-shipment paperwork (marks/measurement/note, consignee, boxes) is saved ONLY
         // on the invoice — it never changes the M/O itself. Local-only (localStorage 'qc_shipping_
@@ -5972,7 +5972,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     range: str(b.range),
                     dim: str(b.dim),
                     desc: str(b.desc),
-                    reference: str(b.reference)
+                    reference: str(b.reference),
+                    piece: /^\d{1,2}$/.test(str(b.piece)) ? str(b.piece) : ''   // 2026-11-25: ชิ้นที่เท่าไรของ M/O (ว่าง = เดาจากขนาด/DIM, ไม่ตรงใช้ชิ้นที่ 1)
                 }))
             };
         }
@@ -6059,19 +6060,70 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             saveShippingInvoicesToLocal();
         }
 
+        // 2026-11-25: รูปแบบของแต่ละกล่อง/พาเลทในใบส่ง — ดึงจากรายการ M/O (รูปหลัก = ชิ้นที่ 1, order.pieceDesignImages = ชิ้นที่ 2+)
+        // ชิ้นที่เท่าไร: เลือกเองได้ (box.piece) ไม่เลือก = เดาจากขนาด/DIM เทียบกับรายการขนาดของ M/O (96" X 122" / 244X310 CM ...) ไม่ตรง = ชิ้นที่ 1
+        function shippingDimToMeters(str) {
+            const t = String(str || '');
+            const m = t.match(/(\d+(?:\.\d+)?)\s*(?:["”″']{0,2}|cm|m|in)?\s*[xX×*]\s*(\d+(?:\.\d+)?)/);
+            if (!m) return null;
+            let f = null;
+            if (/["”″]|\bin(?:ch(?:es)?)?\b/i.test(t)) f = 0.0254;
+            else if (/cm/i.test(t)) f = 0.01;
+            else if (/'/.test(t)) f = 0.3048;
+            if (!f) return null;
+            return [Number(m[1]) * f, Number(m[2]) * f];
+        }
+        function shippingBoxPiece(order, b) {
+            const cnt = orderPieceCount(order);
+            const manual = parseInt(b && b.piece, 10);
+            if (manual >= 1 && manual <= Math.max(cnt, 1)) return { n: manual, auto: false };
+            const d = shippingDimToMeters(b && b.dim);
+            if (d && cnt >= 2) {
+                const items = Array.isArray(order.sizeItems) ? order.sizeItems : [];
+                const near = (x, y) => y > 0 && Math.abs(x - y) / y <= 0.04;
+                for (let i = 0; i < items.length; i++) {
+                    const w = Number(items[i].width) || 0, l = Number(items[i].length) || 0;
+                    if ((near(d[0], w) && near(d[1], l)) || (near(d[0], l) && near(d[1], w))) return { n: i + 1, auto: true, matched: true };
+                }
+            }
+            return { n: 1, auto: true, matched: false };
+        }
+        function shippingBoxPieceCellHtml(inv, b) {
+            const order = findOrderByMoSo(b.moSo);
+            if (!order) return '<span class="text-[10px] text-slate-300">-</span>';
+            const cnt = orderPieceCount(order);
+            const pc = shippingBoxPiece(order, b);
+            const url = orderPieceImageUrl(order, pc.n) || order.designImageUrl || '';   // ชิ้น 2+ ที่ไม่มีรูปแยก = รูปเดียวกับชิ้นที่ 1
+            const img = url
+                ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt="" data-box-thumb-img="${pc.n}" class="w-10 h-10 object-cover rounded border border-slate-200"></a>`
+                : '<div class="w-10 h-10 border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 text-[10px]">-</div>';
+            const sel = cnt >= 2 ? `<select data-box-piece onchange="updateShippingInvoiceBox('${b.id}', 'piece', this.value); refreshShippingBoxThumb('${b.id}')" class="w-full px-1 py-1 bg-white border border-slate-300 rounded text-[10px]">
+                    <option value="">อัตโนมัติ (ชิ้นที่ ${pc.auto ? pc.n : (shippingBoxPiece(order, Object.assign({}, b, { piece: '' })).n)})</option>
+                    ${Array.from({ length: cnt }, (_, k) => `<option value="${k + 1}" ${String(b.piece) === String(k + 1) ? 'selected' : ''}>ชิ้นที่ ${k + 1}${orderPieceSizeText(order, k + 1) ? ' · ' + escapeHtml(orderPieceSizeText(order, k + 1)) : ''}</option>`).join('')}
+                </select>` : '';
+            return `<div class="flex items-center gap-1.5">${img}<div class="min-w-[86px]">${sel}</div></div>`;
+        }
+        function refreshShippingBoxThumb(boxId) {
+            const inv = getShippingInvoice(currentShippingInvoiceId);
+            const b = inv && inv.boxes.find(x => x.id === boxId);
+            const cell = document.querySelector(`[data-box-thumb="${boxId}"]`);
+            if (b && cell) cell.innerHTML = shippingBoxPieceCellHtml(inv, b);
+        }
+
         function updateShippingInvoiceBox(boxId, field, value) {
             const inv = getShippingInvoice(currentShippingInvoiceId);
             const b = inv && inv.boxes.find(x => x.id === boxId);
             if (!b) return;
             b[field] = value;
             saveShippingInvoicesToLocal();
+            if (field === 'dim' || field === 'moSo') refreshShippingBoxThumb(boxId);   // ขนาด/M/O เปลี่ยน → รูปชิ้นที่เดาไว้เปลี่ยนตาม
         }
 
         function addShippingInvoiceBox(itemId) {
             const inv = getShippingInvoice(currentShippingInvoiceId);
             const it = inv && inv.items.find(x => x.id === itemId);
             if (!it) return;
-            inv.boxes.push({ id: newShippingId('bx'), moSo: it.moSo, range: '', dim: '', desc: '', reference: '' });
+            inv.boxes.push({ id: newShippingId('bx'), moSo: it.moSo, range: '', dim: '', desc: '', reference: '', piece: '' });
             saveShippingInvoicesToLocal();
             renderShippingInvoiceEditor();
             renderShippingInvoiceCards();
@@ -6160,7 +6212,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 measurement: defaultMarkNosSize(order),
                 note: 'ห่อพรมปกติ'
             });
-            inv.boxes.push({ id: newShippingId('bx'), moSo: order.moSo || '', range: '', dim: '', desc: '', reference: '' });
+            inv.boxes.push({ id: newShippingId('bx'), moSo: order.moSo || '', range: '', dim: '', desc: '', reference: '', piece: '' });
             if (!inv.consigneeName.trim() && !inv.consigneeAddress.trim() && order.shippingMark) {
                 const lines = String(order.shippingMark).split('\n');
                 inv.consigneeName = (lines.shift() || '').trim();
@@ -6220,9 +6272,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
             const itemRows = inv.items.map((it, idx) => {
                 const order = findOrderByMoSo(it.moSo);
-                const img = order && order.designImageUrl
+                const img0 = order && order.designImageUrl
                     ? `<img src="${escapeHtml(order.designImageUrl)}" alt="" class="w-10 h-10 object-cover rounded border border-slate-200">`
                     : '<div class="w-10 h-10 border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 text-[10px]">-</div>';
+                // รูปชิ้นที่ 2+ ดึงจากรายการ M/O (order.pieceDesignImages) — แสดงเป็นรูปเล็กต่อท้าย พร้อมเลขชิ้น
+                const extraImgs = order ? orderExtraPieceImages(order).map(x => `<a href="${escapeHtml(x.url)}" target="_blank" rel="noopener" title="ชิ้นที่ ${x.n}${x.size ? ' · ' + escapeHtml(x.size) : ''}" data-item-piece-img="${x.n}" class="relative block"><img src="${escapeHtml(x.url)}" alt="" class="w-10 h-10 object-cover rounded border border-slate-200"><span class="absolute -top-1 -left-1 bg-teal-700 text-white text-[9px] leading-none px-1 py-0.5 rounded">${x.n}</span></a>`).join('') : '';
+                const img = extraImgs ? `<div class="flex items-center gap-1">${order && order.designImageUrl ? `<span class="relative block">${img0}<span class="absolute -top-1 -left-1 bg-teal-700 text-white text-[9px] leading-none px-1 py-0.5 rounded">1</span></span>` : img0}${extraImgs}</div>` : img0;
                 return `
                 <tr class="border-b border-slate-100 align-top">
                     <td class="py-2 pr-2">${img}</td>
@@ -6257,6 +6312,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <td class="py-2 pr-2"><input type="text" value="${escapeHtml(b.dim)}" placeholder="50X87X50CM." oninput="updateShippingInvoiceBox('${b.id}', 'dim', this.value)" class="${cell}"></td>
                     <td class="py-2 pr-2"><input type="text" value="${escapeHtml(b.desc)}" placeholder="เช่น BEDSIDE RUGS" oninput="updateShippingInvoiceBox('${b.id}', 'desc', this.value)" class="${cell}"></td>
                     <td class="py-2 pr-2"><input type="text" value="${escapeHtml(b.reference)}" placeholder="เช่น SC#... หรือ D/N#..." oninput="updateShippingInvoiceBox('${b.id}', 'reference', this.value)" class="${cell}"></td>
+                    <td class="py-2 pr-2" data-box-thumb="${b.id}">${shippingBoxPieceCellHtml(inv, b)}</td>
                     <td class="py-2"><button type="button" onclick="removeShippingInvoiceBox('${b.id}')" class="text-[11px] px-2 py-1 border border-slate-400 rounded text-slate-700 hover:bg-rose-50 hover:border-rose-400 hover:text-rose-600">ลบ</button></td>
                 </tr>
             `).join('');
@@ -6315,7 +6371,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                             <thead>
                                 <tr class="text-[10px] uppercase text-slate-500 border-b border-slate-200">
                                     <th class="pb-1.5 pr-2 font-semibold text-center">NO.</th><th class="pb-1.5 pr-2 font-semibold">M/O / SO อ้างอิง</th><th class="pb-1.5 pr-2 font-semibold">ช่วงที่ (เช่น NO.1-5)</th>
-                                    <th class="pb-1.5 pr-2 font-semibold">ขนาด/DIM</th><th class="pb-1.5 pr-2 font-semibold">รายละเอียดสินค้า</th><th class="pb-1.5 pr-2 font-semibold">REFERENCE</th><th class="pb-1.5"></th>
+                                    <th class="pb-1.5 pr-2 font-semibold">ขนาด/DIM</th><th class="pb-1.5 pr-2 font-semibold">รายละเอียดสินค้า</th><th class="pb-1.5 pr-2 font-semibold">REFERENCE</th><th class="pb-1.5 pr-2 font-semibold">รูปแบบ / ชิ้นที่</th><th class="pb-1.5"></th>
                                 </tr>
                             </thead>
                             <tbody>${boxRows}</tbody>
