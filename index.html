@@ -934,6 +934,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <button onclick="setDeptKpiSubTab('finishing', 'board')" id="finishingKpiSubTabBtn-board" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition">
                     <i class="fa-solid fa-table-columns"></i> บอร์ดตกแต่ง/บรรจุภัณฑ์
                 </button>
+                <button onclick="setDeptKpiSubTab('finishing', 'log')" id="finishingKpiSubTabBtn-log" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                    <i class="fa-solid fa-table-list"></i> บันทึกการแต่งรายวัน
+                </button>
                 <button onclick="setDeptKpiSubTab('finishing', 'kpi')" id="finishingKpiSubTabBtn-kpi" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                     <i class="fa-solid fa-scroll"></i> แผนกทากาวตกแต่ง (KPI)
                 </button>
@@ -1647,7 +1650,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     </div>
                     <div id="kpiDuePeriodSummary" class="px-3 pb-3"></div>
                 </div>
-                <p class="px-1 text-[11px] text-slate-400"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-teal-50 border border-teal-300 align-middle mr-1"></span>ช่องสีเขียวอมฟ้า = เติมอัตโนมัติจากระบบ — สถานที่ทอ: SIAM (ทอเอง) หรือชื่อผู้รับจ้างที่กรอกในแผนกทอ · เริ่มทอ/ทอเสร็จ: จากแผนกทอ (จ้างทอ = วันที่ส่งจ้าง/วันที่รับพรม) · เลขที่ใบส่ง/วันส่งพรม: จาก Delivery Note (INVOICE) ในแท็บ รายการรอส่ง — ช่องอื่นพิมพ์ทับได้ · <b>KPI</b> = วันที่ใน Delivery Note ต้องตรงกับกำหนดส่งใน M/O (ตรง = ผ่าน, เร็ว/ช้า = ไม่ผ่าน, เลยกำหนดแล้วยังไม่ส่ง = ไม่ผ่าน) · คลิกหัวคอลัมน์เพื่อเรียง · ช่องใต้หัวคอลัมน์ใช้กรอง</p>
+                <p class="px-1 text-[11px] text-slate-400"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-teal-50 border border-teal-300 align-middle mr-1"></span>ช่องสีเขียวอมฟ้า = เติมอัตโนมัติจากระบบ — สถานที่ทอ: SIAM (ทอเอง) หรือชื่อผู้รับจ้างที่กรอกในแผนกทอ · เริ่มทอ/ทอเสร็จ: จากแผนกทอ (จ้างทอ = วันที่ส่งจ้าง/วันที่รับพรม) · ส่งตามกำหนด: วันที่เสร็จรอส่ง (แผนกตกแต่งกดเสร็จ) · วันส่งพรม/INV อ้างอิง: จาก Delivery Note (INVOICE) ในแท็บ รายการรอส่ง — ช่องอื่นพิมพ์ทับได้ · <b>KPI</b> = วันเสร็จรอส่งไม่เกินกำหนดส่งใน M/O (เสร็จก่อนกำหนดก็ผ่าน, เกิน = ไม่ผ่าน, ยังไม่มีวันเสร็จรอส่งใช้วันส่งตาม Delivery Note แทน, เลยกำหนดแล้วยังไม่เสร็จ = ไม่ผ่าน) · คลิกหัวคอลัมน์เพื่อเรียง · ช่องใต้หัวคอลัมน์ใช้กรอง</p>
                 <div id="kpiDueSplitContainer"></div>
             </div>
 
@@ -2020,6 +2023,116 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         </div>
                         <div id="dyeingSummarySurplusTable"></div>
                     </div>
+                </div>
+            </div>
+
+            <!-- NEW (2026-11-26): "บันทึกการแต่งรายวัน" — ฟอร์มบันทึกแผนกตกแต่ง ทำเหมือน "บันทึกรายการทอรายวัน" (วันที่ × M/O × กะปกติ/OT
+                 + พนักงานติ๊กต่อกะ) แต่ไม่มีช่อง "จอทอ" — เขียนลง order.finishing.efficiencyLog[] ชุดเดียวกับตารางประสิทธิภาพการตกแต่ง (KPI)
+                 จึงยอดสะสม/คงเหลือ/วันเสร็จ M/O ยังตรงกันทุกที่ — ดู finLogSave(). แสดงเมื่อแผนกตกแต่ง → pill "บันทึกการแต่งรายวัน". -->
+            <div id="finishingLogContainer" class="hidden space-y-4">
+                <div id="finLogFormCard" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-hand-holding-heart mr-2 text-fuchsia-600"></i> บันทึกรายการแต่งรายวัน</h3>
+                        <p class="text-[11px] text-slate-400"><i class="fa-solid fa-circle-info mr-1"></i>ดึงข้อมูลจากเลขที่ M/O อัตโนมัติ — แก้ไขได้ทุกช่อง</p>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">วันที่</label>
+                            <input type="date" id="finLogDate" onchange="finLogHandleMoChange()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                        </div>
+                        <div class="col-span-2 sm:col-span-1">
+                            <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">เลขที่ M/O</label>
+                            <input type="text" id="finLogMoSo" list="finLogMoSoOptions" oninput="finLogHandleMoChange()" placeholder="พิมพ์/เลือกเลขที่ M/O" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                            <datalist id="finLogMoSoOptions"></datalist>
+                            <p id="finLogMoSoNotFound" class="hidden text-[10px] text-amber-600 mt-1"><i class="fa-solid fa-circle-exclamation mr-1"></i>ไม่พบ M/O นี้ในระบบ — ต้องเปิด M/O ไว้ในระบบก่อน</p>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">ชิ้นที่</label>
+                            <input type="text" id="finLogPieceNo" placeholder="เช่น 1/3" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">คุณภาพ</label>
+                            <input type="text" id="finLogQuality" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                        </div>
+                        <div class="col-span-2 sm:col-span-1">
+                            <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">กว้าง X ยาว</label>
+                            <input type="text" id="finLogSizeText" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">เกรดการแต่ง</label>
+                            <select id="finLogGrade" onchange="finLogPreview()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                                <option value="">-- เลือกเกรด --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">พื้นที่รวม M/O (ตร.ม.)</label>
+                            <input type="number" id="finLogTotalSqm" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">คงเหลือยกมา (ตร.ม.)</label>
+                            <input type="number" id="finLogRemainingBefore" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="border border-teal-100 bg-teal-50/40 rounded-xl p-3 space-y-2">
+                            <p class="text-xs font-bold text-teal-800"><i class="fa-solid fa-sun mr-1"></i> กะปกติ</p>
+                            <div class="grid grid-cols-3 gap-2">
+                                <div><label class="block text-[10px] text-slate-500 mb-0.5">เริ่ม</label><input type="time" id="finLogRegStart" onchange="finLogPreview()" class="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"></div>
+                                <div><label class="block text-[10px] text-slate-500 mb-0.5">เลิก</label><input type="time" id="finLogRegEnd" onchange="finLogPreview()" class="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"></div>
+                                <div><label class="block text-[10px] text-slate-500 mb-0.5">พ.ท.ทำได้ (ตร.ม.)</label><input type="number" step="0.01" id="finLogRegArea" oninput="finLogPreview()" class="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"></div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-1">พนักงาน (ติ๊กผู้ที่เข้ากะนี้)</label>
+                                <div id="finLogRegularEmployees" class="flex flex-wrap gap-1.5"></div>
+                            </div>
+                        </div>
+                        <div class="border border-amber-100 bg-amber-50/40 rounded-xl p-3 space-y-2">
+                            <p class="text-xs font-bold text-amber-800"><i class="fa-solid fa-moon mr-1"></i> กะ OT</p>
+                            <div class="grid grid-cols-3 gap-2">
+                                <div><label class="block text-[10px] text-slate-500 mb-0.5">เริ่ม</label><input type="time" id="finLogOtStart" onchange="finLogPreview()" class="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"></div>
+                                <div><label class="block text-[10px] text-slate-500 mb-0.5">เลิก</label><input type="time" id="finLogOtEnd" onchange="finLogPreview()" class="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"></div>
+                                <div><label class="block text-[10px] text-slate-500 mb-0.5">พ.ท.ทำได้ (ตร.ม.)</label><input type="number" step="0.01" id="finLogOtArea" oninput="finLogPreview()" class="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"></div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-1">พนักงาน (ติ๊กผู้ที่เข้ากะนี้)</label>
+                                <div id="finLogOtEmployees" class="flex flex-wrap gap-1.5"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">หมายเหตุ</label>
+                        <input type="text" id="finLogNote" placeholder="(ถ้ามี)" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                    </div>
+                    <div id="finLogPreview"></div>
+                    <div class="flex items-center gap-2 pt-1">
+                        <button type="button" id="finLogSaveBtn" onclick="finLogSave()" class="bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition"><i class="fa-solid fa-floppy-disk mr-1"></i>บันทึกรายการแต่งวันนี้</button>
+                        <button type="button" onclick="finLogReset(false)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold px-4 py-2.5 rounded-xl transition">ยกเลิก / เริ่มใหม่</button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-2">
+                    <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-users mr-2 text-fuchsia-600"></i> จัดการรายชื่อพนักงานแต่ง</h3>
+                    <div id="finLogStaffManagerList" class="flex flex-wrap gap-1.5"></div>
+                    <div class="flex items-center gap-1.5 pt-1">
+                        <input type="text" id="finLogStaffNewName" placeholder="ชื่อ-นามสกุล" class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                        <input type="text" id="finLogStaffNewNickname" placeholder="ชื่อเล่น" class="w-28 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                        <button type="button" onclick="finLogAddStaff()" class="shrink-0 bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition"><i class="fa-solid fa-user-plus mr-1"></i>เพิ่ม</button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-table-list mr-2 text-fuchsia-600"></i> ประวัติการแต่งทั้งหมด — คงเหลือ/ประสิทธิภาพต่อ M/O</h3>
+                        <input type="text" id="finLogTableSearch" oninput="finLogRenderTable()" placeholder="ค้นหา M/O, ชื่อพนักงาน..." class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+                        <span class="text-[11px] text-slate-500 font-medium">สรุปยอดรวมตามช่วงเวลา:</span>
+                        <div id="finLogPeriodSelectWrap"></div>
+                    </div>
+                    <div id="finLogPeriodSummary"></div>
+                    <div id="finLogSplitContainer"></div>
                 </div>
             </div>
 
@@ -4234,7 +4347,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-142';
+        const APP_BUILD = 'QCDashboard-145';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -4423,6 +4536,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             populateWeavingLogMoSoOptions();
             resetWeavingLogForm(false);
             renderWeavingLogTable();
+            try { finLogInit(); } catch (e) { console.error('finLogInit failed:', e); }   // 2026-11-26: บันทึกการแต่งรายวัน
 
             // NEW (2026-10-02): saveQCItem()/confirmDeleteItem() both mutate qcData then call initApp()
             // — but neither of them knows whether the order detail modal's "ประวัติ QC" section, or the
@@ -10329,6 +10443,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     return `ทอแล้ว ${sqmWoven}/${totalSqm} ตร.ม. (เหลืออีก ${remainingPct}%)`;
                 }
             }
+            if (stage === 'finishing' && Array.isArray((order.finishing || {}).efficiencyLog) && order.finishing.efficiencyLog.length && Number(order.totalSqm) > 0) {
+                const totalSqm = Number(order.totalSqm);
+                const doneSqm = Math.min(totalSqm, order.finishing.efficiencyLog.reduce((t, l) => t + (Number(l.areaSqm) || 0), 0));
+                return `แต่งแล้ว ${Math.round(doneSqm * 100) / 100}/${totalSqm} ตร.ม. (เหลืออีก ${Math.max(0, Math.round((totalSqm - doneSqm) / totalSqm * 100))}%)`;
+            }
             const items = order[stage].items || [];
             if (items.length === 0) return 'ยังไม่มีรายการ';
             const doneCount = stage === 'dyeing' ? (order.dyeing.colorsCompleted || 0) : items.filter(it => it.status === 'done').length;
@@ -14475,7 +14594,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 }
                 // NEW (2026-10-06): ตกแต่ง/บรรจุ เป็นใบงานแบบเดียวกับวางแผน/ย้อม
                 if (stage === 'finishing') {
-                    renderDeptWorksheetPage('finishing', ordersHere, searchTerm);
+                    if (finishingBoardView === 'cards') renderFinishingCardBoard(ordersHere, searchTerm);
+                    else renderDeptWorksheetPage('finishing', ordersHere, searchTerm);
                     return;
                 }
 
@@ -14789,6 +14909,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 if (subTabBar) subTabBar.classList.toggle('hidden', !isDept);
                 if (kpiContainer) kpiContainer.classList.toggle('hidden', !isDeptKpi);
             });
+
+            // NEW (2026-11-26): แผนกตกแต่ง → "บันทึกการแต่งรายวัน" ใช้ลูปสลับแบบเดียวกับบันทึกการทอรายวัน
+            const finLogContainer = document.getElementById('finishingLogContainer');
+            const isFinishingLog = boardDepartmentFilter === 'finishing' && deptKpiActiveSubTab.finishing === 'log';
+            if (finLogContainer) finLogContainer.classList.toggle('hidden', !isFinishingLog);
+            if (isFinishingLog) { isAnyDeptKpi = true; if (typeof finLogRefresh === 'function') finLogRefresh(); }
 
             if (searchCard) searchCard.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi);
             // NEW (2026-10-07): หน้ารายงาน (KPI/บันทึกการทอรายวัน/รายงานแผนกขาย) ซ่อนแถบค้นหาบอร์ด → โชว์ตัวเลือกเดือนของรายงานแทน
@@ -16550,10 +16676,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 return `<tr class="border-t border-slate-100" data-pw-siam-row="${escapeHtml(g.code)}" data-status="${g.status}">
                     <td class="py-1.5 pr-2 font-mono">${escapeHtml(g.code)}</td>
                     <td class="py-1.5 pr-2 text-right">${g.sysKg === null ? '-' : f2(g.sysKg)}</td>
-                    <td class="py-1.5 pr-2 text-right">${g.actual === null || g.actual === undefined ? '-' : f2(g.actual)}${g.src === 'manual' ? ' <span class="text-[9px] text-slate-400">(คีย์เอง)</span>' : ''}</td>
+                    <td class="py-1.5 pr-2 text-right whitespace-nowrap"><input type="number" min="0" step="0.01" data-pw-siam-edit value="${g.actual === null || g.actual === undefined ? '' : Math.round(g.actual * 100) / 100}" placeholder="-" title="แก้ยอดสั่งย้อมจริงของสีนี้ (ล้างช่อง = ลบยอดที่คีย์เอง)" onchange="planningWsSiamEdit(${orderIndex}, '${escapeHtml(g.key).replace(/'/g, "\\'")}', this.value)" class="w-24 p-1 text-right border ${g.src === 'manual' ? 'border-violet-400 bg-violet-50/40' : 'border-slate-300 bg-white'} rounded">${g.src === 'manual' ? ' <span class="text-[9px] text-slate-400">(คีย์เอง)</span>' : ''}</td>
                     <td class="py-1.5 pr-2 text-right" data-pw-siam-diff>${d}</td>
                     <td class="py-1.5 pr-2 text-right text-slate-500">${g.diffPct === null || g.diffPct === undefined ? '-' : (g.diffPct > 0 ? '+' : '') + planningWsFmt(g.diffPct, 1) + '%'}</td>
-                    <td class="py-1.5"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${st[1]}">${st[0]}</span></td></tr>`;
+                    <td class="py-1.5"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${st[1]}">${st[0]}</span></td>
+                    <td class="py-1.5 text-right"><button type="button" data-pw-siam-del onclick="planningWsSiamDelRow(${orderIndex}, '${escapeHtml(g.key).replace(/'/g, "\\'")}')" title="ลบยอดสั่งย้อมจริงของสีนี้ (ทั้งที่คีย์เองและจาก Excel)" class="text-slate-500 hover:text-rose-600 border border-slate-300 rounded px-1.5 py-0.5">✕</button></td></tr>`;
             }).join('');
             return `
                 <div class="border border-slate-200 rounded-md p-3 space-y-2" data-pw-siam-panel>
@@ -16562,7 +16689,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                             <p class="text-[10px] text-slate-500" data-pw-siam-src>${src}</p></div>
                         <div class="flex items-center gap-2">
                             <label class="px-2.5 py-1 text-[11px] font-semibold border border-violet-600 text-violet-700 rounded bg-white hover:bg-violet-50 cursor-pointer"><i class="fa-solid fa-file-excel mr-1"></i>ดึงสั่งย้อมจาก Excel (SIAM)<input type="file" accept=".xlsx,.xlsm,.xls" class="hidden" data-pw-siam-file onchange="planningWsSiamLoadFile(${orderIndex}, this)"></label>
-                            ${snap ? `<button type="button" data-pw-siam-clear onclick="planningWsSiamClear(${orderIndex})" class="px-2 py-1 text-[11px] border border-slate-300 text-slate-600 rounded bg-white hover:bg-slate-50">ล้าง</button>` : ''}
+                            ${snap ? `<button type="button" data-pw-siam-clear onclick="planningWsSiamClear(${orderIndex})" title="ลบข้อมูลที่ดึงจากไฟล์ Excel (ยอดที่คีย์เองยังอยู่)" class="px-2 py-1 text-[11px] border border-slate-300 text-slate-600 rounded bg-white hover:bg-slate-50">ล้างไฟล์ Excel</button>` : ''}
+                            ${sd.have ? `<button type="button" data-pw-siam-clear-all onclick="planningWsSiamClearAll(${orderIndex})" title="ลบยอดสั่งย้อมจริงทั้งหมด (ทั้งจาก Excel และที่คีย์เอง) เพื่อคีย์/ดึงใหม่" class="px-2 py-1 text-[11px] border border-rose-300 text-rose-600 rounded bg-white hover:bg-rose-50">ล้างยอดจริงทั้งหมด</button>` : ''}
                         </div>
                     </div>
                     ${moMismatch ? '<p class="text-[11px] text-amber-700" data-pw-siam-warn><i class="fa-solid fa-triangle-exclamation"></i> เลขที่ M/O ในไฟล์ไม่ตรงกับใบนี้ — ตรวจสอบว่าเลือกไฟล์ถูกงาน</p>' : ''}
@@ -16572,7 +16700,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         <div class="border border-violet-200 bg-violet-50/40 rounded px-3 py-1.5"><p class="text-[10px] text-slate-500">สั่งย้อมจริง</p><p class="text-sm font-bold text-violet-800" data-pw-siam-actual>${f2(sd.actualTotal)} กก.</p></div>
                         <div class="border-t-4 ${Math.abs(sd.diffTotal) <= 0.05 ? 'border-emerald-500' : (sd.diffTotal > 0 ? 'border-amber-500' : 'border-rose-500')} border-x border-b border-slate-200 rounded px-3 py-1.5"><p class="text-[10px] text-slate-500">ส่วนต่างรวม (จริง − ระบบ)</p><p class="text-sm font-bold ${Math.abs(sd.diffTotal) <= 0.05 ? 'text-emerald-700' : (sd.diffTotal > 0 ? 'text-amber-700' : 'text-rose-600')}" data-pw-siam-total>${sgn(sd.diffTotal)} กก.${sd.diffPctTotal === null ? '' : ` (${sd.diffPctTotal > 0 ? '+' : ''}${planningWsFmt(sd.diffPctTotal, 1)}%)`}</p></div>
                     </div>
-                    <div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-[10px] text-slate-500 text-left border-b border-slate-200"><th class="py-1">รหัสสี</th><th class="text-right">ระบบ (กก.)</th><th class="text-right">สั่งย้อมจริง (กก.)</th><th class="text-right">ส่วนต่าง (กก.)</th><th class="text-right">%</th><th>สถานะ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>` : ''}
+                    <div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-[10px] text-slate-500 text-left border-b border-slate-200"><th class="py-1">รหัสสี</th><th class="text-right">ระบบ (กก.)</th><th class="text-right">สั่งย้อมจริง (กก.)</th><th class="text-right">ส่วนต่าง (กก.)</th><th class="text-right">%</th><th>สถานะ</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div>` : ''}
                 </div>`;
         }
         // ดึง Sheet SIAM จากไฟล์ Excel (ไม่ต้องมี Sheet Dye Order A) — เก็บเป็น ws.siamSnap
@@ -16592,6 +16720,49 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             showToast(`ดึงสั่งย้อมจาก SIAM แล้ว ${snap.colors.length} สี รวม ${planningWsFmt(snap.totalKg, 2)} กก.`, 'fa-file-excel', 'text-emerald-400');
         }
         function planningWsSiamClear(orderIndex) { planningWsMutate(orderIndex, ws => { ws.siamSnap = null; }); }
+        // 2026-11-26: แก้ไข/ลบยอดสั่งย้อมจริง (SIAM) รายสี และล้างทั้งหมด
+        function planningWsSiamSnapFix(ws) {
+            const snap = ws.siamSnap; if (!snap) return;
+            snap.colors = (snap.colors || []).filter(x => Number(x.kg) > 0);
+            snap.totalKg = snap.colors.reduce((a, x) => a + (Number(x.kg) || 0), 0);
+            if (!snap.colors.length) ws.siamSnap = null;
+        }
+        function planningWsSiamKeyOf(code, fallback) { return normalizeDyeColorCodeKey(code) || fallback; }
+        function planningWsSiamEdit(orderIndex, key, raw) {
+            const order = productionOrders[orderIndex]; if (!order) return;
+            const blank = raw === '' || raw === null || raw === undefined || !isFinite(Number(raw));
+            const v = blank ? null : Math.max(0, Number(raw));
+            planningWsMutate(orderIndex, (ws, o) => {
+                const c = planningWsComputeColors(o);
+                const rows = c.rows.filter(x => planningWsSiamKeyOf(String(x.row.code || '').trim(), '#r' + x.row.id) === key);
+                const snapIdx = [];
+                if (ws.siamSnap) (ws.siamSnap.colors || []).forEach((sc, i) => { if (planningWsSiamKeyOf(sc.colorCode, '#s' + sc.colorCode) === key) snapIdx.push(i); });
+                if (rows.length) {
+                    // มีแถวสีในใบ → เก็บเป็นยอดคีย์เองที่แถวแรกของรหัสนั้น (แถวอื่นล้างให้ ไม่ให้ซ้ำ); ล้างช่อง = ลบยอดคีย์เอง กลับไปใช้ยอด Excel
+                    rows.forEach((x, i) => { const r = ws.colorRows.find(z => z.id === x.row.id); if (r) r.orderKg = (i === 0 && v !== null) ? v : ''; });
+                } else if (snapIdx.length) {
+                    // มีเฉพาะใน Excel → แก้ค่าในสำเนา Excel (ล้างช่อง/0 = ลบสีนั้นออก)
+                    ws.siamSnap.colors.forEach((sc, i) => { if (i === snapIdx[0]) sc.kg = v === null ? 0 : v; else if (snapIdx.includes(i)) sc.kg = 0; });
+                    planningWsSiamSnapFix(ws);
+                }
+            });
+        }
+        function planningWsSiamDelRow(orderIndex, key) {
+            planningWsMutate(orderIndex, (ws, o) => {
+                const c = planningWsComputeColors(o);
+                c.rows.forEach(x => { if (planningWsSiamKeyOf(String(x.row.code || '').trim(), '#r' + x.row.id) === key) { const r = ws.colorRows.find(z => z.id === x.row.id); if (r) r.orderKg = ''; } });
+                if (ws.siamSnap) {
+                    ws.siamSnap.colors = (ws.siamSnap.colors || []).filter(sc => planningWsSiamKeyOf(sc.colorCode, '#s' + sc.colorCode) !== key);
+                    planningWsSiamSnapFix(ws);
+                }
+            });
+        }
+        function planningWsSiamClearAll(orderIndex) {
+            const order = productionOrders[orderIndex]; if (!order) return;
+            if (!window.confirm('ลบยอดสั่งย้อมจริงทั้งหมด (ทั้งที่ดึงจาก Excel และที่คีย์เองในแถวสี)?')) return;
+            planningWsMutate(orderIndex, (ws) => { ws.siamSnap = null; ws.colorRows.forEach(r => { r.orderKg = ''; }); });
+            showToast('ล้างยอดสั่งย้อมจริงแล้ว', 'fa-trash-can', 'text-slate-300');
+        }
 
         function planningWsLevenshtein(a, b) {
             const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
@@ -17150,6 +17321,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         <div class="flex flex-wrap gap-1.5">
                             <button type="button" data-pw-piecepct-toggle onclick="planningWsTogglePiecePct(${orderIndex})" title="ใช้เมื่อ M/O มีหลายชิ้นและแบบแต่ละชิ้นมี % สี/% พื้นที่ว่างไม่เท่ากัน" class="px-3 py-1.5 text-xs font-semibold rounded border ${c.perPiece ? 'bg-teal-700 text-white border-teal-700 hover:bg-teal-800' : 'text-teal-700 border-teal-600 bg-white hover:bg-teal-50'}">${c.perPiece ? '✓ แยก % สีรายชิ้น (เปิดอยู่)' : 'แยก % สี/พื้นที่ว่าง รายชิ้น'}</button>
                             <button type="button" onclick="planningWsAddRow(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50">+ เพิ่มแถวสี</button>
+                            ${c.rows.length > 0 ? `<button type="button" data-pw-clear-rows onclick="planningWsClearRows(${orderIndex})" title="ลบแถวสีทั้งหมด เพื่อคีย์/อ่านจากแบบใหม่" class="px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-300 rounded bg-white hover:bg-rose-50"><i class="fa-regular fa-trash-can mr-1"></i>ล้างแถวสีทั้งหมด</button>` : ''}
                         </div>
                     </div>
                     ${planningWsLegendPanelHtml(order, orderIndex)}
@@ -17195,6 +17367,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <div class="flex flex-wrap items-center gap-2 pt-1">
                         <button type="button" onclick="planningWsApplyDyePlan(${orderIndex})" ${c.netKg > 0 ? '' : 'disabled'} class="px-3 py-1.5 text-xs font-semibold rounded ${c.netKg > 0 ? 'bg-teal-700 text-white hover:bg-teal-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}">นำยอดสั่งย้อมไปใส่ "แผนสั่งย้อม"</button>
                         <p class="text-[11px] text-slate-500">${existingPlan.length > 0 ? `แผนสั่งย้อมตอนนี้มี ${existingPlan.length} สี รวม ${planningWsFmt(existingPlan.reduce((s, r) => s + (Number(r.kg) || 0), 0), 2)} กก. — กดแล้วอัปเดตตามรหัสสี (ไม่ลบรายการ Surplus เดิม)` : 'แผนสั่งย้อมยังว่าง — กดแล้วระบบสร้างให้ตามรหัสสี และแผนกย้อมจะเห็นทันที'}</p>
+                        ${planningWsPushedPlanRows(order).length > 0 ? `<button type="button" data-pw-dyeplan-remove onclick="planningWsRemoveDyePlan(${orderIndex})" title="ลบแถวแผนสั่งย้อมที่เคยนำมาจากใบคำนวณนี้ (ไม่ลบรายการ Surplus และบันทึกย้อมจริง)" class="px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-300 rounded bg-white hover:bg-rose-50"><i class="fa-regular fa-trash-can mr-1"></i>ลบแผนสั่งย้อมที่นำไปใส่</button>` : ''}
                     </div>
                 </section>`;
         }
@@ -17398,11 +17571,28 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 planningWsSyncColorCount(order, ws);
             });
         }
+        function planningWsLegendReset() { planningWsLegendUi.status = ''; planningWsLegendUi.tone = ''; planningWsLegendUi.fixNote = ''; }
         function planningWsRemoveRow(orderIndex, rowId) {
             planningWsMutate(orderIndex, (ws, order) => {
                 ws.colorRows = ws.colorRows.filter(r => r.id !== rowId);
                 order.colorsCount = ws.colorRows.length;
+                if (ws.colorRows.length === 0) planningWsLegendReset();
             });
+        }
+        // 2026-11-26: ล้างแถวสีทั้งหมดในใบคำนวณ (คีย์/อ่านจากแบบใหม่ได้) — ไม่แตะแผนสั่งย้อมที่เคยนำไปใส่แล้ว
+        function planningWsClearRows(orderIndex) {
+            const order = productionOrders[orderIndex]; if (!order) return;
+            const ws = planningWsGet(order);
+            if (!ws.colorRows.length) return;
+            if (!window.confirm(`ลบแถวสีทั้งหมด ${ws.colorRows.length} แถวในใบคำนวณ?\n(ยอดสั่งย้อมจริงที่คีย์เองในแถวจะหายไปด้วย — แผนสั่งย้อมที่นำไปใส่แล้วไม่ถูกลบ)`)) return;
+            planningWsMutate(orderIndex, (w, o) => {
+                w.colorRows = [];
+                w.blankPct = 0;
+                if (Array.isArray(w.pieces)) w.pieces.forEach(pc => { pc.blankPct = 0; });
+                o.colorsCount = 0;
+                planningWsLegendReset();
+            });
+            showToast('ล้างแถวสีทั้งหมดแล้ว — คีย์ใหม่หรือกด "อ่านจากแบบ" ได้เลย', 'fa-trash-can', 'text-slate-300');
         }
         function planningWsRowField(orderIndex, rowId, field, value) {
             if (field === 'quality' && value === PW_NEW_QUALITY) { openPlanningWsQuickQuality(orderIndex, rowId); return; }
@@ -17986,11 +18176,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             order.dyeing.colorOrders = order.dyeing.colorOrders.filter(r => r.colorCode || Number(r.kg) > 0 || r.useSurplus);
             plan.forEach(p => {
                 const existing = order.dyeing.colorOrders.find(r => String(r.colorCode || '').trim().toLowerCase() === p.code.toLowerCase());
-                if (existing) { existing.kg = p.kg; if (p.lot) existing.lotNo = p.lot; }
-                else { const row = newDyeingColorOrderRow(); row.colorCode = p.code; row.kg = p.kg; if (p.lot) row.lotNo = p.lot; order.dyeing.colorOrders.push(row); }
+                if (existing) { existing.kg = p.kg; if (p.lot) existing.lotNo = p.lot; existing.fromWs = true; }
+                else { const row = newDyeingColorOrderRow(); row.colorCode = p.code; row.kg = p.kg; row.fromWs = true; if (p.lot) row.lotNo = p.lot; order.dyeing.colorOrders.push(row); }
             });
             planningWsCodeLibAdd(plan.map(p => p.code));   // 2026-11-17: ส่งยอดไปแผนสั่งย้อมแล้ว = รหัสผ่านการตรวจแล้ว เก็บเข้าคลัง
             return plan.length;
+        }
+        // 2026-11-26: แถวในแผนสั่งย้อมที่นำมาจากใบคำนวณ (มีธง fromWs หรือรหัสตรงกับที่ใบคำนวณสร้าง) — ไม่นับแถวที่ใช้ Surplus
+        function planningWsPushedPlanRows(order) {
+            const rows = ((order.dyeing || {}).colorOrders || []).filter(r => r && typeof r === 'object');
+            let codes = null;
+            try { codes = new Set(planningWsBuildDyePlanRows(order).map(p => p.code.toLowerCase())); } catch (e) { codes = new Set(); }
+            return rows.filter(r => r.fromWs || codes.has(String(r.colorCode || '').trim().toLowerCase()));
+        }
+        function planningWsRemoveDyePlan(orderIndex) {
+            const order = productionOrders[orderIndex]; if (!order) return;
+            const pushed = planningWsPushedPlanRows(order);
+            if (!pushed.length) { showToast('ไม่มีแถวในแผนสั่งย้อมที่นำมาจากใบคำนวณ', 'fa-circle-info', 'text-amber-400'); return; }
+            const keep = pushed.filter(r => r.useSurplus || Number(r.surplusKg) > 0 || r.surplusLedgerId);
+            const del = pushed.filter(r => !keep.includes(r));
+            if (!window.confirm(`ลบแถวแผนสั่งย้อมที่นำมาจากใบคำนวณ ${del.length} แถว?${keep.length ? `\n(แถวที่ใช้ไหม Surplus ${keep.length} แถว จะไม่ถูกลบ — เหลือไว้ให้แก้เอง)` : ''}\nบันทึกย้อมจริงไม่ถูกแตะ`)) return;
+            const delIds = new Set(del.map(r => r.id));
+            order.dyeing.colorOrders = order.dyeing.colorOrders.filter(r => !delIds.has(r.id));
+            keep.forEach(r => { r.fromWs = false; });
+            persistOrderChange(order);
+            rerenderOrderViews(orderIndex);
+            showToast(`ลบแผนสั่งย้อมที่นำมาจากใบคำนวณ ${del.length} แถวแล้ว — กด "นำยอดสั่งย้อมไปใส่" เพื่อใส่ใหม่ได้`, 'fa-trash-can', 'text-slate-300');
         }
         function planningWsApplyDyePlan(orderIndex) {
             const order = productionOrders[orderIndex];
@@ -18643,6 +18854,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 const dept = boardDepartmentFilter;
                 if (dept === 'sales') { if (typeof renderSalesReportTables === 'function') renderSalesReportTables(); return; }
                 if (dept === 'weaving' && typeof weavingActiveSubTab !== 'undefined' && weavingActiveSubTab === 'log') { renderWeavingLogTable(); return; }
+                if (dept === 'finishing' && deptKpiActiveSubTab.finishing === 'log') { finLogRenderTable(); return; }
                 if (deptKpiActiveSubTab[dept] === 'kpi') {
                     if (dept === 'planning') renderPlanningKpiReports();
                     else if (dept === 'design') renderDesignKpiReports();
@@ -18678,6 +18890,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // (3) ประวัติ QC ของ M/O → ปุ่มกลับ + ปุ่มโอนงาน
         // ---------------------------------------------------------------------------------------
         const deptWsUi = { design: '', weaving: '', finishing: '', ready_to_ship: '' };
+        let finishingBoardView = 'cards'; // 2026-11-26: 'cards' = บอร์ดงานแต่ง (การ์ดต่อ M/O เหมือนบอร์ดทอ) | 'orders' = ใบงานตกแต่ง (กริด M/O)
+        try { finishingBoardView = localStorage.getItem('qc_finishing_board_view') === 'orders' ? 'orders' : 'cards'; } catch (e) { /* storage blocked */ }
         let weavingBoardView = 'orders'; // 'orders' = ใบงานทอ (กริด M/O) | 'looms' = จอเครื่องทอเดิม
         try { weavingBoardView = localStorage.getItem('qc_weaving_board_view') === 'looms' ? 'looms' : 'orders'; } catch (e) { /* storage blocked */ }
 
@@ -18689,7 +18903,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         };
 
         function deptWsStatus(stage, order) {
-            const pct = stage === 'design' ? 0 : Number((order[stage] || {}).percent) || 0;
+            let pct = stage === 'design' ? 0 : Number((order[stage] || {}).percent) || 0;
+            if (stage === 'finishing' && Array.isArray((order.finishing || {}).efficiencyLog) && order.finishing.efficiencyLog.length && Number(order.totalSqm) > 0) {
+                const doneSqm = order.finishing.efficiencyLog.reduce((t, l) => t + (Number(l.areaSqm) || 0), 0);   // 2026-11-26: % ตามพื้นที่แต่งสะสมจากบันทึกรายวัน
+                pct = Math.max(pct, Math.min(100, Math.round(doneSqm / Number(order.totalSqm) * 100)));
+            }
             if (stage === 'design') {
                 const d = order.design || {};
                 return d.entering ? { key: 'working', label: 'กรอกข้อมูลแล้ว', cls: 'bg-cyan-50 text-cyan-700', pct: 0 } : { key: 'waiting', label: 'รอดีไซน์', cls: 'bg-slate-100 text-slate-600', pct: 0 };
@@ -18795,7 +19013,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             }).join('');
             return `
                 <div class="space-y-4">
-                    ${deptWsHeaderHtml(stage, stage === 'weaving' ? weavingViewToggleHtml() : '')}
+                    ${deptWsHeaderHtml(stage, stage === 'weaving' ? weavingViewToggleHtml() : (stage === 'finishing' ? finishingViewToggleHtml() : ''))}
                     <div class="bg-white border border-slate-200 rounded-lg">
                         <div class="px-4 py-3 border-b border-slate-100">
                             <p class="font-bold text-sm text-slate-800">${escapeHtml(STAGE_LABELS[stage] || cfg.title)} · ${escapeHtml(boardMonthFilter === 'all' ? 'ทุกเดือน' : boardMonthLabel(getBoardMonthSelection()))}</p>
@@ -20252,12 +20470,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         let deptKpiActiveSubTab = { planning: 'board', design: 'board', dyeing: 'board', finishing: 'board' };
 
         function setDeptKpiSubTab(dept, tab) {
-            deptKpiActiveSubTab[dept] = (tab === 'kpi') ? 'kpi' : 'board';
+            deptKpiActiveSubTab[dept] = (tab === 'kpi') ? 'kpi' : ((tab === 'log' && dept === 'finishing') ? 'log' : 'board');
             const activeClasses = ['bg-indigo-600', 'text-white', 'shadow-sm'];
             const inactiveClasses = ['bg-slate-100', 'text-slate-600', 'hover:bg-slate-200'];
             [
                 { el: document.getElementById(`${dept}KpiSubTabBtn-board`), isActive: deptKpiActiveSubTab[dept] === 'board' },
-                { el: document.getElementById(`${dept}KpiSubTabBtn-kpi`), isActive: deptKpiActiveSubTab[dept] === 'kpi' }
+                { el: document.getElementById(`${dept}KpiSubTabBtn-kpi`), isActive: deptKpiActiveSubTab[dept] === 'kpi' },
+                { el: document.getElementById(`${dept}KpiSubTabBtn-log`), isActive: deptKpiActiveSubTab[dept] === 'log' }
             ].forEach(({ el, isActive }) => {
                 if (!el) return;
                 if (isActive) { el.classList.remove(...inactiveClasses); el.classList.add(...activeClasses); }
@@ -20271,6 +20490,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 return; // re-enters via updateBoardColumnVisibility() with the new sub-tab already set
             }
             updateBoardColumnVisibility();
+            if (dept === 'finishing' && deptKpiActiveSubTab[dept] === 'log') finLogRefresh();
             if (deptKpiActiveSubTab[dept] === 'kpi') {
                 if (dept === 'planning') renderPlanningKpiReports();
                 if (dept === 'design') renderDesignKpiReports();
@@ -25698,6 +25918,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         function renderFinishingStaffManagerHtml() {
+            if (typeof finLogRenderStaff === 'function') finLogRenderStaff();   // 2026-11-26: ช่องติ๊กพนักงานในฟอร์มบันทึกการแต่งรายวัน
             const wrap = document.getElementById('finishingStaffManagerList');
             if (!wrap) return;
             wrap.innerHTML = finishingStaffList.map(s => `
@@ -25939,6 +26160,445 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             order.finishing.efficiencyLog[itemIndex][field] = value;
             persistOrderChange(order);
             renderFinishingEfficiencyTable();
+        }
+
+        // =========================================================================================
+        // NEW (2026-11-26): "บันทึกการแต่งรายวัน" — ฟอร์มบันทึกแผนกตกแต่งแบบเดียวกับ "บันทึกรายการทอรายวัน"
+        // (วันที่ × M/O × ชิ้นที่ + กะปกติ/กะ OT พร้อมติ๊กพนักงานต่อกะ) แต่ "ไม่มีช่องจอทอ".
+        // เขียนลง order.finishing.efficiencyLog[] ชุดเดียวกับตาราง "ประสิทธิภาพการตกแต่ง" (KPI) →
+        //   areaSqm = พ.ท.แต่งได้รวมสองกะ, hours = เวลารวมสองกะ (ชม.), employees = พนักงานรวม, grade/note เหมือนเดิม
+        //   ฟิลด์เพิ่ม: pieceNo, quality, sizeText, regular{}, ot{}, staffHours, efficiency, gradePercent, source:'daily'
+        // จึงยอดสะสม/คงเหลือ/วันเสร็จ M/O (computeFinishingLogWithCumulative) ยังตรงกันทุกหน้าโดยไม่ต้องแก้ Apps Script.
+        // =========================================================================================
+        let finLogEditCtx = null;        // { orderIndex, itemIndex } ของรายการที่กำลังแก้ หรือ null
+        let finLogLastMoKey = '';        // ใช้ตั้งเกรดอัตโนมัติเฉพาะตอนเปลี่ยน M/O (เปลี่ยนวันที่ไม่ทับเกรดที่เลือกไว้)
+        let finLogPeriodGranularity = 'month';
+
+        function finLogPopulateGrades() {
+            const sel = document.getElementById('finLogGrade');
+            if (!sel) return;
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">-- เลือกเกรด --</option>' + Object.keys(PLANNING_WS_FINISHING_INFO).map(g => `<option value="${g}">${g} — ${escapeHtml(PLANNING_WS_FINISHING_INFO[g].note)} (เป้า ${PLANNING_WS_FINISHING_INFO[g].target})</option>`).join('');
+            sel.value = cur;
+        }
+        function finLogPopulateMoOptions() {
+            const dl = document.getElementById('finLogMoSoOptions');
+            if (!dl) return;
+            dl.innerHTML = productionOrders
+                .filter(o => getEffectiveStage(o) !== 'shipped')
+                .sort((a, b) => String(a.moSo || '').localeCompare(String(b.moSo || '')))
+                .map(o => `<option value="${escapeHtml(o.moSo)}">`).join('');
+        }
+        function finLogRenderStaff() {
+            const prev = { reg: new Set(finLogCheckedEmployees('finishing-log-emp-reg')), ot: new Set(finLogCheckedEmployees('finishing-log-emp-ot')) };
+            ['reg', 'ot'].forEach(shift => {
+                const wrap = document.getElementById(`finLog${shift === 'reg' ? 'Regular' : 'Ot'}Employees`);
+                if (!wrap) return;
+                wrap.innerHTML = finishingStaffList.map(s => {
+                    const nm = finishingStaffDisplayName(s);
+                    return `<label class="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] cursor-pointer">
+                        <input type="checkbox" value="${escapeHtml(s.id)}" data-name="${escapeHtml(nm)}" ${prev[shift].has(nm) ? 'checked' : ''} class="finishing-log-emp-${shift} rounded" onchange="finLogPreview()">
+                        ${escapeHtml(nm)}
+                    </label>`;
+                }).join('') || '<p class="text-[10px] text-slate-400">ยังไม่มีรายชื่อพนักงาน — เพิ่มได้ที่ "จัดการรายชื่อพนักงานแต่ง" ด้านล่าง</p>';
+            });
+            const mgr = document.getElementById('finLogStaffManagerList');
+            if (mgr) mgr.innerHTML = finishingStaffList.map(s => `
+                <span class="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 bg-slate-50 border border-slate-200 rounded-full text-[11px]">
+                    ${escapeHtml(finishingStaffDisplayName(s))}
+                    <button type="button" onclick="deleteFinishingStaffMember('${escapeHtml(s.id)}')" title="ลบพนักงานคนนี้" class="text-rose-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark"></i></button>
+                </span>`).join('') || '<p class="text-[10px] text-slate-400">ยังไม่มีรายชื่อพนักงาน — เพิ่มได้ด้านล่าง</p>';
+        }
+        function finLogCheckedEmployees(cls) {
+            return Array.from(document.querySelectorAll(`.${cls}:checked`)).map(el => el.dataset.name);
+        }
+        function finLogAddStaff() {
+            const nameEl = document.getElementById('finLogStaffNewName'), nickEl = document.getElementById('finLogStaffNewNickname');
+            const name = nameEl ? nameEl.value.trim() : '', nickname = nickEl ? nickEl.value.trim() : '';
+            if (!name) { showToast('กรุณากรอกชื่อพนักงาน', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            finishingStaffList.push({ id: 'fs_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name, nickname });
+            saveFinishingStaffToLocal();
+            renderFinishingStaffManagerHtml();
+            renderFinishingEfficiencyTable();
+            if (nameEl) nameEl.value = ''; if (nickEl) nickEl.value = '';
+            showToast(`เพิ่ม "${name}" เข้ารายชื่อพนักงานตกแต่งแล้ว`, 'fa-user-plus', 'text-emerald-400');
+        }
+
+        function finLogFindOrder() {
+            const el = document.getElementById('finLogMoSo');
+            return findOrderByMoSoKey(el ? el.value.trim() : '');
+        }
+        function finLogRemainingBefore(order, date) {
+            const log = Array.isArray((order.finishing || {}).efficiencyLog) ? order.finishing.efficiencyLog : [];
+            const done = log.filter(l => String(l.date || '') < date).reduce((s, l) => s + (Number(l.areaSqm) || 0), 0);
+            return Math.max(0, Math.round(((Number(order.totalSqm) || 0) - done) * 100) / 100);
+        }
+        function finLogSizeText(order) {
+            return (Array.isArray(order.sizeItems) ? order.sizeItems : []).map(it => `${it.width || '-'} X ${it.length || '-'}`).join(', ');
+        }
+        function finLogAutoGrade(order) {
+            const log = Array.isArray((order.finishing || {}).efficiencyLog) ? order.finishing.efficiencyLog : [];
+            for (let i = log.length - 1; i >= 0; i--) if (log[i] && log[i].grade) return String(log[i].grade);
+            try { const g = planningWsGrades(order); if (g && g.finishing && g.finishing.grade) return g.finishing.grade; } catch (e) { /* fallthrough */ }
+            if (order.productionCalc && Number(order.productionCalc.totalArea) > 0) return computeFinishingGrade(order.productionCalc).grade;
+            return '';
+        }
+        function finLogHandleMoChange() {
+            const moInput = document.getElementById('finLogMoSo');
+            const moSo = moInput ? moInput.value.trim() : '';
+            const found = findOrderByMoSoKey(moSo);
+            const nf = document.getElementById('finLogMoSoNotFound');
+            if (!found) { if (nf) nf.classList.toggle('hidden', !moSo); finLogPreview(); return; }
+            if (nf) nf.classList.add('hidden');
+            const { order } = found;
+            const key = normalizeMoSoKey(order.moSo);
+            const changed = key !== finLogLastMoKey; finLogLastMoKey = key;
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            if (changed) { set('finLogQuality', order.quality || ''); set('finLogSizeText', finLogSizeText(order)); }
+            const total = Number(order.totalSqm) || 0;
+            set('finLogTotalSqm', total || '');
+            const date = (document.getElementById('finLogDate') || {}).value || '';
+            set('finLogRemainingBefore', finLogRemainingBefore(order, date) || '');
+            if (changed) { const g = finLogAutoGrade(order); if (g) set('finLogGrade', g); }
+            finLogPreview();
+        }
+
+        function finLogRead() {
+            const v = id => (document.getElementById(id) || {}).value || '';
+            const shift = (p, cls) => {
+                const start = v(`finLog${p}Start`), end = v(`finLog${p}End`), area = Number(v(`finLog${p}Area`)) || 0;
+                const employees = finLogCheckedEmployees(cls), hours = timeRangeHours(start, end);
+                return { start, end, hours, staffCount: employees.length, employees, areaDone: area,
+                    efficiency: (employees.length > 0 && hours > 0) ? Math.round((area / (employees.length * hours)) * 10000) / 10000 : null };
+            };
+            const regular = shift('Reg', 'finishing-log-emp-reg'), ot = shift('Ot', 'finishing-log-emp-ot');
+            const sqm = Math.round((regular.areaDone + ot.areaDone) * 100) / 100;
+            const clockHours = Math.round((regular.hours + ot.hours) * 100) / 100;
+            const staffHours = Math.round(((regular.staffCount * regular.hours) + (ot.staffCount * ot.hours)) * 100) / 100;
+            const efficiency = staffHours > 0 ? Math.round((sqm / staffHours) * 10000) / 10000 : null;
+            const grade = v('finLogGrade');
+            const target = grade && PLANNING_WS_FINISHING_INFO[grade] ? PLANNING_WS_FINISHING_INFO[grade].target : null;
+            const gradePercent = (target && efficiency !== null) ? Math.round((efficiency / target) * 1000) / 10 : null;
+            return { regular, ot, sqm, clockHours, staffHours, efficiency, grade, target, gradePercent,
+                employees: Array.from(new Set([...regular.employees, ...ot.employees])) };
+        }
+        function finLogPreview() {
+            const el = document.getElementById('finLogPreview');
+            if (!el) return;
+            const s = finLogRead();
+            const found = finLogFindOrder();
+            const before = Number((document.getElementById('finLogRemainingBefore') || {}).value) || 0;
+            const after = found ? Math.max(0, Math.round((before - s.sqm) * 100) / 100) : null;
+            el.innerHTML = `
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                    <div class="bg-white rounded-lg border border-slate-200 p-2"><p class="text-[10px] text-slate-400">รวมพื้นที่วันนี้</p><p class="text-sm font-bold text-slate-800" data-fin-prev-sqm>${s.sqm.toFixed(2)} ตร.ม.</p></div>
+                    <div class="bg-white rounded-lg border border-slate-200 p-2"><p class="text-[10px] text-slate-400">เวลารวม / คน×ชม.</p><p class="text-sm font-bold text-slate-800">${s.clockHours.toFixed(2)} / ${s.staffHours.toFixed(2)}</p></div>
+                    <div class="bg-white rounded-lg border border-slate-200 p-2"><p class="text-[10px] text-slate-400">ประสิทธิภาพ (ตร.ม./คน/ชม.)</p><p class="text-sm font-bold text-slate-800" data-fin-prev-eff>${s.efficiency === null ? '-' : s.efficiency.toFixed(4)}</p></div>
+                    <div class="bg-white rounded-lg border ${s.gradePercent !== null && s.gradePercent < 90 ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50'} p-2"><p class="text-[10px] text-slate-400">% เทียบเกรด${s.grade ? ' ' + escapeHtml(s.grade) : ''}</p><p class="text-sm font-bold text-slate-800" data-fin-prev-pct>${s.gradePercent === null ? '-' : s.gradePercent + '%'}</p></div>
+                    <div class="bg-white rounded-lg border border-slate-200 p-2"><p class="text-[10px] text-slate-400">คงเหลือหลังบันทึก</p><p class="text-sm font-bold text-slate-800" data-fin-prev-remain>${after === null ? '-' : after.toLocaleString('th-TH') + ' ตร.ม.'}</p></div>
+                </div>`;
+        }
+
+        function finLogReset(keepDate) {
+            const dateEl = document.getElementById('finLogDate');
+            const prev = dateEl ? dateEl.value : '';
+            ['finLogMoSo', 'finLogPieceNo', 'finLogQuality', 'finLogSizeText', 'finLogTotalSqm', 'finLogRemainingBefore', 'finLogRegArea', 'finLogOtArea', 'finLogNote'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+            if (dateEl) { const n = new Date(); dateEl.value = keepDate && prev ? prev : `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; }
+            const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+            set('finLogRegStart', '08:00'); set('finLogRegEnd', '16:30'); set('finLogOtStart', '17:00'); set('finLogOtEnd', '20:00'); set('finLogGrade', '');
+            document.querySelectorAll('.finishing-log-emp-reg, .finishing-log-emp-ot').forEach(cb => { cb.checked = false; });
+            const nf = document.getElementById('finLogMoSoNotFound'); if (nf) nf.classList.add('hidden');
+            finLogEditCtx = null; finLogLastMoKey = '';
+            const btn = document.getElementById('finLogSaveBtn');
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i>บันทึกรายการแต่งวันนี้';
+            finLogPreview();
+        }
+
+        // คำนวณ % งานแต่งจากพื้นที่สะสม (ใช้เมื่อสเตจนี้ไม่มีรายการ checklist — ไม่ทับ % ที่คำนวณจาก checklist)
+        function finLogSyncPercent(order) {
+            const total = Number(order.totalSqm) || 0;
+            if (!(total > 0) || !order.finishing) return;
+            if (Array.isArray(order.finishing.items) && order.finishing.items.length > 0) return;
+            const done = (order.finishing.efficiencyLog || []).reduce((s, l) => s + (Number(l.areaSqm) || 0), 0);
+            order.finishing.percent = Math.max(0, Math.min(100, Math.round(done / total * 100)));
+        }
+        function finLogRefreshAll(orderIndex) {
+            renderProductionBoard(); renderProductionTimeline(); renderProductionOverview();
+            finLogRenderTable(); renderFinishingEfficiencyTable();
+            if (typeof currentDetailOrderIndex !== 'undefined' && currentDetailOrderIndex === orderIndex && orderIndex !== undefined) renderOrderDetailModalBody(orderIndex);
+        }
+
+        function finLogSave() {
+            const date = (document.getElementById('finLogDate') || {}).value || '';
+            const moSo = (document.getElementById('finLogMoSo') || {}).value || '';
+            if (!date) { showToast('กรุณาระบุวันที่', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            const found = findOrderByMoSoKey(moSo.trim());
+            if (!found) { showToast('ไม่พบ M/O นี้ในระบบ — กรุณาตรวจสอบเลขที่ M/O (ต้องเปิด M/O ไว้ในระบบก่อน)', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            const { order, orderIndex } = found;
+            const s = finLogRead();
+            if (s.sqm <= 0) { showToast('กรุณากรอกพื้นที่ที่แต่งได้อย่างน้อย 1 กะ', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            const v = id => ((document.getElementById(id) || {}).value || '').trim();
+            const pieceNo = v('finLogPieceNo');
+            const entry = {
+                date, grade: s.grade, areaSqm: s.sqm, hours: s.clockHours, note: v('finLogNote'), employees: s.employees,
+                pieceNo, quality: v('finLogQuality'), sizeText: v('finLogSizeText'),
+                regular: s.regular, ot: s.ot, staffHours: s.staffHours, efficiency: s.efficiency,
+                gradeTargetEfficiency: s.target, gradePercent: s.gradePercent, source: 'daily'
+            };
+            if (!order.finishing) order.finishing = {};
+            if (!Array.isArray(order.finishing.efficiencyLog)) order.finishing.efficiencyLog = [];
+            const ctx = finLogEditCtx;
+            if (ctx && ctx.orderIndex !== orderIndex) {
+                const oldOrder = productionOrders[ctx.orderIndex];
+                if (oldOrder && oldOrder.finishing && Array.isArray(oldOrder.finishing.efficiencyLog)) {
+                    oldOrder.finishing.efficiencyLog.splice(ctx.itemIndex, 1);
+                    finLogSyncPercent(oldOrder); persistOrderChange(oldOrder);
+                }
+                order.finishing.efficiencyLog.push(entry);
+            } else if (ctx && order.finishing.efficiencyLog[ctx.itemIndex]) {
+                order.finishing.efficiencyLog[ctx.itemIndex] = entry;
+            } else {
+                // บันทึกซ้ำ (วันที่ + ชิ้นที่ เดียวกัน) = แทนที่รายการเดิม ไม่ซ้ำยอด
+                const idx = order.finishing.efficiencyLog.findIndex(l => l && l.source === 'daily' && l.date === date && String(l.pieceNo || '') === pieceNo);
+                if (idx === -1) order.finishing.efficiencyLog.push(entry); else order.finishing.efficiencyLog[idx] = entry;
+            }
+            finLogSyncPercent(order);
+            persistOrderChange(order);
+            finLogRefreshAll(orderIndex);
+            showToast(`บันทึกรายการแต่ง ${order.moSo} วันที่ ${date} แล้ว (${s.sqm.toFixed(2)} ตร.ม.)`, 'fa-floppy-disk', 'text-emerald-400');
+            finLogReset(true);
+        }
+
+        function finLogEdit(orderIndex, itemIndex) {
+            const order = productionOrders[orderIndex];
+            const entry = order && order.finishing && (order.finishing.efficiencyLog || [])[itemIndex];
+            if (!entry) return;
+            setDeptKpiSubTab('finishing', 'log');
+            const set = (id, val) => { const e = document.getElementById(id); if (e) e.value = (val === undefined || val === null) ? '' : val; };
+            set('finLogDate', entry.date || ''); set('finLogMoSo', order.moSo); set('finLogPieceNo', entry.pieceNo || '');
+            set('finLogQuality', entry.quality || order.quality || ''); set('finLogSizeText', entry.sizeText || finLogSizeText(order));
+            set('finLogTotalSqm', order.totalSqm || ''); set('finLogGrade', entry.grade || ''); set('finLogNote', entry.note || '');
+            const reg = entry.regular || { start: '08:00', end: '16:30', areaDone: Number(entry.areaSqm) || 0, employees: entry.employees || [] };
+            const ot = entry.ot || { start: '17:00', end: '20:00', areaDone: 0, employees: [] };
+            set('finLogRegStart', reg.start || '08:00'); set('finLogRegEnd', reg.end || '16:30'); set('finLogRegArea', reg.areaDone || '');
+            set('finLogOtStart', ot.start || '17:00'); set('finLogOtEnd', ot.end || '20:00'); set('finLogOtArea', ot.areaDone || '');
+            document.querySelectorAll('.finishing-log-emp-reg').forEach(cb => { cb.checked = (reg.employees || []).includes(cb.dataset.name); });
+            document.querySelectorAll('.finishing-log-emp-ot').forEach(cb => { cb.checked = (ot.employees || []).includes(cb.dataset.name); });
+            set('finLogRemainingBefore', finLogRemainingBefore(order, entry.date || '') || '');
+            finLogLastMoKey = normalizeMoSoKey(order.moSo);
+            finLogEditCtx = { orderIndex, itemIndex };
+            const btn = document.getElementById('finLogSaveBtn');
+            if (btn) btn.innerHTML = `<i class="fa-solid fa-floppy-disk mr-1"></i>บันทึกการแก้ไข (${escapeHtml(order.moSo)} • ${escapeHtml(entry.date || '')})`;
+            finLogPreview();
+            const f = document.getElementById('finLogFormCard'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function finLogDelete(orderIndex, itemIndex) {
+            const order = productionOrders[orderIndex];
+            const entry = order && order.finishing && (order.finishing.efficiencyLog || [])[itemIndex];
+            if (!entry) return;
+            if (!window.confirm(`ลบรายการแต่ง ${order.moSo} วันที่ ${entry.date || '-'} ถาวรหรือไม่?`)) return;
+            order.finishing.efficiencyLog.splice(itemIndex, 1);
+            if (finLogEditCtx && finLogEditCtx.orderIndex === orderIndex) finLogReset(true);
+            finLogSyncPercent(order);
+            persistOrderChange(order);
+            finLogRefreshAll(orderIndex);
+            showToast('ลบรายการแต่งแล้ว', 'fa-circle-xmark', 'text-rose-400');
+        }
+
+        // เปิดฟอร์มบันทึกวันนี้ของ M/O นี้ (ปุ่มบนการ์ดบอร์ดงานแต่ง)
+        function finLogOpenFor(orderIndex) {
+            const order = productionOrders[orderIndex];
+            if (!order) return;
+            setDeptKpiSubTab('finishing', 'log');
+            finLogReset(false);
+            const el = document.getElementById('finLogMoSo');
+            if (el) el.value = order.moSo;
+            finLogHandleMoChange();
+            const f = document.getElementById('finLogFormCard'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function setFinLogPeriod(value) {
+            finLogPeriodGranularity = (value === 'day' || value === 'year') ? value : 'month';
+            finLogRenderTable();
+        }
+
+        const FIN_LOG_THEAD_HTML = `
+            <th class="px-2 py-2 text-left">วันที่</th>
+            <th class="px-2 py-2 text-left">M/O</th>
+            <th class="px-2 py-2 text-left">ชิ้นที่</th>
+            <th class="px-2 py-2 text-left">เกรด</th>
+            <th class="px-2 py-2 text-left">กะปกติ</th>
+            <th class="px-2 py-2 text-left">กะ OT</th>
+            <th class="px-2 py-2 text-left">พนักงาน</th>
+            <th class="px-2 py-2 text-right">พ.ท แต่งได้ (ตร.ม.)</th>
+            <th class="px-2 py-2 text-right">เวลา (ชม.)</th>
+            <th class="px-2 py-2 text-right">ประสิทธิภาพ (ตร.ม./คน/ชม.)</th>
+            <th class="px-2 py-2 text-right">% เทียบเกรด</th>
+            <th class="px-2 py-2 text-right">คงเหลือ (ตร.ม.)</th>
+            <th class="px-2 py-2 text-center">จัดการ</th>
+        `;
+
+        function finLogRenderTable() {
+            const wrap = document.getElementById('finLogPeriodSelectWrap');
+            if (wrap) wrap.innerHTML = periodDropdownHtml('finLogPeriodSelect', 'setFinLogPeriod', finLogPeriodGranularity);
+            const container = document.getElementById('finLogSplitContainer');
+            if (!container) return;
+            const search = ((document.getElementById('finLogTableSearch') || {}).value || '').trim().toLowerCase();
+            let rows = [];
+            productionOrders.forEach((order, orderIndex) => {
+                const log = Array.isArray((order.finishing || {}).efficiencyLog) ? order.finishing.efficiencyLog : [];
+                if (!log.length) return;
+                const cum = new Map(computeFinishingLogWithCumulative(order).map(r => [r.itemIndex, r]));
+                log.forEach((item, itemIndex) => rows.push({ order, orderIndex, item, itemIndex, cum: cum.get(itemIndex) }));
+            });
+            rows = rows.filter(r => reportMonthMatchDate(r.item.date, r.order));
+            if (search) rows = rows.filter(r => [r.order.moSo, r.item.quality, ...(r.item.employees || [])].map(x => String(x || '').toLowerCase()).some(x => x.includes(search)));
+            rows.sort((a, b) => (a.item.date < b.item.date ? 1 : a.item.date > b.item.date ? -1 : 0));
+            const ps = document.getElementById('finLogPeriodSummary');
+            if (ps) ps.innerHTML = renderPeriodSummaryTableHtml(rows.map(r => r.item), 'date', finLogPeriodGranularity, [
+                { key: 'areaSqm', label: 'พ.ท แต่งได้รวม (ตร.ม.)' }, { key: 'hours', label: 'เวลารวม (ชม.)' }
+            ]);
+            const shiftTxt = sh => (sh && (sh.start || sh.end) && Number(sh.areaDone) > 0) ? `${escapeHtml(sh.start || '')}–${escapeHtml(sh.end || '')}<div class="text-[10px] text-slate-500">${Number(sh.areaDone).toFixed(2)} ตร.ม. · ${(sh.employees || []).length} คน</div>` : '<span class="text-slate-300">-</span>';
+            const rowHtml = ({ order, orderIndex, item, itemIndex, cum }) => {
+                const emp = Array.isArray(item.employees) ? item.employees : [];
+                const sh = Number(item.staffHours) || (emp.length * (Number(item.hours) || 0));
+                const eff = item.efficiency !== undefined && item.efficiency !== null ? Number(item.efficiency) : (sh > 0 ? (Number(item.areaSqm) || 0) / sh : null);
+                const tgt = PLANNING_WS_FINISHING_INFO[item.grade] ? PLANNING_WS_FINISHING_INFO[item.grade].target : null;
+                const pct = item.gradePercent !== undefined && item.gradePercent !== null ? item.gradePercent : ((eff !== null && tgt) ? Math.round(eff / tgt * 1000) / 10 : null);
+                return `<tr class="hover:bg-slate-50/80" data-fin-log-row>
+                    <td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(item.date || '-')}</td>
+                    <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}</td>
+                    <td class="px-2 py-1.5">${escapeHtml(item.pieceNo || '-')}</td>
+                    <td class="px-2 py-1.5">${escapeHtml(item.grade || '-')}</td>
+                    <td class="px-2 py-1.5 whitespace-nowrap">${shiftTxt(item.regular)}</td>
+                    <td class="px-2 py-1.5 whitespace-nowrap">${shiftTxt(item.ot)}</td>
+                    <td class="px-2 py-1.5 text-[11px]">${emp.map(escapeHtml).join(', ') || '-'}</td>
+                    <td class="px-2 py-1.5 text-right font-semibold">${(Number(item.areaSqm) || 0).toLocaleString('th-TH')}</td>
+                    <td class="px-2 py-1.5 text-right">${(Number(item.hours) || 0).toLocaleString('th-TH')}</td>
+                    <td class="px-2 py-1.5 text-right">${eff === null ? '-' : eff.toFixed(4)}</td>
+                    <td class="px-2 py-1.5 text-right ${pct !== null && pct < 90 ? 'text-rose-600' : 'text-emerald-700'} font-semibold">${pct === null ? '-' : pct + '%'}</td>
+                    <td class="px-2 py-1.5 text-right ${cum && cum.remaining <= 0 ? 'text-emerald-600 font-semibold' : 'text-slate-600'}">${cum ? cum.remaining.toLocaleString('th-TH') : '-'}${cum && cum.isCompletingEntry ? ' <i class="fa-solid fa-flag-checkered text-emerald-600" title="เสร็จ 1 M/O,S/O"></i>' : ''}</td>
+                    <td class="px-2 py-1.5 text-center whitespace-nowrap">
+                        <button type="button" onclick="finLogEdit(${orderIndex}, ${itemIndex})" title="แก้ไข" class="text-indigo-500 hover:text-indigo-700 px-1"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
+                        <button type="button" onclick="finLogDelete(${orderIndex}, ${itemIndex})" title="ลบ" class="text-rose-400 hover:text-rose-600 px-1"><i class="fa-solid fa-trash text-xs"></i></button>
+                    </td></tr>`;
+            };
+            const moRows = rows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) !== 'SO');
+            const soRows = rows.filter(r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO');
+            renderSplitOrderTypeTables('finLogSplitContainer', FIN_LOG_THEAD_HTML, moRows.map(rowHtml).join(''), soRows.map(rowHtml).join(''), moRows.length, soRows.length, 13);
+        }
+        function finLogRefresh() { finLogPopulateMoOptions(); finLogRenderTable(); }
+        function finLogInit() {
+            finLogPopulateGrades(); finLogPopulateMoOptions(); finLogRenderStaff(); finLogReset(false); finLogRenderTable();
+        }
+
+        // ---- บอร์ดงานแต่ง (การ์ดต่อ M/O เหมือนบอร์ดจอทอ) -------------------------------------------
+        function finishingOrderStats(order) {
+            const rows = computeFinishingLogWithCumulative(order);
+            const total = Number(order.totalSqm) || 0;
+            const last = rows.length ? rows[rows.length - 1] : null;
+            const done = last ? last.cumulative : 0;
+            let area = 0, staffHours = 0; const dates = new Set();
+            rows.forEach(r => {
+                const it = r.item; area += Number(it.areaSqm) || 0;
+                staffHours += Number(it.staffHours) || ((Array.isArray(it.employees) ? it.employees.length : 0) * (Number(it.hours) || 0));
+                if (it.date) dates.add(it.date);
+            });
+            const eff = staffHours > 0 ? area / staffHours : null;
+            const grade = (last && last.item.grade) || '';
+            const tgt = PLANNING_WS_FINISHING_INFO[grade] ? PLANNING_WS_FINISHING_INFO[grade].target : null;
+            const gradePercent = (eff !== null && tgt) ? Math.round(eff / tgt * 1000) / 10 : null;
+            const pct = total > 0 ? Math.max(0, Math.min(100, Math.round(done / total * 100))) : (Number((order.finishing || {}).percent) || 0);
+            return { rows, total, done, last: last ? last.item : null, days: dates.size, grade, gradePercent, pct, remaining: Math.max(0, Math.round((total - done) * 100) / 100) };
+        }
+        function finishingViewToggleHtml() {
+            const on = 'px-3 py-1.5 text-xs font-semibold bg-fuchsia-600 text-white';
+            const off = 'px-3 py-1.5 text-xs font-semibold bg-white text-slate-600 hover:bg-slate-50';
+            return `<div class="inline-flex rounded-lg overflow-hidden border border-slate-300" data-finishing-view-toggle>
+                <button type="button" onclick="setFinishingBoardView('cards')" class="${finishingBoardView === 'cards' ? on : off}"><i class="fa-solid fa-hand-sparkles mr-1"></i>บอร์ดงานแต่ง</button>
+                <button type="button" onclick="setFinishingBoardView('orders')" class="${finishingBoardView === 'orders' ? on : off}"><i class="fa-solid fa-table-cells-large mr-1"></i>ใบงานตกแต่ง (M/O)</button>
+            </div>`;
+        }
+        function setFinishingBoardView(v) {
+            finishingBoardView = v === 'orders' ? 'orders' : 'cards';
+            try { localStorage.setItem('qc_finishing_board_view', finishingBoardView); } catch (e) { /* storage blocked */ }
+            deptWsUi.finishing = '';
+            renderProductionBoard();
+        }
+        function renderFinishingCardHtml(order, orderIndex) {
+            const st = finishingOrderStats(order);
+            const last = st.last || {};
+            const employees = (last.employees || []).map(escapeHtml).join(', ') || '-';
+            const warn = renderDeadlineWarningBadge(order);
+            const doneAll = st.total > 0 && st.remaining <= 0;
+            const pctBadge = st.gradePercent === null ? '<span class="text-slate-300">-</span>' : `<span class="font-bold ${st.gradePercent < 90 ? 'text-rose-600' : 'text-emerald-700'}">${st.gradePercent}%</span>`;
+            return `
+                <div data-fin-card="${escapeHtml(order.moSo)}" class="bg-white rounded-xl border ${doneAll ? 'border-emerald-300' : 'border-fuchsia-200'} shadow-sm p-2.5 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="inline-flex items-center gap-1 text-[10px] font-bold ${doneAll ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-fuchsia-700 bg-fuchsia-50 border-fuchsia-200'} border rounded-full px-2 py-0.5"><i class="fa-solid fa-hand-sparkles"></i> ${doneAll ? 'แต่งครบแล้ว' : 'กำลังแต่ง'} ${st.pct}%</span>
+                        <button onclick="openOrderDetailModal(${orderIndex}, 'finishing')" class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition inline-flex items-center justify-center" title="ดู/แก้ไขรายละเอียด"><i class="fa-solid fa-pen-to-square text-[10px]"></i></button>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        ${order.designImageUrl ? `<img src="${escapeHtml(order.designImageUrl)}" class="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0" alt="รูปดีไซน์" loading="lazy">` : ''}
+                        <div class="min-w-0">
+                            <p class="font-bold ${moSoTextColorClass(order)} text-xs font-mono truncate">${orderTypeBadgeHtml(order.orderType)}${marketBadgeHtml(order.market)}${escapeHtml(order.moSo)}</p>
+                            ${order.customerName ? `<p class="text-[10px] text-slate-500 truncate">${escapeHtml(order.customerName)}</p>` : ''}
+                            <p class="text-[10px] text-slate-400">กำหนดเสร็จ: ${escapeHtml(order.dueDate || '-')}</p>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-600 truncate"><i class="fa-solid fa-users mr-1 text-fuchsia-500"></i>${employees}</p>
+                    <div class="grid grid-cols-2 gap-1.5 text-center">
+                        <div class="bg-slate-50 rounded-lg p-1.5"><p class="text-[9px] text-slate-400">เกรด</p><p class="text-xs font-bold text-slate-700">${escapeHtml(st.grade || '-')}</p></div>
+                        <div class="bg-slate-50 rounded-lg p-1.5"><p class="text-[9px] text-slate-400">% เทียบเกรด (M/O นี้)</p><p class="text-xs">${pctBadge}</p></div>
+                        <div class="bg-slate-50 rounded-lg p-1.5"><p class="text-[9px] text-slate-400">ใช้เวลาล่าสุด</p><p class="text-xs font-bold text-slate-700">${(Number(last.hours) || 0).toFixed(2)} ชม.</p></div>
+                        <div class="bg-slate-50 rounded-lg p-1.5"><p class="text-[9px] text-slate-400">ระยะเวลาทำงาน</p><p class="text-xs font-bold text-slate-700">${st.days} วัน</p></div>
+                    </div>
+                    <p class="text-[11px] text-slate-600"><i class="fa-solid fa-ruler-combined mr-1 text-fuchsia-500"></i>แต่งแล้ว <span class="font-bold">${st.done.toFixed(2)}${st.total > 0 ? ' / ' + st.total : ''} ตร.ม.</span>${st.total > 0 ? ` (เหลือ ${st.remaining.toLocaleString('th-TH')})` : ''}${last.date ? ` • ล่าสุด ${escapeHtml(last.date)}` : ''}</p>
+                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full ${doneAll ? 'bg-emerald-500' : 'bg-fuchsia-500'}" style="width:${st.pct}%"></div></div>
+                    ${warn ? `<div>${warn}</div>` : ''}
+                    <div class="flex gap-1.5">
+                        <button onclick="finLogOpenFor(${orderIndex})" class="flex-1 bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-[11px] font-medium py-1.5 rounded-lg shadow transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-pen"></i> บันทึกวันนี้</button>
+                        <button onclick="deptWsPass('finishing', ${orderIndex})" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-medium py-1.5 rounded-lg shadow transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-arrow-right"></i> แต่งเสร็จ → รอส่ง</button>
+                    </div>
+                </div>`;
+        }
+        function renderFinishingWaitingRowHtml(order, orderIndex) {
+            const warn = renderDeadlineWarningBadge(order);
+            return `
+                <div data-fin-wait="${escapeHtml(order.moSo)}" class="bg-white rounded-lg border border-slate-200 px-2.5 py-2 flex items-center justify-between gap-2 text-xs">
+                    <div class="min-w-0 flex-grow">
+                        <p class="font-bold ${moSoTextColorClass(order)} font-mono truncate">${orderTypeBadgeHtml(order.orderType)}${marketBadgeHtml(order.market)}${escapeHtml(order.moSo)}</p>
+                        <p class="text-[10px] text-slate-400 truncate">${escapeHtml(order.customerName || '-')} • กำหนดเสร็จ: ${escapeHtml(order.dueDate || '-')}${Number(order.totalSqm) > 0 ? ` • ${order.totalSqm} ตร.ม.` : ''}</p>
+                        ${warn ? `<div class="mt-0.5">${warn}</div>` : ''}
+                    </div>
+                    <button onclick="finLogOpenFor(${orderIndex})" class="shrink-0 text-fuchsia-600 hover:text-fuchsia-800 px-1.5 text-[11px] font-semibold border border-fuchsia-200 rounded-lg py-1" title="บันทึกการแต่งวันนี้"><i class="fa-solid fa-pen mr-1"></i>บันทึก</button>
+                    <button onclick="openOrderDetailModal(${orderIndex}, 'finishing')" class="shrink-0 text-indigo-500 hover:text-indigo-700 px-1" title="ดู/แก้ไข"><i class="fa-solid fa-pen-to-square"></i></button>
+                </div>`;
+        }
+        function renderFinishingCardBoard(ordersHere, searchTerm) {
+            const column = document.getElementById('boardColumn-finishing');
+            if (!column) return;
+            const working = [], waiting = [];
+            ordersHere.forEach(o => {
+                const hasLog = Array.isArray((o.finishing || {}).efficiencyLog) && o.finishing.efficiencyLog.length > 0;
+                (hasLog || Number((o.finishing || {}).percent) > 0 ? working : waiting).push(o);
+            });
+            working.sort((a, b) => String((finishingOrderStats(b).last || {}).date || '').localeCompare(String((finishingOrderStats(a).last || {}).date || '')));
+            waiting.sort((a, b) => (a.dueDate || '9999') < (b.dueDate || '9999') ? -1 : ((a.dueDate || '9999') > (b.dueDate || '9999') ? 1 : 0));
+            const cards = working.map(o => renderFinishingCardHtml(o, productionOrders.indexOf(o))).join('');
+            const waitHtml = waiting.length
+                ? waiting.map(o => renderFinishingWaitingRowHtml(o, productionOrders.indexOf(o))).join('')
+                : `<p class="text-[11px] text-slate-400 px-1">${searchTerm ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : 'ไม่มีรายการรอเริ่มแต่ง'}</p>`;
+            column.innerHTML = `
+                <div class="space-y-4">
+                    ${deptWsHeaderHtml('finishing', finishingViewToggleHtml()).replace('ใบงานตกแต่ง/บรรจุ', 'บอร์ดงานแต่ง').replace(/<p class="text-xs text-slate-500 mt-0.5">[^<]*<\/p>/, '<p class="text-xs text-slate-500 mt-0.5">การ์ดงานแต่งต่อ M/O — ความคืบหน้า/พนักงาน/เกรด จากบันทึกการแต่งรายวัน (สลับไปดูใบงานตกแต่งได้ด้านขวา)</p>')}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5" data-fin-board>${cards || `<p class="text-xs text-slate-400 px-1 col-span-full">${searchTerm ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : 'ยังไม่มีงานที่กำลังแต่ง — กด "บันทึก" ที่รายการรอเริ่มแต่งด้านล่าง'}</p>`}</div>
+                    <div class="pt-3 border-t border-fuchsia-200/70">
+                        <h5 class="text-[11px] font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half text-amber-500"></i> รอเริ่มแต่ง (${waiting.length})</h5>
+                        <div class="space-y-1.5">${waitHtml}</div>
+                    </div>
+                </div>`;
         }
 
         // ---- การเบิกใช้กาว (glue usage) -----------------------------------------------------------------
