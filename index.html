@@ -4234,7 +4234,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-141';
+        const APP_BUILD = 'QCDashboard-142';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -23726,7 +23726,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         //   เริ่มทอ    = ทอเอง: วันแรกในบันทึกทอ · จ้างทอ: วันที่ส่งผ้า+ไหมให้ผู้รับจ้าง (sentDate)
         //   ทอเสร็จ    = ทอเอง: วันที่แผนกทอโอนไปแผนกตกแต่ง · จ้างทอ: วันที่ได้รับพรม (receivedDate) · ทอปนกัน: วันที่ช้ากว่า
         //   (ตัดคอลัมน์ "วันที่โอน" ออก)
-        //   เลขที่ใบส่ง / วันส่งพรม = เลข INVOICE และวันที่ จาก Delivery Note (แท็บ รายการรอส่ง) — ใช้ค่าจากใบส่งก่อนเสมอ
+        //   UPDATED (2026-11-26): ตัดคอลัมน์ "เลขที่ใบส่ง" ออก ยึดเลข INVOICE (INV อ้างอิง) อย่างเดียว · เพิ่มคอลัมน์ "ส่งตามกำหนด" = วันที่เสร็จรอส่ง
+        //     (วันที่กดเสร็จ/รอส่งของแผนกตกแต่ง — actualFinishDates.finishing; พิมพ์ทับได้ finishing.kpiReadyDate)
+        //     KPI ผ่าน = วันเสร็จรอส่ง ≤ กำหนดส่งใน M/O (เสร็จก่อนกำหนดก็ผ่าน) · ช้ากว่ากำหนด = ไม่ผ่าน · ยังไม่มีวันเสร็จรอส่งแต่มีวันส่งตาม Delivery Note → ใช้วันส่งแทน
+        //     วันส่งพรม = วันที่ใน Delivery Note (ส่งออกจริง) — แสดงอ้างอิง ไม่ใช้ตัดสิน KPI เมื่อมีวันเสร็จรอส่ง
+        //   (เดิม) เลขที่ใบส่ง / วันส่งพรม = เลข INVOICE และวันที่ จาก Delivery Note (แท็บ รายการรอส่ง) — ใช้ค่าจากใบส่งก่อนเสมอ
         //   KPI = วันที่ใน Delivery Note ตรงกับกำหนดส่งใน M/O หรือไม่ (ตรง = ผ่าน, เร็ว/ช้ากว่า = ไม่ผ่าน)
         //         ยังไม่มี Delivery Note → รอส่ง · แต่เลยกำหนดแล้วยังไม่ส่ง = ไม่ผ่าน
         // =========================================================================================
@@ -23790,6 +23794,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     const intPending = split.intSqm > 0 ? Math.ceil(split.intPieces * (1 - Math.min(1, woven / split.intSqm)) - 1e-9) : 0;
                     out.pendingQty = weavingDone ? 0 : Math.max(0, intPending) + (extRecv ? 0 : split.extPieces);
                 } else if (!external && total > 0 && pieces > 0) out.pendingQty = weavingDone ? 0 : Math.max(0, Math.ceil(pieces * (1 - Math.min(1, woven / total)) - 1e-9));
+                // วันที่เสร็จรอส่ง (วันที่แผนกตกแต่งกดเสร็จ → รอส่ง)
+                const rd = getStageActualDate(order, 'finishing');
+                if (rd) out.readyDate = rd;
                 // เลขที่ใบส่ง / วันส่งพรม จากใบส่งสินค้า (Delivery Note)
                 const invs = kpiShippingInvoicesFor(order);
                 const invNos = [...new Set(invs.map(i => String(i.invNo || '').trim()).filter(Boolean))];
@@ -23809,25 +23816,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 grade: pick(w.grade, a.grade), location: pick(w.location, a.location), startDate: pick(w.startDate, a.startDate),
                 finishDate: pick(w.finishDate, a.finishDate), pendingQty: pick(w.pendingQty && Number(w.pendingQty) !== 0 ? w.pendingQty : '', a.pendingQty),
                 invNo: pick(fin.invNo, a.invNo),
-                deliveryNoteNo: a.invNo ? { v: a.invNo, auto: true, fromInvoice: true } : pick(fin.deliveryNoteNo, ''),
+                readyDate: pick(fin.kpiReadyDate, a.readyDate),
                 shippedDate: a.shipDateFromInvoice
                     ? { v: a.shipDateFromInvoice, auto: true, fromInvoice: true }
                     : { v: order.shippedDate || '', auto: false, fromInvoice: false }
             };
         }
-        // KPI: วันที่ส่งตาม Delivery Note ตรงกับกำหนดส่งใน M/O ไหม
+        // KPI ส่งตามกำหนด (2026-11-26): วันที่เสร็จรอส่ง ไม่เกินกำหนดส่งใน M/O = ผ่าน (เสร็จก่อนกำหนดก็ผ่าน) · เกิน = ไม่ผ่าน
+        //   ไม่มีวันเสร็จรอส่ง → ใช้วันส่งตาม Delivery Note แทน · ยังไม่เสร็จและเลยกำหนด = ไม่ผ่าน · ยังไม่ถึงกำหนด = รอส่ง
         function kpiDueStatus(order, e, todayKey) {
             const due = normalizeDateString(order.dueDate) || '';
+            const ready = normalizeDateString(e.readyDate && e.readyDate.v) || '';
             const ship = normalizeDateString(e.shippedDate.v) || '';
             if (!due) return { code: 'none', rank: 3, label: 'ไม่มีกำหนดส่ง', note: '', diff: null };
-            if (ship) {
-                const d = planningDiffDays(due, ship);
-                if (d === 0) return { code: 'pass', rank: 2, label: 'ผ่าน', note: 'ตรงกำหนดส่ง', diff: 0 };
-                return { code: 'fail', rank: 0, label: 'ไม่ผ่าน', note: d > 0 ? `ส่งช้า ${d} วัน` : `ส่งก่อน ${-d} วัน`, diff: d };
+            const basis = ready || ship;
+            if (basis) {
+                const d = planningDiffDays(due, basis);
+                const what = ready ? 'เสร็จรอส่ง' : 'ส่ง';
+                if (d === null) return { code: 'none', rank: 3, label: 'ไม่มีวันที่', note: '', diff: null };
+                if (d <= 0) return { code: 'pass', rank: 2, label: 'ผ่าน', note: d === 0 ? `${what}ตรงกำหนด` : `${what}ก่อนกำหนด ${-d} วัน`, diff: d };
+                return { code: 'fail', rank: 0, label: 'ไม่ผ่าน', note: `${what}ช้า ${d} วัน`, diff: d };
             }
-            if (getEffectiveStage(order) === 'shipped') return { code: 'none', rank: 3, label: 'ไม่มีวันส่ง', note: 'ส่งแล้วแต่ยังไม่มี Delivery Note', diff: null };
+            if (getEffectiveStage(order) === 'shipped') return { code: 'none', rank: 3, label: 'ไม่มีวันที่', note: 'ส่งแล้วแต่ยังไม่มีวันเสร็จรอส่ง/Delivery Note', diff: null };
             const late = planningDiffDays(due, todayKey || kpiTodayKey());
-            if (late !== null && late > 0) return { code: 'fail', rank: 0, label: 'ไม่ผ่าน', note: `เลยกำหนด ${late} วัน (ยังไม่ส่ง)`, diff: late };
+            if (late !== null && late > 0) return { code: 'fail', rank: 0, label: 'ไม่ผ่าน', note: `เลยกำหนด ${late} วัน (ยังไม่เสร็จรอส่ง)`, diff: late };
             return { code: 'wait', rank: 1, label: 'รอส่ง', note: late === 0 ? 'ครบกำหนดวันนี้' : (late === null ? '' : `อีก ${-late} วัน`), diff: late };
         }
         function kpiStatusBadgeHtml(st) {
@@ -23855,7 +23867,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             { key: 'start', label: 'เริ่มทอ', w: 114, sort: true, filter: 'date' },
             { key: 'finish', label: 'ทอเสร็จ', w: 114, sort: true, filter: 'date' },
             { key: 'pending', label: 'ค้างทอ', w: 54, sort: true, filter: 'num' },
-            { key: 'dnNo', label: 'เลขที่ใบส่ง', w: 104, sort: true, filter: 'text' },
+            { key: 'ready', label: 'ส่งตามกำหนด (เสร็จรอส่ง)', w: 132, sort: true, filter: 'date' },
             { key: 'ship', label: 'วันส่งพรม', w: 84, sort: true, filter: 'date' },
             { key: 'invRef', label: 'INV อ้างอิง', w: 100, sort: true, filter: 'text' },
             { key: 'kpi', label: 'KPI ส่งตามกำหนด', w: 196, sort: true, filter: 'select', options: [['', 'ทั้งหมด'], ['pass', 'ผ่าน'], ['fail', 'ไม่ผ่าน'], ['wait', 'รอส่ง'], ['none', 'ไม่มีข้อมูล']] }
@@ -23933,7 +23945,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     mo: overviewGridMoSortKey(order.moSo), moText: String(order.moSo || ''), opened: iso(order.openDate), customer: String(order.customerName || ''),
                     po: String(order.customerPO || ''), quality: String(order.quality || ''), due: iso(order.dueDate), pieces: num(order.totalPieces), colors: num(order.colorsCount),
                     sqm: num(order.totalSqm), grade: String(e.grade.v || ''), location: String(e.location.v || ''), start: iso(e.startDate.v), finish: iso(e.finishDate.v),
-                    pending: num(e.pendingQty.v), dnNo: String(e.deliveryNoteNo.v || ''), ship: iso(e.shippedDate.v), invRef: String(e.invNo.v || ''), kpi: st.rank
+                    pending: num(e.pendingQty.v), ready: iso(e.readyDate.v), ship: iso(e.shippedDate.v), invRef: String(e.invNo.v || ''), kpi: st.rank
                 }
             };
         }
@@ -23983,9 +23995,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const t = v => `<td class="ov-t" title="${escapeHtml(v || '')}">${v ? escapeHtml(v) : '<span class="text-slate-300">-</span>'}</td>`;
             const n = (v, d) => `<td class="ov-n">${v === null || v === 0 || v === undefined ? '<span class="text-slate-300">-</span>' : (d ? Number(v).toFixed(d) : escapeHtml(String(v)))}</td>`;
             const d = v => { const s = kpiShortDate(v); return `<td class="whitespace-nowrap">${s ? escapeHtml(s) : '<span class="text-slate-300">-</span>'}</td>`; };
-            const dnCell = e.deliveryNoteNo.fromInvoice
-                ? `<td class="ov-t text-teal-700 font-semibold" data-kpi-field="deliveryNoteNo" data-auto="1" title="เลขที่ใบส่งสินค้า (INVOICE) จาก Delivery Note ในแท็บ รายการรอส่ง">${escapeHtml(e.deliveryNoteNo.v)}</td>`
-                : `<td><input type="text" value="${escapeHtml(e.deliveryNoteNo.v)}" data-kpi-field="deliveryNoteNo" data-auto="0" onchange="${f('finishing.deliveryNoteNo')}" placeholder="-" class="kpi-in border ${baseCls}"></td>`;
+            const readyCell = `<td><input type="date" value="${escapeHtml(e.readyDate.v)}" data-kpi-field="readyDate" data-auto="${e.readyDate.auto ? 1 : 0}"${tip(e.readyDate, 'วันที่แผนกตกแต่งกดเสร็จ → รอส่ง')} onchange="${f('finishing.kpiReadyDate')}" class="kpi-in border ${cls(e.readyDate)}"></td>`;
             const shipCell = e.shippedDate.fromInvoice
                 ? `<td class="whitespace-nowrap text-teal-700 font-semibold" data-kpi-field="shippedDate" title="วันที่ส่งตาม Delivery Note">${escapeHtml(kpiShortDate(e.shippedDate.v) || '-')}</td>`
                 : `<td class="whitespace-nowrap" data-kpi-field="shippedDate">${e.shippedDate.v ? escapeHtml(kpiShortDate(e.shippedDate.v)) : '<span class="text-slate-300">-</span>'}</td>`;
@@ -23999,7 +24009,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <td><input type="date" value="${escapeHtml(e.startDate.v)}" data-kpi-field="startDate" data-auto="${e.startDate.auto ? 1 : 0}"${tip(e.startDate, 'แผนกทอ (วันแรกที่ทอ / วันที่ส่งจ้างทอ)')} onchange="${f('weaving.startDate')}" class="kpi-in border ${cls(e.startDate)}"></td>
                 <td><input type="date" value="${escapeHtml(e.finishDate.v)}" data-kpi-field="finishDate" data-auto="${e.finishDate.auto ? 1 : 0}"${tip(e.finishDate, 'แผนกทอ (วันที่โอนไปแผนกตกแต่ง / วันที่รับพรมจากผู้รับจ้าง)')} onchange="${f('weaving.finishDate')}" class="kpi-in border ${cls(e.finishDate)}"></td>
                 <td><input type="number" step="1" value="${escapeHtml(String(e.pendingQty.v))}" data-kpi-field="pendingQty" data-auto="${e.pendingQty.auto ? 1 : 0}"${tip(e.pendingQty, 'จำนวนชิ้น × สัดส่วน ตร.ม. ที่ยังไม่ได้ทอ')} onchange="updateOrderField(${orderIndex}, 'weaving.pendingQty', Number(this.value))" class="kpi-in border ${cls(e.pendingQty)} text-right"></td>
-                ${dnCell}${shipCell}
+                ${readyCell}${shipCell}
                 <td><input type="text" value="${escapeHtml(e.invNo.v)}" data-kpi-field="invNo" data-auto="${e.invNo.auto ? 1 : 0}"${tip(e.invNo, 'ใบส่งสินค้า (INVOICE) ในแท็บ รายการรอส่ง')} onchange="${f('finishing.invNo')}" placeholder="-" class="kpi-in border ${cls(e.invNo)}"></td>
                 <td>${kpiStatusBadgeHtml(m.st)}</td>
             </tr>`;
@@ -27691,7 +27701,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             { key: 'startDate', label: 'เริ่มทอ', type: 'date' },
             { key: 'finishDate', label: 'ทอเสร็จ', type: 'date' },
             { key: 'pendingQty', label: 'ค้างทอ', type: 'number' },
-            { key: 'deliveryNoteNo', label: 'เลขที่ใบส่ง' },
+            { key: 'readyDate', label: 'ส่งตามกำหนด (เสร็จรอส่ง)', type: 'date' },
             { key: 'shippedDate', label: 'วันส่งพรม' },
             { key: 'invNo', label: 'เลขที่ INV อ้างอิง' },
             { key: 'kpi', label: 'KPI ส่งตามกำหนด' },
@@ -27708,7 +27718,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 quality: order.quality, dueDate: order.dueDate, totalPieces: order.totalPieces,
                 colorsCount: order.colorsCount, totalSqm: order.totalSqm,
                 grade: e.grade.v, location: e.location.v, startDate: e.startDate.v, finishDate: e.finishDate.v,
-                pendingQty: e.pendingQty.v, deliveryNoteNo: e.deliveryNoteNo.v,
+                pendingQty: e.pendingQty.v, readyDate: e.readyDate.v,
                 shippedDate: kpiShortDate(e.shippedDate.v), invNo: e.invNo.v,
                 kpi: st.label, kpiNote: st.note
             }));
@@ -27737,7 +27747,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     if (diff(r.startDate, eff.startDate.v)) order.weaving.startDate = r.startDate;
                     if (diff(r.finishDate, eff.finishDate.v)) order.weaving.finishDate = r.finishDate;
                     if (diff(r.pendingQty, eff.pendingQty.v)) order.weaving.pendingQty = r.pendingQty;
-                    if (diff(r.deliveryNoteNo, eff.deliveryNoteNo.v) && !eff.deliveryNoteNo.fromInvoice) order.finishing.deliveryNoteNo = r.deliveryNoteNo;
+                    { const rv = normalizeDateString(r.readyDate) || ''; if (rv && rv !== String(eff.readyDate.v)) order.finishing.kpiReadyDate = rv; }
                     if (diff(r.invNo, eff.invNo.v)) order.finishing.invNo = r.invNo;
                     persistOrderChange(order);
                     matched++;
