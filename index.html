@@ -1630,6 +1630,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <button onclick="setPlanningKpiTab('extraDye')" id="kpiTabExtraDyeBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                         <i class="fa-solid fa-droplet-slash"></i> ไหมสั่งย้อมเพิ่ม
                     </button>
+                    <button onclick="setPlanningKpiTab('dyeOrder')" id="kpiTabDyeOrderBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                        <i class="fa-solid fa-file-invoice"></i> รายงานใบสั่งย้อม
+                    </button>
                 </div>
             </div>
 
@@ -1788,6 +1791,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     </div>
                     <div id="kpiSurplusEmptyState" class="hidden py-10 text-center text-slate-400 text-sm">ยังไม่มีข้อมูล — กด "เพิ่มเดือน" เพื่อเริ่มบันทึก</div>
                 </div>
+            </div>
+
+            <div id="kpiDyeOrderSection" class="hidden">
+                <!-- NEW (2026-11-27): "รายงานใบสั่งย้อม" — รวมทุก M/O, S/O รายสี จากแผนสั่งย้อมของแผนกวางแผน (order.dyeing.colorOrders)
+                     เทียบกับที่ย้อมแล้วจริง (บันทึกย้อม dyeOrderLog) — อ่านอย่างเดียว ไม่สร้างข้อมูลซ้ำ -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-3">
+                    <div class="p-4 bg-indigo-50/50 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div>
+                            <h3 class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-file-invoice mr-2 text-indigo-600"></i> รายงานใบสั่งย้อม</h3>
+                            <p class="text-[11px] text-slate-400 mt-0.5">รวมทุก M/O, S/O รายสี: ยอดสั่งย้อมจากแผนกวางแผน หัก Surplus เทียบกับที่ย้อมแล้วจริง · วันที่ = วันที่ต้องการ (ถ้าไม่ระบุใช้วันที่ย้อมเสร็จตามแผน) · กรองตามเดือนที่เลือกด้านบน</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <input type="text" id="kpiDyeOrdSearch" oninput="renderKpiDyeOrderReport()" placeholder="ค้นหา M/O, ลูกค้า, PO, Code สี..." class="text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg w-full sm:w-56">
+                            <select id="kpiDyeOrdStatus" onchange="renderKpiDyeOrderReport()" class="text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                                <option value="">ทุกสถานะ</option><option value="none">ยังไม่ย้อม</option><option value="part">ย้อมบางส่วน</option><option value="done">ย้อมครบ</option><option value="over">ย้อมเกิน</option><option value="surplus">ใช้ Surplus ทั้งหมด</option><option value="extra">ไม่อยู่ในแผน</option>
+                            </select>
+                            <button onclick="exportKpiDyeOrderReport()" type="button" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5"><i class="fa-solid fa-file-export"></i> ส่งออก Excel</button>
+                        </div>
+                    </div>
+                    <div id="kpiDyeOrdSummary" class="p-3 flex flex-wrap gap-2 border-b border-slate-100"></div>
+                    <div class="p-3 flex flex-wrap items-center gap-2 border-b border-slate-100">
+                        <span class="text-[11px] text-slate-500 font-medium">สรุปยอดรวมตามช่วงเวลา:</span>
+                        <div id="kpiDyeOrdPeriodWrap"></div>
+                    </div>
+                    <div id="kpiDyeOrdPeriodSummary" class="p-3"></div>
+                </div>
+                <div id="kpiDyeOrdSplitContainer"></div>
             </div>
 
             <div id="kpiExtraDyeSection" class="hidden">
@@ -4586,7 +4616,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-150';
+        const APP_BUILD = 'QCDashboard-151';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -24238,14 +24268,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             renderKpiYarnRemainingReport();
             renderKpiSurplusLedger();
             renderKpiExtraDyeingLog();
+            renderKpiDyeOrderReport();
         }
 
         function setPlanningKpiTab(tab) {
             currentPlanningKpiTab = tab;
             const activeCls = "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition";
             const inactiveCls = "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
-            const tabs = { due: 'kpiTabDueBtn', yarn: 'kpiTabYarnBtn', surplus: 'kpiTabSurplusBtn', extraDye: 'kpiTabExtraDyeBtn' };
-            const sections = { due: 'kpiDueDateSection', yarn: 'kpiYarnSection', surplus: 'kpiSurplusSection', extraDye: 'kpiExtraDyeSection' };
+            const tabs = { due: 'kpiTabDueBtn', yarn: 'kpiTabYarnBtn', surplus: 'kpiTabSurplusBtn', extraDye: 'kpiTabExtraDyeBtn', dyeOrder: 'kpiTabDyeOrderBtn' };
+            const sections = { due: 'kpiDueDateSection', yarn: 'kpiYarnSection', surplus: 'kpiSurplusSection', extraDye: 'kpiExtraDyeSection', dyeOrder: 'kpiDyeOrderSection' };
             Object.keys(tabs).forEach(key => {
                 const btnEl = document.getElementById(tabs[key]);
                 const secEl = document.getElementById(sections[key]);
@@ -24916,6 +24947,107 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <th class="px-2 py-2 text-left">หมายเหตุ (เพราะอะไร)</th>
             <th class="px-2 py-2 text-center">ลบ</th>
         `;
+
+        // =========================================================================================
+        // NEW (2026-11-27): แท็บ "รายงานใบสั่งย้อม" (รายงานวางแผน KPI) — รายสีทุก M/O, S/O
+        //  สั่งย้อม = order.dyeing.colorOrders (รหัสสีเดียวกันรวมแถว) · ใช้ Surplus = surplusKg ของแถวที่ติ๊กใช้ Surplus ·
+        //  ย้อมสุทธิ = สั่ง − Surplus (ตรงกับ getDyeingRequiredKgByColor) · ย้อมแล้ว = รวม actualTransferKg ใน dyeOrderLog (getDyeingActualKgByColor)
+        //  สถานะ: ยังไม่ย้อม / ย้อมบางส่วน / ย้อมครบ / ย้อมเกิน / ใช้ Surplus ทั้งหมด / ไม่อยู่ในแผน (ย้อมแล้วแต่ไม่มีในแผน)
+        //  คำนวณสดทุกครั้ง ไม่เก็บซ้ำ — ปุ่มพิมพ์ต่อแถวใช้ openDyeingOrderPrintFromOrder (ใบสั่งย้อมของ M/O นั้น)
+        // =========================================================================================
+        const KPI_DYEORD_STATUS = { none: ['ยังไม่ย้อม', 'bg-slate-100 text-slate-600'], part: ['ย้อมบางส่วน', 'bg-amber-100 text-amber-800'], done: ['ย้อมครบ', 'bg-emerald-100 text-emerald-700'], over: ['ย้อมเกิน', 'bg-rose-100 text-rose-700'], surplus: ['ใช้ Surplus ทั้งหมด', 'bg-sky-100 text-sky-700'], extra: ['ไม่อยู่ในแผน', 'bg-violet-100 text-violet-700'] };
+        const KPI_DYEORD_COLUMNS = [
+            { key: 'moSo', label: 'M/O, S/O' }, { key: 'customer', label: 'ลูกค้า' }, { key: 'po', label: 'PO' }, { key: 'code', label: 'Code สี' }, { key: 'yarnType', label: 'ชนิดไหม' },
+            { key: 'orderedKg', label: 'สั่งย้อม (กก.)' }, { key: 'surplusKg', label: 'ใช้ Surplus (กก.)' }, { key: 'netKg', label: 'ย้อมสุทธิ (กก.)' }, { key: 'dyedKg', label: 'ย้อมแล้ว (กก.)' }, { key: 'remainKg', label: 'คงเหลือ (กก.)' },
+            { key: 'reqDate', label: 'วันที่ต้องการ' }, { key: 'whereLabel', label: 'ย้อมที่' }, { key: 'statusLabel', label: 'สถานะ' }, { key: 'note', label: 'หมายเหตุ' }
+        ];
+        let kpiDyeOrdPeriod = 'month';
+        function setKpiDyeOrdPeriod(v) { kpiDyeOrdPeriod = (v === 'day' || v === 'year') ? v : 'month'; renderKpiDyeOrderReport(); }
+        function kpiDyeOrdBuildRows() {
+            const out = [];
+            productionOrders.forEach((order, orderIndex) => {
+                const dye = order.dyeing || {};
+                const plan = (Array.isArray(dye.colorOrders) ? dye.colorOrders : []).filter(r => r && typeof r === 'object' && (String(r.colorCode || '').trim() || Number(r.kg) > 0));
+                const log = (Array.isArray(dye.dyeOrderLog) ? dye.dyeOrderLog : []).filter(r => r && typeof r === 'object');
+                // รหัสสีในแผนที่นำมาจากใบวางแผนเป็น "รหัส / ชนิดไหม" แต่บันทึกย้อมใช้รหัสล้วน → จับคู่ด้วยรหัสสี (ตัดส่วน " / ชนิดไหม" ออก)
+                const baseKey = v => normalizeDyeColorCodeKey(String(v || '').replace(/\s+\/\s+.*$/, ''));
+                const actual = new Map();
+                log.forEach(r => { const k = baseKey(r.colorCode); if (k) actual.set(k, (actual.get(k) || 0) + (Number(r.actualTransferKg) || 0)); });
+                const groups = new Map();
+                plan.forEach(r => {
+                    const key = baseKey(r.colorCode) || ('#' + (r.id || groups.size));
+                    if (!groups.has(key)) groups.set(key, { key, label: String(r.colorCode || '').trim().replace(/\s+\/\s+.*$/, ''), planned: true, orderedKg: 0, surplusKg: 0, dates: [], where: new Set(), yarns: [], notes: [] });
+                    const g = groups.get(key); const kg = Number(r.kg) || 0;
+                    g.orderedKg += kg; if (r.useSurplus) g.surplusKg += Math.min(kg, Number(r.surplusKg) || 0);
+                    if (r.reqDate) g.dates.push(String(r.reqDate)); g.where.add(getDyeRowWhere(order, r));
+                    { const pm = String(r.colorCode || '').match(/\s+\/\s+(.+)$/); const y = String(r.yarnType || (pm ? pm[1] : '')).trim(); if (y && !g.yarns.includes(y)) g.yarns.push(y); }
+                    if (r.yarnSource === 'overdye' && !g.notes.includes('ย้อมทับ')) g.notes.push('ย้อมทับ');
+                    if (r.yarnNote && !g.notes.includes(r.yarnNote)) g.notes.push(r.yarnNote);
+                    if (r.lotNo && !g.notes.includes('LOT ' + r.lotNo)) g.notes.push('LOT ' + r.lotNo);
+                });
+                actual.forEach((kg, key) => {
+                    if (groups.has(key)) return;
+                    const lr = log.find(r => baseKey(r.colorCode) === key);
+                    groups.set(key, { key, label: lr ? String(lr.colorCode || '').trim().replace(/\s+\/\s+.*$/, '') : key, planned: false, orderedKg: 0, surplusKg: 0, dates: [], where: new Set([getDyeRowWhere(order, null)]), yarns: lr && lr.yarnType ? [String(lr.yarnType)] : [], notes: [] });
+                });
+                const planDate = (order.planDates || {}).dyeing || '';
+                groups.forEach(g => {
+                    const code = g.label, yarn = g.yarns.join(' + ');
+                    const dyed = actual.get(g.key) || 0, net = Math.max(0, g.orderedKg - g.surplusKg);
+                    let st;
+                    if (!g.planned) st = 'extra';
+                    else if (net <= 0.0001) st = 'surplus';
+                    else if (dyed <= 0.0001) st = 'none';
+                    else if (dyed >= net - 0.01) st = dyed > net + 0.05 ? 'over' : 'done';
+                    else st = 'part';
+                    const reqDate = g.dates.slice().sort()[0] || '';
+                    const effDate = reqDate || planDate;
+                    out.push({ order, orderIndex, moSo: order.moSo, customer: order.customerName || '', po: order.customerPO || '', code, yarnType: yarn,
+                        orderedKg: Math.round(g.orderedKg * 1000) / 1000, surplusKg: Math.round(g.surplusKg * 1000) / 1000, netKg: Math.round(net * 1000) / 1000, dyedKg: Math.round(dyed * 1000) / 1000,
+                        remainKg: Math.round(Math.max(0, net - dyed) * 1000) / 1000, reqDate, effDate, date: effDate || normalizeDateString(order.openDate) || '',
+                        whereLabel: g.where.has('external') ? (g.where.has('internal') ? 'ใน+นอก' : 'ย้อมนอก') : 'ย้อมใน', status: st, statusLabel: KPI_DYEORD_STATUS[st][0], note: g.notes.join(' · ') });
+                });
+            });
+            return out;
+        }
+        function kpiDyeOrdFilteredRows() {
+            const q = ((document.getElementById('kpiDyeOrdSearch') || {}).value || '').trim().toLowerCase();
+            const stf = (document.getElementById('kpiDyeOrdStatus') || {}).value || '';
+            const rows = kpiDyeOrdBuildRows().filter(r => reportMonthMatchDate(r.effDate, r.order) && (!stf || r.status === stf) && (!q || [r.moSo, r.customer, r.po, r.code, r.yarnType].some(x => String(x || '').toLowerCase().includes(q))));
+            rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) || a.orderIndex - b.orderIndex);
+            return rows;
+        }
+        function renderKpiDyeOrderReport() {
+            const root = document.getElementById('kpiDyeOrdSplitContainer'); if (!root) return;
+            const wrap = document.getElementById('kpiDyeOrdPeriodWrap'); if (wrap) wrap.innerHTML = periodDropdownHtml('kpiDyeOrdPeriodSelect', 'setKpiDyeOrdPeriod', kpiDyeOrdPeriod);
+            const rows = kpiDyeOrdFilteredRows(), f = n => (Number(n) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const sum = k => rows.reduce((s, r) => s + (r[k] || 0), 0);
+            const chip = (label, val, cls) => `<div class="px-3 py-1.5 rounded-lg border ${cls || 'border-slate-200 bg-slate-50'}"><p class="text-[10px] text-slate-500">${label}</p><p class="text-sm font-bold text-slate-800">${val}</p></div>`;
+            const sm = document.getElementById('kpiDyeOrdSummary');
+            if (sm) sm.innerHTML = chip('จำนวน M/O, S/O', new Set(rows.map(r => r.moSo)).size) + chip('จำนวนสี', rows.length) + chip('สั่งย้อม (กก.)', f(sum('orderedKg'))) + chip('ใช้ Surplus (กก.)', f(sum('surplusKg')), 'border-sky-200 bg-sky-50')
+                + chip('ย้อมสุทธิ (กก.)', f(sum('netKg')), 'border-indigo-200 bg-indigo-50') + chip('ย้อมแล้ว (กก.)', f(sum('dyedKg')), 'border-emerald-200 bg-emerald-50') + chip('คงเหลือต้องย้อม (กก.)', f(sum('remainKg')), 'border-amber-200 bg-amber-50');
+            const ps = document.getElementById('kpiDyeOrdPeriodSummary');
+            if (ps) ps.innerHTML = renderPeriodSummaryTableHtml(rows, 'date', kpiDyeOrdPeriod, [{ key: 'orderedKg', label: 'สั่งย้อม (กก.)' }, { key: 'surplusKg', label: 'ใช้ Surplus (กก.)' }, { key: 'netKg', label: 'ย้อมสุทธิ (กก.)' }, { key: 'dyedKg', label: 'ย้อมแล้ว (กก.)' }, { key: 'remainKg', label: 'คงเหลือ (กก.)' }]);
+            const th = c => `<th class="px-2 py-2 ${['orderedKg', 'surplusKg', 'netKg', 'dyedKg', 'remainKg'].includes(c.key) ? 'text-right' : 'text-left'}">${c.label}</th>`;
+            const thead = KPI_DYEORD_COLUMNS.filter(c => c.key !== 'note').map(th).join('') + '<th class="px-2 py-2 text-left">หมายเหตุ</th><th class="px-2 py-2 text-center">พิมพ์</th>';
+            const rowHtml = r => { const st = KPI_DYEORD_STATUS[r.status];
+                return `<tr class="hover:bg-slate-50/80" data-dyeord-row="${escapeHtml(r.moSo)}" data-status="${r.status}">
+                    <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(r.order)} whitespace-nowrap">${escapeHtml(r.moSo)}</td><td class="px-2 py-1.5">${escapeHtml(r.customer)}</td><td class="px-2 py-1.5">${escapeHtml(r.po)}</td>
+                    <td class="px-2 py-1.5 font-semibold">${escapeHtml(r.code)}</td><td class="px-2 py-1.5">${escapeHtml(r.yarnType)}</td>
+                    <td class="px-2 py-1.5 text-right">${f(r.orderedKg)}</td><td class="px-2 py-1.5 text-right text-sky-700">${r.surplusKg ? f(r.surplusKg) : '-'}</td><td class="px-2 py-1.5 text-right font-semibold">${f(r.netKg)}</td>
+                    <td class="px-2 py-1.5 text-right text-emerald-700">${f(r.dyedKg)}</td><td class="px-2 py-1.5 text-right ${r.remainKg > 0 ? 'text-amber-700 font-semibold' : 'text-slate-400'}">${f(r.remainKg)}</td>
+                    <td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(r.reqDate || '-')}</td><td class="px-2 py-1.5">${r.whereLabel}</td>
+                    <td class="px-2 py-1.5"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${st[1]}">${st[0]}</span></td><td class="px-2 py-1.5 text-[11px] text-slate-500">${escapeHtml(r.note)}</td>
+                    <td class="px-2 py-1.5 text-center"><button type="button" onclick="openDyeingOrderPrintFromOrder(${r.orderIndex})" class="text-slate-500 hover:text-violet-600 px-1" title="พิมพ์ใบสั่งย้อมของ M/O นี้"><i class="fa-solid fa-print text-xs"></i></button></td></tr>`; };
+            const isSo = r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO';
+            const mo = rows.filter(r => !isSo(r)), so = rows.filter(isSo);
+            renderSplitOrderTypeTables('kpiDyeOrdSplitContainer', thead, mo.map(rowHtml).join(''), so.map(rowHtml).join(''), mo.length, so.length, 15);
+        }
+        function exportKpiDyeOrderReport() {
+            const rows = kpiDyeOrdFilteredRows();
+            if (!rows.length) { showToast('ไม่มีรายการให้ส่งออก', 'fa-circle-info', 'text-amber-400'); return; }
+            exportFlatRowsToExcel('รายงานใบสั่งย้อม.xlsx', 'ใบสั่งย้อม', KPI_DYEORD_COLUMNS, rows);
+        }
 
         function renderKpiExtraDyeingLog() {
             const selectWrap = document.getElementById('kpiExtraDyePeriodSelectWrap');
