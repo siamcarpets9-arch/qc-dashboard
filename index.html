@@ -4586,7 +4586,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-148';
+        const APP_BUILD = 'QCDashboard-150';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -17568,6 +17568,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         <div class="flex flex-wrap gap-1.5">
                             <button type="button" data-pw-piecepct-toggle onclick="planningWsTogglePiecePct(${orderIndex})" title="ใช้เมื่อ M/O มีหลายชิ้นและแบบแต่ละชิ้นมี % สี/% พื้นที่ว่างไม่เท่ากัน" class="px-3 py-1.5 text-xs font-semibold rounded border ${c.perPiece ? 'bg-teal-700 text-white border-teal-700 hover:bg-teal-800' : 'text-teal-700 border-teal-600 bg-white hover:bg-teal-50'}">${c.perPiece ? '✓ แยก % สีรายชิ้น (เปิดอยู่)' : 'แยก % สี/พื้นที่ว่าง รายชิ้น'}</button>
                             <button type="button" onclick="planningWsAddRow(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50">+ เพิ่มแถวสี</button>
+                            <button type="button" data-pw-print-dye onclick="planningWsPrintDyeOrder(${orderIndex})" title="พิมพ์ใบสั่งย้อมตามยอดสั่งย้อมสุทธิในใบนี้ (รูปแบบเดียวกับชีต SIAM)" class="px-3 py-1.5 text-xs font-semibold text-violet-700 border border-violet-500 rounded bg-white hover:bg-violet-50"><i class="fa-solid fa-print mr-1"></i>พิมพ์ใบสั่งย้อม</button>
                             ${c.rows.length > 0 ? `<button type="button" data-pw-clear-rows onclick="planningWsClearRows(${orderIndex})" title="ลบแถวสีทั้งหมด เพื่อคีย์/อ่านจากแบบใหม่" class="px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-300 rounded bg-white hover:bg-rose-50"><i class="fa-regular fa-trash-can mr-1"></i>ล้างแถวสีทั้งหมด</button>` : ''}
                         </div>
                     </div>
@@ -17613,6 +17614,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     ${planningWsSiamPanelHtml(order, orderIndex, c)}
                     <div class="flex flex-wrap items-center gap-2 pt-1">
                         <button type="button" onclick="planningWsApplyDyePlan(${orderIndex})" ${c.netKg > 0 ? '' : 'disabled'} class="px-3 py-1.5 text-xs font-semibold rounded ${c.netKg > 0 ? 'bg-teal-700 text-white hover:bg-teal-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}">นำยอดสั่งย้อมไปใส่ "แผนสั่งย้อม"</button>
+                        <button type="button" data-pw-print-dye2 onclick="planningWsPrintDyeOrder(${orderIndex})" title="พิมพ์ใบสั่งย้อมตามยอดสั่งย้อมสุทธิในใบนี้ (รูปแบบเดียวกับชีต SIAM) — ถ้ายังไม่มียอดสี จะพิมพ์ใบที่ตารางสีว่าง" class="px-3 py-1.5 text-xs font-semibold rounded border border-violet-500 text-violet-700 bg-white hover:bg-violet-50"><i class="fa-solid fa-print mr-1"></i>พิมพ์ใบสั่งย้อม</button>
                         <p class="text-[11px] text-slate-500">${existingPlan.length > 0 ? `แผนสั่งย้อมตอนนี้มี ${existingPlan.length} สี รวม ${planningWsFmt(existingPlan.reduce((s, r) => s + (Number(r.kg) || 0), 0), 2)} กก. — กดแล้วอัปเดตตามรหัสสี (ไม่ลบรายการ Surplus เดิม)` : 'แผนสั่งย้อมยังว่าง — กดแล้วระบบสร้างให้ตามรหัสสี และแผนกย้อมจะเห็นทันที'}</p>
                         ${planningWsPushedPlanRows(order).length > 0 ? `<button type="button" data-pw-dyeplan-remove onclick="planningWsRemoveDyePlan(${orderIndex})" title="ลบแถวแผนสั่งย้อมที่เคยนำมาจากใบคำนวณนี้ (ไม่ลบรายการ Surplus และบันทึกย้อมจริง)" class="px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-300 rounded bg-white hover:bg-rose-50"><i class="fa-regular fa-trash-can mr-1"></i>ลบแผนสั่งย้อมที่นำไปใส่</button>` : ''}
                     </div>
@@ -18450,6 +18452,106 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             rerenderOrderViews(orderIndex);
             showToast(`ลบแผนสั่งย้อมที่นำมาจากใบคำนวณ ${del.length} แถวแล้ว — กด "นำยอดสั่งย้อมไปใส่" เพื่อใส่ใหม่ได้`, 'fa-trash-can', 'text-slate-300');
         }
+        // =========================================================================================
+        // NEW (2026-11-27): "พิมพ์ใบสั่งย้อม" จากใบวางแผนงาน ส่วนที่ 2 — รูปแบบเดียวกับ Sheet "SIAM" ของ Excel
+        // (ใบสั่งย้อมที่ส่งแผนกย้อม): หัวใบ M/O · พื้นที่รวม · อ้างถึง, ตาราง No./สี/ชนิดไหม/TEX/น้ำหนัก (กก.)/
+        // วันที่ต้องการ/สถานที่ + รวม, และบล็อกท้ายใบ "คำนวณ … Kgs/M2 | เผื่อ | พื้นที่จริง | เฉลี่ยหลังเผื่อ"
+        // ยอดต่อสี = ยอดสั่งย้อมสุทธิ (รวมเผื่อ/ปัดแล้ว) เดียวกับที่ "นำยอดสั่งย้อมไปใส่แผนสั่งย้อม" ใช้ (รวมแถวที่รหัสสี+ชนิดไหมเดียวกัน)
+        // วันที่ต้องการ/สถานที่/Surplus/หมายเหตุ ดึงจากแผนสั่งย้อมของ M/O (ถ้ามี) ไม่เช่นนั้นใช้วันที่ย้อมเสร็จตามแผนและ ย้อมใน/ย้อมนอกตามใบ
+        // ไม่บันทึกอะไร — เป็นเอกสารพิมพ์/Save as PDF ตามต้องการเท่านั้น
+        // =========================================================================================
+        function planningWsSplitYarnTex(text) {
+            const s = String(text || '').trim(); if (!s) return { type: '', tex: '' };
+            const m = s.match(/([A-Za-z]{1,6}\s*\d{2,4}\s*\/\s*\d+)/);
+            if (!m) return { type: s, tex: '' };
+            return { type: s.replace(m[1], '').replace(/\s+/g, ' ').trim(), tex: m[1].replace(/\s+/g, ' ').trim() };
+        }
+        function planningWsDyeOrderRows(order) {
+            const c = planningWsComputeColors(order);
+            const plan = ((order.dyeing || {}).colorOrders || []).filter(r => r && typeof r === 'object');
+            const groups = new Map(), keys = [];
+            c.rows.forEach((x, i) => {
+                if (!(x.netKg > 0)) return;
+                const code0 = String(x.row.code || '').trim() || `สี ${i + 1}`, yarn0 = String(x.row.yarn || '').trim();
+                const key = (code0 + '||' + yarn0).toLowerCase();
+                if (!groups.has(key)) { groups.set(key, { code: code0, yarn: yarn0, kg: 0, lots: [], techs: [], planRow: null }); keys.push(key); }
+                const g = groups.get(key); g.kg += x.netKg;
+                String(x.row.lot || '').split(/[,;\n]+/).map(t => t.trim()).filter(Boolean).forEach(t => { if (!g.lots.includes(t)) g.lots.push(t); });
+                const tech = String(x.row.technique || '').trim(); if (tech && !g.techs.includes(tech)) g.techs.push(tech);
+            });
+            const dyeFinish = (order.planDates || {}).dyeing || '';
+            return keys.map((k, idx) => {
+                const g = groups.get(k);
+                const full = (g.yarn ? `${g.code} / ${g.yarn}` : g.code).toLowerCase();
+                const pr = plan.find(r => String(r.colorCode || '').trim().toLowerCase() === full) || plan.find(r => String(r.colorCode || '').trim().toLowerCase() === g.code.toLowerCase()) || null;
+                const sp = planningWsSplitYarnTex(g.yarn || (pr && pr.yarnType) || '');
+                const where = pr ? getDyeRowWhere(order, pr) : (((order.dyeing || {}).mode === 'external') ? 'external' : 'internal');
+                const notes = [];
+                if (g.techs.length) notes.push(g.techs.join('/'));
+                if (g.lots.length) notes.push('LOT ' + g.lots.join(', '));
+                if (pr && pr.yarnSource === 'overdye') notes.push('ย้อมทับ');
+                if (pr && (pr.useSurplus || Number(pr.surplusKg) > 0) && Number(pr.surplusKg) > 0) notes.push(`ใช้ Surplus ${planningWsFmt(pr.surplusKg, 2)} กก. (ย้อมใหม่ ${planningWsFmt(Math.max(0, g.kg - Number(pr.surplusKg)), 2)})`);
+                if (pr && pr.yarnNote) notes.push(pr.yarnNote);
+                return { no: idx + 1, code: g.code, type: sp.type, tex: sp.tex, kg: planningWsRound(g.kg, 3), reqDate: (pr && pr.reqDate) || dyeFinish, where: where === 'external' ? 'ย้อมนอก' : 'ย้อมใน', note: notes.join(' · ') };
+            });
+        }
+        function planningWsDyeShortDate(v) { const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}` : String(v || ''); }
+        function buildPlanningDyeOrderPrintHTML(order) {
+            const c = planningWsComputeColors(order), rows = planningWsDyeOrderRows(order), ws = planningWsGet(order);
+            const e = escapeHtml, f2 = v => planningWsFmt(v, 2);
+            const isExt = (order.dyeing || {}).mode === 'external';
+            const total = rows.reduce((s, r) => s + r.kg, 0);
+            const today = new Date(); const todayTxt = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+            const area = planningWsTotalArea(order);
+            const blankTxt = c.blankPctEff > 0 ? ` (พื้นที่ว่าง ${f2(c.blankPctEff)}%)` : '';
+            const minRows = 12, n = Math.max(minRows, rows.length);
+            const body = Array.from({ length: n }, (_, i) => { const r = rows[i];
+                return `<tr><td class="c">${r ? r.no : ''}</td><td class="c b">${r ? e(r.code) : ''}</td><td>${r ? e(r.type) : ''}</td><td class="c">${r ? e(r.tex) : ''}</td><td class="r b">${r ? f2(r.kg) : ''}</td><td class="c">${r ? e(planningWsDyeShortDate(r.reqDate)) : ''}</td><td class="c">${r ? r.where : ''}</td><td class="n">${r ? e(r.note) : ''}</td></tr>`; }).join('');
+            // บล็อกท้ายใบ: ต่อคุณภาพ — คำนวณ g/ตร.ม., เผื่อ, พื้นที่จริง, เฉลี่ยหลังเผื่อ
+            const qg = new Map();
+            c.rows.forEach(x => { if (!(x.area > 0)) return; const k = String(x.row.quality || '-') + '|' + x.allowance; if (!qg.has(k)) qg.set(k, { q: String(x.row.quality || '-'), gsm: x.kgPerSqm * 1000, allow: x.allowance, area: 0, net: 0 }); const g = qg.get(k); g.area += x.area; g.net += x.netKg; });
+            const specRows = Array.from(qg.values()).map(g => `<tr><td>${e(g.q)}</td><td class="r">${planningWsFmt(g.gsm, 0)} g/ตร.ม. (${planningWsFmt(g.gsm / 1000, 3)} Kgs/M2)</td><td class="r">${planningWsFmt(g.allow, 1)}%</td><td class="r">${f2(g.area)}</td><td class="r">${g.area > 0 ? planningWsFmt(g.net / g.area, 3) : '-'}</td><td class="r b">${f2(g.net)}</td></tr>`).join('');
+            const css = `<style>
+                .pwd{font-family:'Prompt',sans-serif;color:#000;font-size:12px;}
+                .pwd h1{font-size:20px;font-weight:700;text-align:center;margin:0 0 1mm;}
+                .pwd .sub{text-align:center;font-size:11px;color:#444;margin:0 0 4mm;}
+                .pwd table{width:100%;border-collapse:collapse;}
+                .pwd .info td{padding:1.2mm 1.5mm;border:1px solid #000;vertical-align:top;}
+                .pwd .info td.l{background:#f1f5f9;width:15%;font-weight:600;white-space:nowrap;}
+                .pwd .grid th,.pwd .grid td{border:1px solid #000;padding:1.2mm 1.5mm;}
+                .pwd .grid th{background:#f1f5f9;font-weight:600;text-align:center;}
+                .pwd .grid tbody tr{height:8.5mm;}
+                .pwd .c{text-align:center;} .pwd .r{text-align:right;} .pwd .b{font-weight:700;} .pwd .n{font-size:10.5px;}
+                .pwd .tot td{font-weight:700;background:#f8fafc;}
+                .pwd h2{font-size:12px;font-weight:700;margin:4mm 0 1.5mm;}
+                .pwd .sig{display:flex;gap:8mm;margin-top:14mm;} .pwd .sig div{flex:1;text-align:center;font-size:11px;} .pwd .sig i{display:block;border-top:1px solid #000;margin-bottom:1mm;}
+                .pwd .foot{margin-top:4mm;font-size:10px;color:#555;text-align:right;}
+            </style>`;
+            return css + `<div class="pwd print-sheet">
+                <h1>${isExt ? 'ใบสั่งจ้างย้อมนอกบริษัท' : 'ใบสั่งย้อม'}</h1><p class="sub">Siam Carpets Manufacturing · แผนกวางแผน → แผนกย้อม</p>
+                <table class="info"><tr><td class="l">M/O, S/O</td><td><b>${e(order.moSo || '-')}</b></td><td class="l">วันที่ออกใบสั่ง</td><td>${todayTxt}</td></tr>
+                <tr><td class="l">Design</td><td>${e(order.designRef || planningWsTitle(order))}</td><td class="l">กำหนดส่งลูกค้า</td><td>${e(order.dueDate || '-')}</td></tr>
+                <tr><td class="l">ลูกค้า</td><td>${e(order.customerName || '-')}</td><td class="l">โปรเจกต์/PO</td><td>${e(order.customerPO || '-')}</td></tr>
+                <tr><td class="l">คุณภาพ</td><td>${e(order.quality || '-')}</td><td class="l">พื้นที่รวม</td><td>${f2(area)} ตร.ม.${e(blankTxt)}</td></tr>
+                <tr><td class="l">ประเภทการย้อม</td><td>${isExt ? 'จ้างย้อมนอกบริษัท' : 'ย้อมในบริษัท'}</td><td class="l">อ้างถึง</td><td>&nbsp;</td></tr></table>
+                <h2>รายการสีที่สั่งย้อม (${rows.length} สี)</h2>
+                <table class="grid"><colgroup><col style="width:6%"><col style="width:13%"><col style="width:19%"><col style="width:12%"><col style="width:12%"><col style="width:11%"><col style="width:9%"><col style="width:18%"></colgroup>
+                <thead><tr><th>No.</th><th>สี</th><th>ชนิดไหม</th><th>TEX</th><th>น้ำหนัก (กก.)</th><th>วันที่ต้องการ</th><th>สถานที่</th><th>หมายเหตุ</th></tr></thead>
+                <tbody>${body}</tbody><tfoot><tr class="tot"><td colspan="4" class="r">รวม</td><td class="r">${rows.length ? f2(total) : ''}</td><td colspan="3"></td></tr></tfoot></table>
+                ${specRows ? `<h2>การคำนวณ</h2><table class="grid"><thead><tr><th>คุณภาพ</th><th>คำนวณ</th><th>เผื่อ</th><th>พื้นที่จริง (ตร.ม.)</th><th>เฉลี่ยหลังเผื่อ (กก./ตร.ม.)</th><th>รวมหลังเผื่อ (กก.)</th></tr></thead><tbody>${specRows}</tbody></table>` : ''}
+                <div class="sig"><div><i></i>ผู้สั่งย้อม (แผนกวางแผน)</div><div><i></i>ผู้อนุมัติ</div><div><i></i>${isExt ? 'ผู้รับจ้างย้อม' : 'แผนกย้อม (ผู้รับงาน)'}</div></div>
+                <p class="foot">พิมพ์เมื่อ: ${new Date().toLocaleString('th-TH')}</p></div>`;
+        }
+        function planningWsPrintDyeOrder(orderIndex) {
+            const order = productionOrders[orderIndex]; if (!order) return;
+            // พิมพ์ได้เสมอ — ถ้ายังไม่มียอดสี จะพิมพ์ใบสั่งย้อมที่มีหัวใบครบ แต่ตารางสีว่างให้เขียนมือ
+            const empty = planningWsDyeOrderRows(order).length === 0;
+            document.getElementById('printArea').innerHTML = buildPlanningDyeOrderPrintHTML(order);
+            document.body.classList.add('print-single-mode');
+            showToast(empty ? 'ยังไม่มียอดสั่งย้อม — พิมพ์ใบสั่งย้อมที่ตารางสีว่างไว้ให้เขียนมือ' : 'กำลังเปิดหน้าต่างพิมพ์ใบสั่งย้อม... เลือก "Save as PDF" เพื่อบันทึกเป็นไฟล์ได้', 'fa-print', 'text-violet-400');
+            setTimeout(() => window.print(), 150);
+        }
+
         function planningWsApplyDyePlan(orderIndex) {
             const order = productionOrders[orderIndex];
             if (!order) return;
@@ -22928,7 +23030,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             }
 
             const bodyContentHtml = stage === 'planning'
-                ? `<div class="space-y-2">${renderPlanningChecklistHtml(order, orderIndex)}</div>`
+                ? `<div class="space-y-2" data-planning-detail-note>
+                        <!-- 2026-11-27: "รายการตามภาพ (BOM / ช่องติ๊กคำนวณสเปค-ลงแผนงาน / วิธีวางแผนระยะเวลา / ข้อมูลสำหรับ AI / งานย้อม / งานทอ) ให้ตัดออกจากรายละเอียด M/O,S/O
+                             เพราะรายการพวกนี้ไปอยู่ในแต่ละแผนกแล้ว" — ฟังก์ชัน renderPlanningChecklistHtml ยังอยู่ในโค้ด (ไม่ได้ลบ) แต่ไม่ถูกเรียกในหน้านี้อีก -->
+                        <div class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs text-slate-600 space-y-2">
+                            <p><i class="fa-solid fa-circle-info text-indigo-500 mr-1.5"></i>รายละเอียดการวางแผน (คำนวณน้ำหนักไหม/แผนสั่งย้อม ระยะเวลาผลิต ย้อมใน-นอก ทอใน-นอก) ทำในหน้า <b>ใบวางแผนงาน</b> และดูรายละเอียดของแต่ละงานได้ในแท็บของแต่ละแผนก</p>
+                            ${getEffectiveStage(order) === 'planning' ? `<button type="button" data-open-planning-ws onclick="closeOrderDetailModal(); setTimeout(() => { switchView('board'); setBoardDepartmentTab('planning'); openPlanningWorksheet(${orderIndex}); }, 50);" class="bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-table-list mr-1"></i>เปิดใบวางแผนงานของ M/O นี้</button>` : ''}
+                        </div>
+                    </div>`
                 : (isWeavingExternal
                     ? '' // Outsourced weaving is a single job record (see weavingChecks above), not an item list.
                     : `<div class="space-y-2">${STAGE_ITEM_RENDERERS[stage](order, orderIndex)}</div>`);
@@ -22977,7 +23086,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     </div>
                     <div class="p-3 space-y-2">
                         ${modeToggleHtml}
-                        <p class="text-xs ${complete ? 'text-emerald-600 font-semibold' : 'text-slate-500'}"><i class="fa-solid ${complete ? 'fa-circle-check' : 'fa-hourglass-half'} mr-1"></i>${escapeHtml(stageProgressText(order, stage))}</p>
+                        ${stage === 'planning' ? '' : `<p class="text-xs ${complete ? 'text-emerald-600 font-semibold' : 'text-slate-500'}"><i class="fa-solid ${complete ? 'fa-circle-check' : 'fa-hourglass-half'} mr-1"></i>${escapeHtml(stageProgressText(order, stage))}</p>`}
                         ${weavingChecks}
                         ${bodyContentHtml}
                         ${actionHtml ? `<div class="pt-2 flex flex-wrap justify-end gap-2">${actionHtml}</div>` : ''}
