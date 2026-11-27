@@ -1800,13 +1800,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <div class="p-4 bg-indigo-50/50 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                         <div>
                             <h3 class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-file-invoice mr-2 text-indigo-600"></i> รายงานใบสั่งย้อม</h3>
-                            <p class="text-[11px] text-slate-400 mt-0.5">รวมทุก M/O, S/O รายสี: ยอดสั่งย้อมจากแผนกวางแผน หัก Surplus เทียบกับที่ย้อมแล้วจริง · วันที่ = วันที่ต้องการ (ถ้าไม่ระบุใช้วันที่ย้อมเสร็จตามแผน) · กรองตามเดือนที่เลือกด้านบน</p>
+                            <p class="text-[11px] text-slate-400 mt-0.5">รวมทุก M/O, S/O (กดที่แถวเพื่อดูรายสี): ยอดสั่งย้อมจากแผนกวางแผน หัก Surplus เทียบกับที่ย้อมแล้วจริง · วันที่ = วันที่ต้องการ (ถ้าไม่ระบุใช้วันที่ย้อมเสร็จตามแผน) · กรองตามเดือนที่เลือกด้านบน</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-1.5">
                             <input type="text" id="kpiDyeOrdSearch" oninput="renderKpiDyeOrderReport()" placeholder="ค้นหา M/O, ลูกค้า, PO, Code สี..." class="text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg w-full sm:w-56">
                             <select id="kpiDyeOrdStatus" onchange="renderKpiDyeOrderReport()" class="text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
                                 <option value="">ทุกสถานะ</option><option value="none">ยังไม่ย้อม</option><option value="part">ย้อมบางส่วน</option><option value="done">ย้อมครบ</option><option value="over">ย้อมเกิน</option><option value="surplus">ใช้ Surplus ทั้งหมด</option><option value="extra">ไม่อยู่ในแผน</option>
                             </select>
+                            <button onclick="kpiDyeOrdToggleAll(true)" type="button" class="shrink-0 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium px-2.5 py-1.5 rounded-lg transition text-xs">ขยายทั้งหมด</button>
+                            <button onclick="kpiDyeOrdToggleAll(false)" type="button" class="shrink-0 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium px-2.5 py-1.5 rounded-lg transition text-xs">ซ่อนทั้งหมด</button>
                             <button onclick="exportKpiDyeOrderReport()" type="button" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5"><i class="fa-solid fa-file-export"></i> ส่งออก Excel</button>
                         </div>
                     </div>
@@ -4616,7 +4618,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-151';
+        const APP_BUILD = 'QCDashboard-152';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -25028,21 +25030,44 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 + chip('ย้อมสุทธิ (กก.)', f(sum('netKg')), 'border-indigo-200 bg-indigo-50') + chip('ย้อมแล้ว (กก.)', f(sum('dyedKg')), 'border-emerald-200 bg-emerald-50') + chip('คงเหลือต้องย้อม (กก.)', f(sum('remainKg')), 'border-amber-200 bg-amber-50');
             const ps = document.getElementById('kpiDyeOrdPeriodSummary');
             if (ps) ps.innerHTML = renderPeriodSummaryTableHtml(rows, 'date', kpiDyeOrdPeriod, [{ key: 'orderedKg', label: 'สั่งย้อม (กก.)' }, { key: 'surplusKg', label: 'ใช้ Surplus (กก.)' }, { key: 'netKg', label: 'ย้อมสุทธิ (กก.)' }, { key: 'dyedKg', label: 'ย้อมแล้ว (กก.)' }, { key: 'remainKg', label: 'คงเหลือ (กก.)' }]);
-            const th = c => `<th class="px-2 py-2 ${['orderedKg', 'surplusKg', 'netKg', 'dyedKg', 'remainKg'].includes(c.key) ? 'text-right' : 'text-left'}">${c.label}</th>`;
-            const thead = KPI_DYEORD_COLUMNS.filter(c => c.key !== 'note').map(th).join('') + '<th class="px-2 py-2 text-left">หมายเหตุ</th><th class="px-2 py-2 text-center">พิมพ์</th>';
-            const rowHtml = r => { const st = KPI_DYEORD_STATUS[r.status];
-                return `<tr class="hover:bg-slate-50/80" data-dyeord-row="${escapeHtml(r.moSo)}" data-status="${r.status}">
-                    <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(r.order)} whitespace-nowrap">${escapeHtml(r.moSo)}</td><td class="px-2 py-1.5">${escapeHtml(r.customer)}</td><td class="px-2 py-1.5">${escapeHtml(r.po)}</td>
-                    <td class="px-2 py-1.5 font-semibold">${escapeHtml(r.code)}</td><td class="px-2 py-1.5">${escapeHtml(r.yarnType)}</td>
-                    <td class="px-2 py-1.5 text-right">${f(r.orderedKg)}</td><td class="px-2 py-1.5 text-right text-sky-700">${r.surplusKg ? f(r.surplusKg) : '-'}</td><td class="px-2 py-1.5 text-right font-semibold">${f(r.netKg)}</td>
-                    <td class="px-2 py-1.5 text-right text-emerald-700">${f(r.dyedKg)}</td><td class="px-2 py-1.5 text-right ${r.remainKg > 0 ? 'text-amber-700 font-semibold' : 'text-slate-400'}">${f(r.remainKg)}</td>
-                    <td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(r.reqDate || '-')}</td><td class="px-2 py-1.5">${r.whereLabel}</td>
-                    <td class="px-2 py-1.5"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${st[1]}">${st[0]}</span></td><td class="px-2 py-1.5 text-[11px] text-slate-500">${escapeHtml(r.note)}</td>
-                    <td class="px-2 py-1.5 text-center"><button type="button" onclick="openDyeingOrderPrintFromOrder(${r.orderIndex})" class="text-slate-500 hover:text-violet-600 px-1" title="พิมพ์ใบสั่งย้อมของ M/O นี้"><i class="fa-solid fa-print text-xs"></i></button></td></tr>`; };
-            const isSo = r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO';
-            const mo = rows.filter(r => !isSo(r)), so = rows.filter(isSo);
-            renderSplitOrderTypeTables('kpiDyeOrdSplitContainer', thead, mo.map(rowHtml).join(''), so.map(rowHtml).join(''), mo.length, so.length, 15);
+            // 2026-11-27: "ทำรายการซ่อนไว้ ให้โชว์ M/O,S/O กับชื่อลูกค้า จะดูค่อยกดดู" — แถวหลักต่อ M/O,S/O (โชว์ M/O + ลูกค้า + ยอดรวม) กดแถวเพื่อดูรายสี
+            const thead = ['<th class="px-2 py-2 text-left w-8"></th>', '<th class="px-2 py-2 text-left">M/O, S/O</th>', '<th class="px-2 py-2 text-left">ลูกค้า</th>', '<th class="px-2 py-2 text-left">PO</th>', '<th class="px-2 py-2 text-right">จำนวนสี</th>']
+                .concat(['สั่งย้อม (กก.)', 'ใช้ Surplus (กก.)', 'ย้อมสุทธิ (กก.)', 'ย้อมแล้ว (กก.)', 'คงเหลือ (กก.)'].map(l => `<th class="px-2 py-2 text-right">${l}</th>`))
+                .concat(['<th class="px-2 py-2 text-left">สถานะรายสี</th>', '<th class="px-2 py-2 text-center">พิมพ์</th>']).join('');
+            const colorRowHtml = r => { const st = KPI_DYEORD_STATUS[r.status];
+                return `<tr class="border-t border-slate-100" data-dyeord-row="${escapeHtml(r.moSo)}" data-status="${r.status}">
+                    <td class="px-2 py-1 font-semibold">${escapeHtml(r.code)}</td><td class="px-2 py-1">${escapeHtml(r.yarnType)}</td>
+                    <td class="px-2 py-1 text-right">${f(r.orderedKg)}</td><td class="px-2 py-1 text-right text-sky-700">${r.surplusKg ? f(r.surplusKg) : '-'}</td><td class="px-2 py-1 text-right font-semibold">${f(r.netKg)}</td>
+                    <td class="px-2 py-1 text-right text-emerald-700">${f(r.dyedKg)}</td><td class="px-2 py-1 text-right ${r.remainKg > 0 ? 'text-amber-700 font-semibold' : 'text-slate-400'}">${f(r.remainKg)}</td>
+                    <td class="px-2 py-1 whitespace-nowrap">${escapeHtml(r.reqDate || '-')}</td><td class="px-2 py-1">${r.whereLabel}</td>
+                    <td class="px-2 py-1"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${st[1]}">${st[0]}</span></td><td class="px-2 py-1 text-[11px] text-slate-500">${escapeHtml(r.note)}</td></tr>`; };
+            const groups = []; const gmap = new Map();
+            rows.forEach(r => { if (!gmap.has(r.orderIndex)) { const g = { order: r.order, orderIndex: r.orderIndex, rows: [] }; gmap.set(r.orderIndex, g); groups.push(g); } gmap.get(r.orderIndex).rows.push(r); });
+            const gsum = (g, k) => g.rows.reduce((t, r) => t + (r[k] || 0), 0);
+            const groupHtml = g => {
+                const open = kpiDyeOrdOpen.has(g.order.moSo), o = g.order;
+                const cnt = {}; g.rows.forEach(r => { cnt[r.status] = (cnt[r.status] || 0) + 1; });
+                const chips = Object.keys(KPI_DYEORD_STATUS).filter(k => cnt[k]).map(k => `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${KPI_DYEORD_STATUS[k][1]}">${KPI_DYEORD_STATUS[k][0]} ${cnt[k]}</span>`).join(' ');
+                const main = `<tr class="hover:bg-slate-50/80 cursor-pointer ${open ? 'bg-indigo-50/40' : ''}" data-dyeord-group="${escapeHtml(o.moSo)}" onclick="kpiDyeOrdToggle(${g.orderIndex})">
+                    <td class="px-2 py-2 text-slate-400"><i class="fa-solid fa-chevron-${open ? 'down' : 'right'} text-[10px]"></i></td>
+                    <td class="px-2 py-2 font-semibold ${moSoTextColorClass(o)} whitespace-nowrap">${escapeHtml(o.moSo)}</td><td class="px-2 py-2">${escapeHtml(o.customerName || '-')}</td><td class="px-2 py-2 text-slate-500">${escapeHtml(o.customerPO || '')}</td>
+                    <td class="px-2 py-2 text-right">${g.rows.length}</td><td class="px-2 py-2 text-right">${f(gsum(g, 'orderedKg'))}</td><td class="px-2 py-2 text-right text-sky-700">${gsum(g, 'surplusKg') ? f(gsum(g, 'surplusKg')) : '-'}</td>
+                    <td class="px-2 py-2 text-right font-semibold">${f(gsum(g, 'netKg'))}</td><td class="px-2 py-2 text-right text-emerald-700">${f(gsum(g, 'dyedKg'))}</td><td class="px-2 py-2 text-right ${gsum(g, 'remainKg') > 0 ? 'text-amber-700 font-semibold' : 'text-slate-400'}">${f(gsum(g, 'remainKg'))}</td>
+                    <td class="px-2 py-2"><div class="flex flex-wrap gap-1">${chips}</div></td>
+                    <td class="px-2 py-2 text-center"><button type="button" onclick="event.stopPropagation(); openDyeingOrderPrintFromOrder(${g.orderIndex})" class="text-slate-500 hover:text-violet-600 px-1" title="พิมพ์ใบสั่งย้อมของ M/O นี้"><i class="fa-solid fa-print text-xs"></i></button></td></tr>`;
+                if (!open) return main;
+                const detail = `<tr data-dyeord-detail="${escapeHtml(o.moSo)}"><td></td><td colspan="11" class="px-2 pb-3 pt-0 bg-slate-50/60">
+                    <table class="w-full text-xs"><thead class="text-[10px] text-slate-500 uppercase"><tr><th class="px-2 py-1 text-left">Code สี</th><th class="px-2 py-1 text-left">ชนิดไหม</th><th class="px-2 py-1 text-right">สั่งย้อม</th><th class="px-2 py-1 text-right">Surplus</th><th class="px-2 py-1 text-right">สุทธิ</th><th class="px-2 py-1 text-right">ย้อมแล้ว</th><th class="px-2 py-1 text-right">คงเหลือ</th><th class="px-2 py-1 text-left">วันที่ต้องการ</th><th class="px-2 py-1 text-left">ย้อมที่</th><th class="px-2 py-1 text-left">สถานะ</th><th class="px-2 py-1 text-left">หมายเหตุ</th></tr></thead>
+                    <tbody>${g.rows.map(colorRowHtml).join('')}</tbody></table></td></tr>`;
+                return main + detail;
+            };
+            const isSo = g => (g.order.orderType || detectOrderTypeFromMoSo(g.order.moSo)) === 'SO';
+            const moG = groups.filter(g => !isSo(g)), soG = groups.filter(isSo);
+            renderSplitOrderTypeTables('kpiDyeOrdSplitContainer', thead, moG.map(groupHtml).join(''), soG.map(groupHtml).join(''), moG.length, soG.length, 12);
         }
+        let kpiDyeOrdOpen = new Set();
+        function kpiDyeOrdToggle(orderIndex) { const o = productionOrders[orderIndex]; if (!o) return; if (kpiDyeOrdOpen.has(o.moSo)) kpiDyeOrdOpen.delete(o.moSo); else kpiDyeOrdOpen.add(o.moSo); renderKpiDyeOrderReport(); }
+        function kpiDyeOrdToggleAll(open) { kpiDyeOrdOpen = new Set(open ? productionOrders.map(o => o.moSo) : []); renderKpiDyeOrderReport(); }
         function exportKpiDyeOrderReport() {
             const rows = kpiDyeOrdFilteredRows();
             if (!rows.length) { showToast('ไม่มีรายการให้ส่งออก', 'fa-circle-info', 'text-amber-400'); return; }
