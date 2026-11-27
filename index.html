@@ -876,6 +876,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         <i class="fa-solid fa-bell"></i> แจ้งเตือน
                         <span id="boardTabCount-ready_to_ship" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold">0</span>
                     </button>
+                    <button onclick="setBoardDepartmentTab('stock')" id="boardTabBtn-stock" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition" title="Stock สินค้าและวัตถุดิบ — บัญชีรับเข้า/เบิกออก + ยอดคงเหลือ">
+                        <i class="fa-solid fa-warehouse"></i> Stock
+                        <span id="boardTabCount-stock" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold">0</span>
+                    </button>
                 </div>
             </div>
 
@@ -2026,6 +2030,113 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 </div>
             </div>
 
+            <!-- NEW (2026-11-27): "Stock สินค้าและวัตถุดิบ" — pill ใหม่ในแถบแผนก (เหมือนแผนกขาย: ไม่มีคอลัมน์บอร์ด สลับเป็น container เฉพาะ)
+                 2 ส่วน: วัตถุดิบ (ไหมดิบ/ผ้าใบ/กาว/ผ้าตาข่าย/วัสดุหีบห่อ/ยางกันลื่น/อื่นๆ สร้างเองได้) และสินค้า — บัญชีรับเข้า/เบิกออก + ยอดคงเหลือ
+                 + จุดสั่งซื้อขั้นต่ำ. ใบเบิกวัสดุหีบห่อ (packagingLog) ตัดยอดอัตโนมัติผ่าน "ผูกใบเบิก". เก็บใน localStorage (qc_stock_v1) — ดู stk*(). -->
+            <div id="stockContainer" class="hidden space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900"><i class="fa-solid fa-warehouse mr-2 text-teal-600"></i>Stock สินค้าและวัตถุดิบ</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">บัญชีรับเข้า/เบิกออก + ยอดคงเหลือ — ตั้งจุดสั่งซื้อขั้นต่ำเพื่อเตือนเมื่อใกล้หมด</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button type="button" onclick="stkExport()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5"><i class="fa-solid fa-file-export"></i> ส่งออก Excel</button>
+                        <button type="button" onclick="stkBackup()" class="bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 font-medium px-3 py-1.5 rounded-lg transition text-xs flex items-center gap-1.5" title="ดาวน์โหลดข้อมูล Stock ทั้งหมดเป็นไฟล์ JSON เก็บสำรอง/ย้ายเครื่อง"><i class="fa-solid fa-floppy-disk"></i> สำรองข้อมูล</button>
+                        <label class="bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 font-medium px-3 py-1.5 rounded-lg transition text-xs flex items-center gap-1.5 cursor-pointer" title="กู้คืนข้อมูล Stock จากไฟล์สำรอง (แทนที่ข้อมูลปัจจุบัน)"><i class="fa-solid fa-rotate-left"></i> กู้คืน<input type="file" accept=".json" class="hidden" onchange="stkRestore(this)"></label>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="inline-flex rounded-lg overflow-hidden border border-slate-300" data-stk-sections>
+                        <button type="button" id="stkSecBtn-raw" onclick="stkSetSection('raw')" class="px-3.5 py-2 text-xs font-semibold bg-teal-600 text-white"><i class="fa-solid fa-boxes-stacked mr-1"></i>วัตถุดิบ</button>
+                        <button type="button" id="stkSecBtn-product" onclick="stkSetSection('product')" class="px-3.5 py-2 text-xs font-semibold bg-white text-slate-600 hover:bg-slate-50"><i class="fa-solid fa-box mr-1"></i>สินค้า</button>
+                    </div>
+                    <div id="stkSummary" class="flex flex-wrap items-center gap-2 text-[11px]"></div>
+                </div>
+
+                <div id="stkItemCard" class="hidden bg-white rounded-2xl shadow-sm border border-teal-200 p-4 space-y-3">
+                    <h3 class="font-bold text-slate-800 text-sm" id="stkItemTitle">เพิ่มรายการ</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="col-span-2"><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">ชื่อรายการ</label>
+                            <input type="text" id="stkItemName" placeholder="เช่น ไหมดิบ NYLON, ยางกันลื่น" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+                        <div><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">หมวด</label>
+                            <input type="text" id="stkItemCat" list="stkCatOptions" placeholder="เลือก/พิมพ์หมวดใหม่" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <datalist id="stkCatOptions"></datalist></div>
+                        <div><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">หน่วย</label>
+                            <input type="text" id="stkItemUnit" list="stkUnitOptions" placeholder="กก., ม้วน..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <datalist id="stkUnitOptions"><option value="กก."><option value="ม้วน"><option value="ม."><option value="ตร.ม."><option value="ชิ้น"><option value="ผืน"><option value="แผ่น"><option value="กล่อง"><option value="ถุง"><option value="ลัง"></datalist></div>
+                        <div><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">จุดสั่งซื้อขั้นต่ำ</label>
+                            <input type="number" min="0" step="any" id="stkItemMin" placeholder="0 = ไม่เตือน" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+                        <div id="stkItemOpenWrap"><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">ยอดยกมา</label>
+                            <input type="number" min="0" step="any" id="stkItemOpen" placeholder="0" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+                        <div id="stkItemSlipWrap" class="col-span-2"><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">ผูกกับใบเบิกวัสดุหีบห่อ (ตัดยอดอัตโนมัติ)</label>
+                            <select id="stkItemSlip" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></select></div>
+                        <div class="col-span-2 sm:col-span-4"><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">หมายเหตุ</label>
+                            <input type="text" id="stkItemNote" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="stkSaveItem()" class="bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow transition"><i class="fa-solid fa-floppy-disk mr-1"></i>บันทึกรายการ</button>
+                        <button type="button" onclick="stkCloseForms()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold px-4 py-2 rounded-xl transition">ยกเลิก</button>
+                    </div>
+                </div>
+
+                <div id="stkMoveCard" class="hidden bg-white rounded-2xl shadow-sm border border-indigo-200 p-4 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <h3 class="font-bold text-slate-800 text-sm" id="stkMoveTitle">รับเข้า</h3>
+                        <p class="text-[11px] text-slate-500" id="stkMoveHint"></p>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <div><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">ประเภท</label>
+                            <select id="stkMoveType" onchange="stkMoveHint()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"><option value="in">รับเข้า</option><option value="out">เบิกออก</option><option value="adjust">ปรับยอด (นับจริง)</option></select></div>
+                        <div><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">วันที่</label>
+                            <input type="date" id="stkMoveDate" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"></div>
+                        <div><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1" id="stkMoveQtyLabel">จำนวน</label>
+                            <input type="number" min="0" step="any" id="stkMoveQty" oninput="stkMoveHint()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"></div>
+                        <div><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">อ้างอิง M/O, S/O / เลขที่เอกสาร</label>
+                            <input type="text" id="stkMoveRef" list="stkMoRefOptions" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"><datalist id="stkMoRefOptions"></datalist></div>
+                        <div><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1" id="stkMovePartyLabel">ผู้ขาย/ผู้ส่ง</label>
+                            <input type="text" id="stkMoveParty" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"></div>
+                        <div class="col-span-2 sm:col-span-5"><label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">หมายเหตุ</label>
+                            <input type="text" id="stkMoveNote" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"></div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="stkSaveMove()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow transition"><i class="fa-solid fa-floppy-disk mr-1"></i>บันทึก</button>
+                        <button type="button" onclick="stkCloseForms()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold px-4 py-2 rounded-xl transition">ยกเลิก</button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-3 bg-teal-50/50 border-b border-slate-100 flex flex-wrap items-center gap-2">
+                        <h3 class="font-bold text-teal-900 text-sm mr-auto" id="stkTableTitle">ยอดคงเหลือ</h3>
+                        <select id="stkCatFilter" onchange="stkRender()" class="text-xs px-2 py-1.5 bg-white border border-slate-200 rounded-lg"></select>
+                        <input type="text" id="stkSearch" oninput="stkRender()" placeholder="ค้นหารายการ..." class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg">
+                        <button type="button" onclick="stkOpenItem(null)" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5"><i class="fa-solid fa-plus-circle"></i> เพิ่มรายการ</button>
+                    </div>
+                    <div class="overflow-x-auto"><table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500"><tr>
+                            <th class="px-2 py-2 text-left">หมวด</th><th class="px-2 py-2 text-left">รายการ</th><th class="px-2 py-2 text-left">หน่วย</th>
+                            <th class="px-2 py-2 text-right">รับเข้ารวม</th><th class="px-2 py-2 text-right">เบิกออกรวม</th><th class="px-2 py-2 text-right">คงเหลือ</th>
+                            <th class="px-2 py-2 text-right">จุดสั่งซื้อ</th><th class="px-2 py-2 text-center">สถานะ</th><th class="px-2 py-2 text-center">จัดการ</th>
+                        </tr></thead>
+                        <tbody id="stkTableBody" class="divide-y divide-slate-100"></tbody>
+                    </table></div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-3 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center gap-2">
+                        <h3 class="font-bold text-slate-800 text-sm mr-auto"><i class="fa-solid fa-clock-rotate-left mr-1.5 text-slate-500"></i>ประวัติความเคลื่อนไหว</h3>
+                        <select id="stkHistItem" onchange="stkRender()" class="text-xs px-2 py-1.5 bg-white border border-slate-200 rounded-lg"></select>
+                        <input type="month" id="stkHistMonth" onchange="stkRender()" title="เว้นว่าง = ทุกเดือน" class="text-xs px-2 py-1.5 bg-white border border-slate-200 rounded-lg">
+                    </div>
+                    <div class="overflow-x-auto"><table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500"><tr>
+                            <th class="px-2 py-2 text-left">วันที่</th><th class="px-2 py-2 text-left">รายการ</th><th class="px-2 py-2 text-center">ประเภท</th><th class="px-2 py-2 text-right">จำนวน</th>
+                            <th class="px-2 py-2 text-left">อ้างอิง</th><th class="px-2 py-2 text-left">ผู้เกี่ยวข้อง</th><th class="px-2 py-2 text-left">หมายเหตุ</th><th class="px-2 py-2 text-center">ลบ</th>
+                        </tr></thead>
+                        <tbody id="stkHistBody" class="divide-y divide-slate-100"></tbody>
+                    </table></div>
+                </div>
+            </div>
+
             <!-- NEW (2026-11-26): "บันทึกการแต่งรายวัน" — ฟอร์มบันทึกแผนกตกแต่ง ทำเหมือน "บันทึกรายการทอรายวัน" (วันที่ × M/O × กะปกติ/OT
                  + พนักงานติ๊กต่อกะ) แต่ไม่มีช่อง "จอทอ" — เขียนลง order.finishing.efficiencyLog[] ชุดเดียวกับตารางประสิทธิภาพการตกแต่ง (KPI)
                  จึงยอดสะสม/คงเหลือ/วันเสร็จ M/O ยังตรงกันทุกที่ — ดู finLogSave(). แสดงเมื่อแผนกตกแต่ง → pill "บันทึกการแต่งรายวัน". -->
@@ -2150,6 +2261,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         <button onclick="setFinishingKpiTab('glue')" id="finishingKpiTabGlueBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                             <i class="fa-solid fa-bottle-droplet"></i> การเบิกใช้กาว
                         </button>
+                        <button onclick="setFinishingKpiTab('pack')" id="finishingKpiTabPackBtn" class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                            <i class="fa-solid fa-box-open"></i> รายการใช้วัสดุหีบห่อ
+                        </button>
                     </div>
                 </div>
 
@@ -2189,6 +2303,78 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         </div>
                         <div id="finishingKpiEfficiencyPeriodSummary" class="p-3 border-b border-slate-100"></div>
                         <div id="finishingKpiEfficiencySplitContainer"></div>
+                    </div>
+                </div>
+
+                <!-- NEW (2026-11-27): "รายการใช้วัสดุหีบห่อ" — ใบเบิกผ้าพลาสติกสีฟ้า / ผ้าพลาสติกใสห่อพรม / ไฟเบอร์กล๊าส (30x1, 30x1.5, 50x1 ม.)
+                     เบิกเป็นม้วน ผูกกับ M/O,S/O เก็บที่ order.finishing.packagingLog[] — ดู packSave()/printPackagingSlip() -->
+                <div id="finishingKpiPackSection" class="hidden space-y-3">
+                    <div id="packFormCard" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-4">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-box-open mr-2 text-indigo-600"></i> ใบเบิกวัสดุหีบห่อ</h3>
+                            <p class="text-[11px] text-slate-400">เลขที่ใบเบิก: <span id="packSlipNoPreview" class="font-mono font-semibold text-indigo-700">-</span> (ออกอัตโนมัติ)</p>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">วันที่เบิก</label>
+                                <input type="date" id="packDate" onchange="packUpdateSlipPreview()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div class="col-span-2 sm:col-span-1">
+                                <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">ใช้กับ M/O, S/O</label>
+                                <input type="text" id="packMoSo" list="packMoSoOptions" oninput="packHandleMoChange()" placeholder="พิมพ์/เลือกเลขที่ M/O, S/O" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <datalist id="packMoSoOptions"></datalist>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">ผู้เบิก</label>
+                                <input type="text" id="packRequester" placeholder="ชื่อผู้เบิก" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                        <p id="packMoInfo" class="text-[11px] text-slate-500 min-h-[16px]"></p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="border border-sky-100 bg-sky-50/50 rounded-xl p-3 space-y-1">
+                                <p class="text-xs font-bold text-sky-800"><i class="fa-solid fa-droplet mr-1"></i> ผ้าพลาสติกสีฟ้า</p>
+                                <div class="flex items-center gap-2"><input type="number" min="0" step="1" id="packBlueRolls" class="w-24 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right"><span class="text-xs text-slate-500">ม้วน</span></div>
+                            </div>
+                            <div class="border border-slate-200 bg-slate-50 rounded-xl p-3 space-y-1">
+                                <p class="text-xs font-bold text-slate-700"><i class="fa-regular fa-square mr-1"></i> ผ้าพลาสติกใสห่อพรม</p>
+                                <div class="flex items-center gap-2"><input type="number" min="0" step="1" id="packClearRolls" class="w-24 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right"><span class="text-xs text-slate-500">ม้วน</span></div>
+                            </div>
+                            <div class="border border-amber-100 bg-amber-50/50 rounded-xl p-3 space-y-1">
+                                <p class="text-xs font-bold text-amber-800"><i class="fa-solid fa-layer-group mr-1"></i> ไฟเบอร์กล๊าส (เลือกขนาด)</p>
+                                <div class="space-y-1">
+                                    <div class="flex items-center gap-2"><span class="text-[11px] text-slate-600 w-24">30 cm. × 1 m.</span><input type="number" min="0" step="1" id="packFiber30x100" class="w-20 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right"><span class="text-xs text-slate-500">ม้วน</span></div>
+                                    <div class="flex items-center gap-2"><span class="text-[11px] text-slate-600 w-24">30 cm. × 1.5 m.</span><input type="number" min="0" step="1" id="packFiber30x150" class="w-20 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right"><span class="text-xs text-slate-500">ม้วน</span></div>
+                                    <div class="flex items-center gap-2"><span class="text-[11px] text-slate-600 w-24">50 cm. × 1.00 m.</span><input type="number" min="0" step="1" id="packFiber50x100" class="w-20 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right"><span class="text-xs text-slate-500">ม้วน</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">หมายเหตุ</label>
+                            <input type="text" id="packNote" placeholder="(ถ้ามี)" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 pt-1">
+                            <button type="button" id="packSaveBtn" onclick="packSave(false)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition"><i class="fa-solid fa-floppy-disk mr-1"></i>บันทึกใบเบิก</button>
+                            <button type="button" onclick="packSave(true)" class="bg-white border border-indigo-600 text-indigo-700 hover:bg-indigo-50 text-xs font-semibold px-4 py-2.5 rounded-xl transition"><i class="fa-solid fa-print mr-1"></i>บันทึกและพิมพ์ใบเบิก</button>
+                            <button type="button" onclick="packReset(false)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold px-4 py-2.5 rounded-xl transition">ยกเลิก / เริ่มใหม่</button>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="p-4 bg-indigo-50/50 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div>
+                                <h3 class="font-bold text-indigo-900 text-sm"><i class="fa-solid fa-box-open mr-2 text-indigo-600"></i> รายการใช้วัสดุหีบห่อ</h3>
+                                <p class="text-[11px] text-slate-400 mt-0.5">ประวัติใบเบิกตามเดือนที่เลือก — พิมพ์ใบเบิกซ้ำ/แก้ไข/ลบได้</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <input type="text" id="packTableSearch" oninput="packRenderTable()" placeholder="ค้นหา M/O, ลูกค้า, เลขที่ใบเบิก, ผู้เบิก..." class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg">
+                                <button onclick="packExport()" type="button" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5"><i class="fa-solid fa-file-export"></i> ส่งออก Excel</button>
+                            </div>
+                        </div>
+                        <div class="p-3 flex flex-wrap items-center gap-2 border-b border-slate-100">
+                            <span class="text-[11px] text-slate-500 font-medium">สรุปยอดรวมตามช่วงเวลา:</span>
+                            <div id="packPeriodSelectWrap"></div>
+                        </div>
+                        <div id="packPeriodSummary" class="p-3 border-b border-slate-100"></div>
+                        <div id="packSplitContainer"></div>
                     </div>
                 </div>
 
@@ -4347,7 +4533,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-145';
+        const APP_BUILD = 'QCDashboard-147';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -4536,7 +4722,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             populateWeavingLogMoSoOptions();
             resetWeavingLogForm(false);
             renderWeavingLogTable();
-            try { finLogInit(); } catch (e) { console.error('finLogInit failed:', e); }   // 2026-11-26: บันทึกการแต่งรายวัน
+            try { finLogInit(); } catch (e) { console.error('finLogInit failed:', e); }
+            try { packReset(false); packPopulateMoOptions(); } catch (e) { console.error('pack init failed:', e); }
+            try { stkRender(); } catch (e) { console.error('stock init failed:', e); }   // 2026-11-27: Stock สินค้าและวัตถุดิบ
 
             // NEW (2026-10-02): saveQCItem()/confirmDeleteItem() both mutate qcData then call initApp()
             // — but neither of them knows whether the order detail modal's "ประวัติ QC" section, or the
@@ -14844,11 +15032,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             // swaps the whole grid out for salesFormContainer instead (see updateBoardColumnVisibility()).
             // CHANGED (2026-09-16, later same day): '' is no longer a valid state — an unrecognized stage
             // now falls back to 'planning' instead of the removed combined view.
-            boardDepartmentFilter = (stage === 'sales' || BOARD_TABS.includes(stage)) ? stage : 'planning';
+            boardDepartmentFilter = (stage === 'sales' || stage === 'stock' || BOARD_TABS.includes(stage)) ? stage : 'planning';
             updateBoardDepartmentTabStyles();
             updateBoardColumnVisibility();
             // NEW (2026-09-11): refresh the "รายการทั้งหมด" report in case productionOrders changed
             // while the sales tab wasn't visible (e.g. an order was shipped from another board tab).
+            if (stage === 'stock') stkRender();   // 2026-11-27: Stock สินค้าและวัตถุดิบ
             if (stage === 'sales' && typeof salesActiveSubTab !== 'undefined' && salesActiveSubTab === 'report') {
                 renderSalesReportTables();
             }
@@ -14862,7 +15051,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const activeClasses = ['bg-indigo-600', 'text-white', 'shadow-sm'];
             const inactiveClasses = ['bg-slate-100', 'text-slate-600', 'hover:bg-slate-200'];
             const buttons = [
-                { el: document.getElementById('boardTabBtn-sales'), isActive: boardDepartmentFilter === 'sales' }
+                { el: document.getElementById('boardTabBtn-sales'), isActive: boardDepartmentFilter === 'sales' },
+                { el: document.getElementById('boardTabBtn-stock'), isActive: boardDepartmentFilter === 'stock' }
             ].concat(BOARD_TABS.map(stage => ({
                     el: document.getElementById(`boardTabBtn-${stage}`),
                     isActive: boardDepartmentFilter === stage
@@ -14881,6 +15071,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         function updateBoardColumnVisibility() {
             const isSales = boardDepartmentFilter === 'sales';
+            const isStock = boardDepartmentFilter === 'stock';   // 2026-11-27
+            const stockContainer = document.getElementById('stockContainer');
+            if (stockContainer) stockContainer.classList.toggle('hidden', !isStock);
             // NEW (2026-09-12): "แผนกทอ" → "บันทึกการทอรายวัน" sub-tab — same swap-the-grid-out idea as
             // แผนกขาย above, gated on BOTH boardDepartmentFilter === 'weaving' AND the inner sub-tab
             // pill (weavingActiveSubTab, see setWeavingSubTab()) being on 'log'.
@@ -14916,7 +15109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (finLogContainer) finLogContainer.classList.toggle('hidden', !isFinishingLog);
             if (isFinishingLog) { isAnyDeptKpi = true; if (typeof finLogRefresh === 'function') finLogRefresh(); }
 
-            if (searchCard) searchCard.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi);
+            if (searchCard) searchCard.classList.toggle('hidden', isSales || isStock || isWeavingLog || isAnyDeptKpi);
             // NEW (2026-10-07): หน้ารายงาน (KPI/บันทึกการทอรายวัน/รายงานแผนกขาย) ซ่อนแถบค้นหาบอร์ด → โชว์ตัวเลือกเดือนของรายงานแทน
             const reportMonthBar = document.getElementById('reportMonthBar');
             if (reportMonthBar) {
@@ -14926,12 +15119,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
             const grid = document.getElementById('boardColumnsGrid');
             if (grid) {
-                grid.classList.toggle('hidden', isSales || isWeavingLog || isAnyDeptKpi);
+                grid.classList.toggle('hidden', isSales || isStock || isWeavingLog || isAnyDeptKpi);
             }
             BOARD_TABS.forEach(stage => {
                 const wrap = document.getElementById(`boardColWrap-${stage}`);
                 if (!wrap) return;
-                const shouldShow = !isSales && !isWeavingLog && !isAnyDeptKpi && boardDepartmentFilter === stage;
+                const shouldShow = !isSales && !isStock && !isWeavingLog && !isAnyDeptKpi && boardDepartmentFilter === stage;
                 wrap.classList.toggle('hidden', !shouldShow);
             });
         }
@@ -26016,16 +26209,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             renderFinishingStaffManagerHtml();
             renderFinishingEfficiencyTable();
             renderGlueUsageTable();
+            packPopulateMoOptions(); packRenderTable(); packUpdateSlipPreview();   // 2026-11-27: รายการใช้วัสดุหีบห่อ
         }
 
         function setFinishingKpiTab(tab) {
-            currentFinishingKpiTab = tab === 'glue' ? 'glue' : 'efficiency';
+            currentFinishingKpiTab = (tab === 'glue' || tab === 'pack') ? tab : 'efficiency';
             const activeCls = "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition";
             const inactiveCls = "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
-            document.getElementById('finishingKpiTabEfficiencyBtn').className = currentFinishingKpiTab === 'efficiency' ? activeCls : inactiveCls;
-            document.getElementById('finishingKpiTabGlueBtn').className = currentFinishingKpiTab === 'glue' ? activeCls : inactiveCls;
-            document.getElementById('finishingKpiEfficiencySection').classList.toggle('hidden', currentFinishingKpiTab !== 'efficiency');
-            document.getElementById('finishingKpiGlueSection').classList.toggle('hidden', currentFinishingKpiTab !== 'glue');
+            [['efficiency', 'finishingKpiTabEfficiencyBtn', 'finishingKpiEfficiencySection'], ['glue', 'finishingKpiTabGlueBtn', 'finishingKpiGlueSection'], ['pack', 'finishingKpiTabPackBtn', 'finishingKpiPackSection']].forEach(([k, btn, sec]) => {
+                const b = document.getElementById(btn), c = document.getElementById(sec);
+                if (b) b.className = currentFinishingKpiTab === k ? activeCls : inactiveCls;
+                if (c) c.classList.toggle('hidden', currentFinishingKpiTab !== k);
+            });
+            if (currentFinishingKpiTab === 'pack') { packPopulateMoOptions(); packRenderTable(); packUpdateSlipPreview(); }
+            // เปิดแท็บนี้จากที่อื่น (เช่น ปุ่มแก้ไขใบเบิก) ให้สลับมาที่ KPI ของแผนกตกแต่งด้วย
+            if (typeof deptKpiActiveSubTab !== 'undefined' && (boardDepartmentFilter !== 'finishing' || deptKpiActiveSubTab.finishing !== 'kpi')) setDeptKpiSubTab('finishing', 'kpi');
         }
 
         let finishingKpiEfficiencyPeriodGranularity = 'month';
@@ -26599,6 +26797,459 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         <div class="space-y-1.5">${waitHtml}</div>
                     </div>
                 </div>`;
+        }
+
+        // =========================================================================================
+        // NEW (2026-11-27): "รายการใช้วัสดุหีบห่อ" (แผนกตกแต่ง → KPI → แท็บที่ 3) — ใบเบิกผ้าพลาสติกสีฟ้า /
+        // ผ้าพลาสติกใสห่อพรม / ไฟเบอร์กล๊าส (30cm×1m, 30cm×1.5m, 50cm×1.00m) เบิกเป็น "ม้วน" ผูกกับ M/O,S/O
+        // เก็บที่ order.finishing.packagingLog[] = { id, slipNo, date, requester, note, blueRolls, clearRolls,
+        // fiber30x100, fiber30x150, fiber50x100 } (อยู่ใน order JSON → ไม่ต้องแก้ Apps Script) พิมพ์ใบเบิกได้.
+        // =========================================================================================
+        const PACK_MATERIALS = [
+            { key: 'blueRolls', label: 'ผ้าพลาสติกสีฟ้า', size: '-', short: 'พลาสติกสีฟ้า' },
+            { key: 'clearRolls', label: 'ผ้าพลาสติกใสห่อพรม', size: '-', short: 'พลาสติกใส' },
+            { key: 'fiber30x100', label: 'ไฟเบอร์กล๊าส', size: '30 cm. x 1 m.', short: 'ไฟเบอร์ 30×1' },
+            { key: 'fiber30x150', label: 'ไฟเบอร์กล๊าส', size: '30 cm. x 1.5 m.', short: 'ไฟเบอร์ 30×1.5' },
+            { key: 'fiber50x100', label: 'ไฟเบอร์กล๊าส', size: '50 cm. x 1.00 m.', short: 'ไฟเบอร์ 50×1' }
+        ];
+        const PACK_FIELD_IDS = { blueRolls: 'packBlueRolls', clearRolls: 'packClearRolls', fiber30x100: 'packFiber30x100', fiber30x150: 'packFiber30x150', fiber50x100: 'packFiber50x100' };
+        let packEditCtx = null;          // { orderIndex, slipIndex } ขณะแก้ไข
+        let packPeriodGranularity = 'month';
+
+        function packTodayKey() { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; }
+        function packPopulateMoOptions() {
+            const dl = document.getElementById('packMoSoOptions'); if (!dl) return;
+            dl.innerHTML = productionOrders.filter(o => getEffectiveStage(o) !== 'shipped')
+                .sort((a, b) => String(a.moSo || '').localeCompare(String(b.moSo || ''))).map(o => `<option value="${escapeHtml(o.moSo)}">`).join('');
+        }
+        // เลขที่ใบเบิก PK{ปี2หลัก}{เดือน}-{ลำดับ} รันต่อเดือนของวันที่เบิก (นับจากทุก M/O)
+        function packNextSlipNo(date) {
+            const m = String(date || packTodayKey()).match(/^(\d{4})-(\d{2})/);
+            const prefix = m ? `PK${m[1].slice(2)}${m[2]}-` : 'PK-';
+            let max = 0;
+            productionOrders.forEach(o => ((o.finishing || {}).packagingLog || []).forEach(s => {
+                if (s && String(s.slipNo || '').startsWith(prefix)) max = Math.max(max, parseInt(String(s.slipNo).slice(prefix.length), 10) || 0);
+            }));
+            return prefix + String(max + 1).padStart(3, '0');
+        }
+        function packUpdateSlipPreview() {
+            const el = document.getElementById('packSlipNoPreview'); if (!el) return;
+            if (packEditCtx) { const o = productionOrders[packEditCtx.orderIndex]; const s = o && o.finishing.packagingLog[packEditCtx.slipIndex]; el.textContent = s ? s.slipNo : '-'; return; }
+            el.textContent = packNextSlipNo((document.getElementById('packDate') || {}).value);
+        }
+        function packHandleMoChange() {
+            const info = document.getElementById('packMoInfo');
+            const found = findOrderByMoSoKey(((document.getElementById('packMoSo') || {}).value || '').trim());
+            if (!info) return;
+            if (!found) { info.innerHTML = ((document.getElementById('packMoSo') || {}).value || '').trim() ? '<span class="text-amber-600"><i class="fa-solid fa-circle-exclamation mr-1"></i>ไม่พบ M/O,S/O นี้ในระบบ</span>' : ''; return; }
+            const o = found.order;
+            info.textContent = [o.customerName, o.quality, Number(o.totalSqm) > 0 ? `${o.totalSqm} ตร.ม.` : '', o.dueDate ? `กำหนดส่ง ${o.dueDate}` : ''].filter(Boolean).join(' • ');
+        }
+        function packReset(keepDate) {
+            const d = document.getElementById('packDate'); const prev = d ? d.value : '';
+            if (d) d.value = keepDate && prev ? prev : packTodayKey();
+            ['packMoSo', 'packNote', 'packBlueRolls', 'packClearRolls', 'packFiber30x100', 'packFiber30x150', 'packFiber50x100'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+            if (!keepDate) { const r = document.getElementById('packRequester'); if (r) r.value = ''; }
+            packEditCtx = null;
+            const b = document.getElementById('packSaveBtn'); if (b) b.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i>บันทึกใบเบิก';
+            packHandleMoChange(); packUpdateSlipPreview();
+        }
+        function packReadForm() {
+            const q = {}; PACK_MATERIALS.forEach(m => { q[m.key] = Math.max(0, Math.round(Number((document.getElementById(PACK_FIELD_IDS[m.key]) || {}).value) || 0)); });
+            return q;
+        }
+        function packSave(thenPrint) {
+            const v = id => ((document.getElementById(id) || {}).value || '').trim();
+            const date = v('packDate');
+            if (!date) { showToast('กรุณาระบุวันที่เบิก', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            const found = findOrderByMoSoKey(v('packMoSo'));
+            if (!found) { showToast('กรุณาระบุ M/O, S/O ที่ใช้วัสดุ (ต้องมีในระบบ)', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            const q = packReadForm();
+            if (!PACK_MATERIALS.some(m => q[m.key] > 0)) { showToast('กรุณากรอกจำนวนวัสดุที่เบิกอย่างน้อย 1 รายการ', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            const { order, orderIndex } = found;
+            if (!order.finishing) order.finishing = {};
+            if (!Array.isArray(order.finishing.packagingLog)) order.finishing.packagingLog = [];
+            const ctx = packEditCtx;
+            let slipNo = '', id = '';
+            if (ctx) { const old = ((productionOrders[ctx.orderIndex] || {}).finishing || {}).packagingLog; const os = old && old[ctx.slipIndex]; if (os) { slipNo = os.slipNo; id = os.id; } }
+            const slip = Object.assign({ id: id || 'pk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), slipNo: slipNo || packNextSlipNo(date), date, requester: v('packRequester'), note: v('packNote') }, q);
+            let slipIndex;
+            if (ctx && ctx.orderIndex === orderIndex && order.finishing.packagingLog[ctx.slipIndex]) { slipIndex = ctx.slipIndex; order.finishing.packagingLog[slipIndex] = slip; }
+            else {
+                if (ctx) { const oo = productionOrders[ctx.orderIndex]; if (oo && oo.finishing && oo.finishing.packagingLog) { oo.finishing.packagingLog.splice(ctx.slipIndex, 1); persistOrderChange(oo); } }
+                order.finishing.packagingLog.push(slip); slipIndex = order.finishing.packagingLog.length - 1;
+            }
+            persistOrderChange(order);
+            packRenderTable();
+            showToast(`บันทึกใบเบิก ${slip.slipNo} (${order.moSo}) แล้ว`, 'fa-floppy-disk', 'text-emerald-400');
+            packReset(true);
+            if (thenPrint) printPackagingSlip(orderIndex, slipIndex);
+        }
+        function packEdit(orderIndex, slipIndex) {
+            const o = productionOrders[orderIndex]; const s = o && (o.finishing.packagingLog || [])[slipIndex]; if (!s) return;
+            setFinishingKpiTab('pack');
+            const set = (id, val) => { const e = document.getElementById(id); if (e) e.value = (val === undefined || val === null || val === 0) ? '' : val; };
+            set('packDate', s.date || ''); set('packMoSo', o.moSo); set('packRequester', s.requester || ''); set('packNote', s.note || '');
+            PACK_MATERIALS.forEach(m => set(PACK_FIELD_IDS[m.key], s[m.key]));
+            packEditCtx = { orderIndex, slipIndex };
+            const b = document.getElementById('packSaveBtn'); if (b) b.innerHTML = `<i class="fa-solid fa-floppy-disk mr-1"></i>บันทึกการแก้ไข (${escapeHtml(s.slipNo)})`;
+            packHandleMoChange(); packUpdateSlipPreview();
+            const f = document.getElementById('packFormCard'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        function packDelete(orderIndex, slipIndex) {
+            const o = productionOrders[orderIndex]; const s = o && (o.finishing.packagingLog || [])[slipIndex]; if (!s) return;
+            if (!window.confirm(`ลบใบเบิก ${s.slipNo} (${o.moSo}) ถาวรหรือไม่?`)) return;
+            o.finishing.packagingLog.splice(slipIndex, 1);
+            if (packEditCtx && packEditCtx.orderIndex === orderIndex) packReset(true);
+            persistOrderChange(o); packRenderTable();
+            showToast('ลบใบเบิกแล้ว', 'fa-circle-xmark', 'text-rose-400');
+        }
+        function packFlatRows() {
+            const rows = [];
+            productionOrders.forEach((order, orderIndex) => ((order.finishing || {}).packagingLog || []).forEach((slip, slipIndex) => { if (slip) rows.push({ order, orderIndex, slip, slipIndex }); }));
+            return rows;
+        }
+        function setPackPeriod(value) { packPeriodGranularity = (value === 'day' || value === 'year') ? value : 'month'; packRenderTable(); }
+        const PACK_THEAD_HTML = `
+            <th class="px-2 py-2 text-left">เลขที่ใบเบิก</th><th class="px-2 py-2 text-left">วันที่</th><th class="px-2 py-2 text-left">ใช้กับ M/O, S/O</th><th class="px-2 py-2 text-left">ลูกค้า</th><th class="px-2 py-2 text-left">ผู้เบิก</th>
+            <th class="px-2 py-2 text-right">พลาสติกสีฟ้า (ม้วน)</th><th class="px-2 py-2 text-right">พลาสติกใส (ม้วน)</th>
+            <th class="px-2 py-2 text-right">ไฟเบอร์ 30×1 (ม้วน)</th><th class="px-2 py-2 text-right">ไฟเบอร์ 30×1.5 (ม้วน)</th><th class="px-2 py-2 text-right">ไฟเบอร์ 50×1 (ม้วน)</th>
+            <th class="px-2 py-2 text-left">หมายเหตุ</th><th class="px-2 py-2 text-center">จัดการ</th>`;
+        function packRenderTable() {
+            const wrap = document.getElementById('packPeriodSelectWrap');
+            if (wrap) wrap.innerHTML = periodDropdownHtml('packPeriodSelect', 'setPackPeriod', packPeriodGranularity);
+            if (!document.getElementById('packSplitContainer')) return;
+            const search = ((document.getElementById('packTableSearch') || {}).value || '').trim().toLowerCase();
+            let rows = packFlatRows().filter(r => reportMonthMatchDate(r.slip.date, r.order));
+            if (search) rows = rows.filter(r => [r.order.moSo, r.order.customerName, r.slip.slipNo, r.slip.requester, r.slip.note].map(x => String(x || '').toLowerCase()).some(x => x.includes(search)));
+            rows.sort((a, b) => (a.slip.date < b.slip.date ? 1 : a.slip.date > b.slip.date ? -1 : String(b.slip.slipNo).localeCompare(String(a.slip.slipNo))));
+            const ps = document.getElementById('packPeriodSummary');
+            if (ps) ps.innerHTML = renderPeriodSummaryTableHtml(rows.map(r => r.slip), 'date', packPeriodGranularity, PACK_MATERIALS.map(m => ({ key: m.key, label: `${m.short} (ม้วน)` })));
+            const n = x => Number(x) > 0 ? Number(x).toLocaleString('th-TH') : '<span class="text-slate-300">-</span>';
+            const rowHtml = ({ order, orderIndex, slip, slipIndex }) => `<tr class="hover:bg-slate-50/80" data-pack-row>
+                <td class="px-2 py-1.5 font-mono font-semibold text-indigo-700 whitespace-nowrap">${escapeHtml(slip.slipNo || '-')}</td>
+                <td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(slip.date || '-')}</td>
+                <td class="px-2 py-1.5 font-semibold ${moSoTextColorClass(order)} whitespace-nowrap">${escapeHtml(order.moSo)}</td>
+                <td class="px-2 py-1.5 text-[11px]">${escapeHtml(order.customerName || '-')}</td>
+                <td class="px-2 py-1.5">${escapeHtml(slip.requester || '-')}</td>
+                ${PACK_MATERIALS.map(m => `<td class="px-2 py-1.5 text-right">${n(slip[m.key])}</td>`).join('')}
+                <td class="px-2 py-1.5 text-[11px]">${escapeHtml(slip.note || '')}</td>
+                <td class="px-2 py-1.5 text-center whitespace-nowrap">
+                    <button type="button" onclick="printPackagingSlip(${orderIndex}, ${slipIndex})" title="พิมพ์ใบเบิก" class="text-slate-500 hover:text-indigo-700 px-1"><i class="fa-solid fa-print text-xs"></i></button>
+                    <button type="button" onclick="packEdit(${orderIndex}, ${slipIndex})" title="แก้ไข" class="text-indigo-500 hover:text-indigo-700 px-1"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
+                    <button type="button" onclick="packDelete(${orderIndex}, ${slipIndex})" title="ลบ" class="text-rose-400 hover:text-rose-600 px-1"><i class="fa-solid fa-trash text-xs"></i></button>
+                </td></tr>`;
+            const isSo = r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO';
+            const moRows = rows.filter(r => !isSo(r)), soRows = rows.filter(isSo);
+            renderSplitOrderTypeTables('packSplitContainer', PACK_THEAD_HTML, moRows.map(rowHtml).join(''), soRows.map(rowHtml).join(''), moRows.length, soRows.length, 12);
+        }
+        function packExport() {
+            const cols = [{ key: 'slipNo', label: 'เลขที่ใบเบิก' }, { key: 'date', label: 'วันที่เบิก', type: 'date' }, { key: 'moSo', label: 'ใช้กับ M/O, S/O' }, { key: 'customerName', label: 'ลูกค้า' }, { key: 'requester', label: 'ผู้เบิก' }]
+                .concat(PACK_MATERIALS.map(m => ({ key: m.key, label: `${m.label}${m.size !== '-' ? ' ' + m.size : ''} (ม้วน)`, type: 'number' }))).concat([{ key: 'note', label: 'หมายเหตุ' }]);
+            exportFlatRowsToExcel('รายการใช้วัสดุหีบห่อ.xlsx', 'ใช้วัสดุหีบห่อ', cols, packFlatRows().map(r => Object.assign({}, r.slip, { moSo: r.order.moSo, customerName: r.order.customerName || '' })));
+        }
+        function buildPackagingSlipHtml(order, slip) {
+            const rows = PACK_MATERIALS.map((m, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(m.label)}</td><td>${escapeHtml(m.size)}</td><td style="text-align:right;">${Number(slip[m.key]) > 0 ? Number(slip[m.key]).toLocaleString('th-TH') : '-'}</td><td style="text-align:center;">ม้วน</td></tr>`).join('');
+            const total = PACK_MATERIALS.reduce((s, m) => s + (Number(slip[m.key]) || 0), 0);
+            return `
+                <div class="print-sheet">
+                    <div class="print-header"><h1>ใบเบิกวัสดุหีบห่อ</h1><p>Siam Carpets Manufacturing — แผนกตกแต่ง/บรรจุภัณฑ์</p></div>
+                    <table class="print-info-table">
+                        <tr><th>เลขที่ใบเบิก</th><td>${escapeHtml(slip.slipNo || '-')}</td></tr>
+                        <tr><th>วันที่เบิก</th><td>${escapeHtml(slip.date || '-')}</td></tr>
+                        <tr><th>ใช้กับ M/O, S/O</th><td><b>${escapeHtml(order.moSo || '-')}</b></td></tr>
+                        ${order.customerName ? `<tr><th>ลูกค้า</th><td>${escapeHtml(order.customerName)}</td></tr>` : ''}
+                        ${order.quality ? `<tr><th>คุณภาพ</th><td>${escapeHtml(order.quality)}</td></tr>` : ''}
+                        ${Number(order.totalSqm) > 0 ? `<tr><th>พื้นที่รวม</th><td>${escapeHtml(String(order.totalSqm))} ตร.ม.</td></tr>` : ''}
+                        ${order.dueDate ? `<tr><th>กำหนดส่ง</th><td>${escapeHtml(order.dueDate)}</td></tr>` : ''}
+                        <tr><th>ผู้เบิก</th><td>${escapeHtml(slip.requester || '')}&nbsp;</td></tr>
+                    </table>
+                    <p class="print-section-title">รายการวัสดุที่เบิก</p>
+                    <table class="print-detail-table">
+                        <thead><tr><th style="width:32px;">#</th><th>รายการ</th><th>ขนาด</th><th style="text-align:right;">จำนวน</th><th style="text-align:center;">หน่วย</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                        <tfoot><tr><th colspan="3" style="text-align:right;">รวมทั้งหมด</th><th style="text-align:right;">${total.toLocaleString('th-TH')}</th><th style="text-align:center;">ม้วน</th></tr></tfoot>
+                    </table>
+                    ${slip.note ? `<p class="print-section-title">หมายเหตุ</p><p style="font-size:12px;">${escapeHtml(slip.note)}</p>` : ''}
+                    <div class="print-signature-row">
+                        <div class="print-signature-box"><div class="print-sign-line"></div>ผู้เบิก</div>
+                        <div class="print-signature-box"><div class="print-sign-line"></div>ผู้อนุมัติ</div>
+                        <div class="print-signature-box"><div class="print-sign-line"></div>ผู้จ่ายวัสดุ</div>
+                    </div>
+                    <p class="print-footer-note">พิมพ์เมื่อ: ${new Date().toLocaleString('th-TH')}</p>
+                </div>`;
+        }
+        function printPackagingSlip(orderIndex, slipIndex) {
+            const o = productionOrders[orderIndex]; const s = o && (o.finishing.packagingLog || [])[slipIndex]; if (!s) return;
+            document.getElementById('printArea').innerHTML = buildPackagingSlipHtml(o, s);
+            document.body.classList.add('print-single-mode');
+            showToast('กำลังเปิดหน้าต่างพิมพ์ใบเบิกวัสดุหีบห่อ... เลือก "Save as PDF" เพื่อบันทึกเป็นไฟล์ PDF ได้', 'fa-print', 'text-indigo-300');
+            setTimeout(() => window.print(), 150);
+        }
+
+        // =========================================================================================
+        // NEW (2026-11-27): "Stock สินค้าและวัตถุดิบ" — บัญชีรับเข้า/เบิกออก + ยอดคงเหลือ + จุดสั่งซื้อขั้นต่ำ
+        // 2 ส่วน: raw = วัตถุดิบ (ไหมดิบ/ผ้าใบ/กาว/ผ้าตาข่าย/วัสดุหีบห่อ/ยางกันลื่น/อื่นๆ สร้างเองได้), product = สินค้า
+        // stockData = { items:[{id,section,category,name,unit,minQty,slipKey,note}], moves:[{id,itemId,date,type:'in'|'out'|'adjust',qty,ref,party,note}] }
+        //  - adjust: qty เป็นส่วนต่างมีเครื่องหมาย (นับจริง − ยอดในระบบ)
+        //  - รายการที่ผูก slipKey (blueRolls/clearRolls/fiber...) ถูกตัดยอดอัตโนมัติจากใบเบิกวัสดุหีบห่อ (order.finishing.packagingLog)
+        //    แบบคำนวณสด (ไม่เขียนซ้ำ) → แก้/ลบใบเบิก ยอด Stock ปรับตามเอง
+        // เก็บใน localStorage (qc_stock_v1) เหมือนรายการกลางอื่น (Surplus/รายชื่อพนักงาน) — มีปุ่มสำรอง/กู้คืนไฟล์ JSON
+        // =========================================================================================
+        const STK_KEY = 'qc_stock_v1';
+        const STK_CATS_RAW = ['ไหมดิบ', 'ผ้าใบ', 'กาว', 'ผ้าตาข่าย', 'วัสดุหีบห่อ', 'ยางกันลื่น', 'อื่นๆ'];
+        let stockData = null;
+        let stkUi = { section: 'raw', itemEditId: null, moveItemId: null };
+
+        function stkSeed() {
+            const mk = (cat, name, unit, slipKey) => ({ id: 'stk_' + Math.random().toString(36).slice(2, 9), section: 'raw', category: cat, name, unit, minQty: 0, slipKey: slipKey || '', note: '' });
+            const items = [mk('ไหมดิบ', 'ไหมดิบ', 'กก.'), mk('ผ้าใบ', 'ผ้าใบ', 'ม้วน')];
+            ((productionSettings.finishing || {}).glueTypes || []).forEach(g => items.push(mk('กาว', `กาว ${g.label}`, 'กก.')));
+            items.push(mk('ผ้าตาข่าย', 'ผ้าตาข่าย', 'ม้วน'));
+            PACK_MATERIALS.forEach(m => items.push(mk('วัสดุหีบห่อ', m.size === '-' ? m.label : `${m.label} ${m.size}`, 'ม้วน', m.key)));
+            items.push(mk('ยางกันลื่น', 'ยางกันลื่น', 'ม้วน'));
+            return { items, moves: [] };
+        }
+        function stkEnsure() {
+            if (stockData) return stockData;
+            try { const raw = localStorage.getItem(STK_KEY); if (raw) { const d = JSON.parse(raw); if (d && Array.isArray(d.items) && Array.isArray(d.moves)) { stockData = d; return d; } } } catch (e) { /* storage blocked/corrupt */ }
+            stockData = stkSeed();
+            return stockData;
+        }
+        function stkPersist() { try { localStorage.setItem(STK_KEY, JSON.stringify(stkEnsure())); } catch (e) { console.warn('stock save failed', e); } }
+        function stkFmt(n) { return (Number(n) || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 }); }
+        function stkId(p) { return p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+        function stkTodayKey() { return packTodayKey(); }
+
+        // การเบิกอัตโนมัติจากใบเบิกวัสดุหีบห่อ (คำนวณสด)
+        function stkSlipMoves() {
+            const d = stkEnsure(); const out = [];
+            const byKey = new Map(); d.items.forEach(it => { if (it.slipKey) { if (!byKey.has(it.slipKey)) byKey.set(it.slipKey, []); byKey.get(it.slipKey).push(it); } });
+            if (!byKey.size) return out;
+            productionOrders.forEach(order => ((order.finishing || {}).packagingLog || []).forEach(slip => {
+                if (!slip) return;
+                byKey.forEach((items, key) => { const q = Number(slip[key]) || 0; if (q > 0) items.forEach(it => out.push({ id: `slip:${slip.id}:${it.id}`, itemId: it.id, date: slip.date || '', type: 'out', qty: q, ref: order.moSo, doc: slip.slipNo || '', party: slip.requester || '', note: slip.note || '', derived: true })); });
+            }));
+            return out;
+        }
+        function stkAllMoves() { return stkEnsure().moves.concat(stkSlipMoves()); }
+        function stkBalances() {
+            const m = new Map(); stkEnsure().items.forEach(it => m.set(it.id, { inQty: 0, outQty: 0, adjQty: 0, slipQty: 0, balance: 0 }));
+            stkAllMoves().forEach(mv => {
+                const b = m.get(mv.itemId); if (!b) return; const q = Number(mv.qty) || 0;
+                if (mv.type === 'in') b.inQty += q; else if (mv.type === 'out') { b.outQty += q; if (mv.derived) b.slipQty += q; } else b.adjQty += q;
+            });
+            m.forEach(b => { b.balance = Math.round((b.inQty + b.adjQty - b.outQty) * 1000) / 1000; });
+            return m;
+        }
+        function stkStatus(item, bal, b) {
+            // ยังไม่เคยมีความเคลื่อนไหวเลย (รายการใหม่/seed) → สีเทา ไม่ขึ้นแดงรบกวน
+            if (b && !b.inQty && !b.outQty && !b.adjQty && !(Number(item.minQty) > 0)) return { key: 'new', label: 'ยังไม่มียอด', cls: 'bg-slate-100 text-slate-500' };
+            if (bal <= 0) return { key: 'out', label: 'หมด', cls: 'bg-rose-100 text-rose-700' };
+            if (Number(item.minQty) > 0 && bal <= Number(item.minQty)) return { key: 'low', label: 'ใกล้หมด', cls: 'bg-amber-100 text-amber-800' };
+            return { key: 'ok', label: 'ปกติ', cls: 'bg-emerald-100 text-emerald-700' };
+        }
+        function stkUpdateBadge() {
+            const el = document.getElementById('boardTabCount-stock'); if (!el) return;
+            const bals = stkBalances(); let n = 0;
+            stkEnsure().items.forEach(it => { const s = stkStatus(it, bals.get(it.id).balance, bals.get(it.id)); if (s.key === 'low' || (s.key === 'out' && Number(it.minQty) > 0)) n++; });
+            el.textContent = String(n);
+            el.className = 'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ' + (n > 0 ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-600');
+        }
+
+        function stkSetSection(sec) {
+            stkUi.section = sec === 'product' ? 'product' : 'raw';
+            const on = 'px-3.5 py-2 text-xs font-semibold bg-teal-600 text-white', off = 'px-3.5 py-2 text-xs font-semibold bg-white text-slate-600 hover:bg-slate-50';
+            ['raw', 'product'].forEach(k => { const b = document.getElementById('stkSecBtn-' + k); if (b) b.className = stkUi.section === k ? on : off; });
+            const cf = document.getElementById('stkCatFilter'); if (cf) cf.value = '';
+            const hi = document.getElementById('stkHistItem'); if (hi) hi.value = '';
+            stkCloseForms(); stkRender();
+        }
+        function stkCloseForms() {
+            ['stkItemCard', 'stkMoveCard'].forEach(id => { const e = document.getElementById(id); if (e) e.classList.add('hidden'); });
+            stkUi.itemEditId = null; stkUi.moveItemId = null;
+        }
+        function stkItemsOfSection() { return stkEnsure().items.filter(i => i.section === stkUi.section); }
+
+        function stkRender() {
+            const root = document.getElementById('stockContainer'); if (!root) return;
+            const d = stkEnsure(), bals = stkBalances(), sec = stkUi.section;
+            const items = stkItemsOfSection();
+            // ตัวกรองหมวด + datalist
+            const cats = Array.from(new Set((sec === 'raw' ? STK_CATS_RAW : []).concat(items.map(i => i.category).filter(Boolean))));
+            const cf = document.getElementById('stkCatFilter');
+            if (cf) { const cur = cf.value; cf.innerHTML = '<option value="">ทุกหมวด</option>' + Array.from(new Set(items.map(i => i.category).filter(Boolean))).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join(''); cf.value = cats.includes(cur) || items.some(i => i.category === cur) ? cur : ''; }
+            const dl = document.getElementById('stkCatOptions'); if (dl) dl.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
+            const mo = document.getElementById('stkMoRefOptions'); if (mo) mo.innerHTML = productionOrders.map(o => `<option value="${escapeHtml(o.moSo)}">`).join('');
+            const cat = cf ? cf.value : '', q = ((document.getElementById('stkSearch') || {}).value || '').trim().toLowerCase();
+            let rows = items.filter(i => (!cat || i.category === cat) && (!q || [i.name, i.category, i.note].some(x => String(x || '').toLowerCase().includes(q))));
+            rows.sort((a, b) => String(a.category).localeCompare(String(b.category)) || String(a.name).localeCompare(String(b.name)));
+            // สรุป
+            let low = 0, empty = 0; items.forEach(i => { const s = stkStatus(i, bals.get(i.id).balance, bals.get(i.id)); if (s.key === 'low') low++; else if (s.key === 'out' && Number(i.minQty) > 0) empty++; });
+            const sm = document.getElementById('stkSummary');
+            if (sm) sm.innerHTML = `<span class="px-2 py-1 rounded-lg bg-slate-100 text-slate-600" data-stk-count>${items.length} รายการ</span>` + (low ? `<span class="px-2 py-1 rounded-lg bg-amber-100 text-amber-800 font-semibold" data-stk-low>ใกล้หมด ${low}</span>` : '') + (empty ? `<span class="px-2 py-1 rounded-lg bg-rose-100 text-rose-700 font-semibold" data-stk-empty>หมด ${empty}</span>` : '');
+            const tt = document.getElementById('stkTableTitle'); if (tt) tt.textContent = sec === 'raw' ? 'ยอดคงเหลือ — วัตถุดิบ' : 'ยอดคงเหลือ — สินค้า';
+            const tb = document.getElementById('stkTableBody');
+            if (tb) tb.innerHTML = rows.length ? rows.map(i => {
+                const b = bals.get(i.id), st = stkStatus(i, b.balance, b), eid = escapeHtml(i.id);
+                return `<tr class="hover:bg-slate-50/80" data-stk-row="${escapeHtml(i.name)}" data-status="${st.key}">
+                    <td class="px-2 py-1.5 text-slate-500">${escapeHtml(i.category || '-')}</td>
+                    <td class="px-2 py-1.5 font-semibold text-slate-800">${escapeHtml(i.name)}${i.slipKey ? ' <span class="text-[9px] font-normal text-indigo-600 bg-indigo-50 border border-indigo-100 rounded px-1" title="ตัดยอดอัตโนมัติจากใบเบิกวัสดุหีบห่อ">ผูกใบเบิก</span>' : ''}</td>
+                    <td class="px-2 py-1.5">${escapeHtml(i.unit || '')}</td>
+                    <td class="px-2 py-1.5 text-right">${stkFmt(b.inQty)}</td>
+                    <td class="px-2 py-1.5 text-right">${stkFmt(b.outQty)}${b.slipQty ? `<div class="text-[9px] text-indigo-500">(จากใบเบิก ${stkFmt(b.slipQty)})</div>` : ''}</td>
+                    <td class="px-2 py-1.5 text-right font-bold ${st.key === 'out' ? 'text-rose-600' : (st.key === 'low' ? 'text-amber-700' : (st.key === 'new' ? 'text-slate-400' : 'text-slate-900'))}" data-stk-balance>${stkFmt(b.balance)}</td>
+                    <td class="px-2 py-1.5 text-right text-slate-500">${Number(i.minQty) > 0 ? stkFmt(i.minQty) : '-'}</td>
+                    <td class="px-2 py-1.5 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.cls}">${st.label}</span></td>
+                    <td class="px-2 py-1.5 text-center whitespace-nowrap">
+                        <button type="button" onclick="stkOpenMove('${eid}','in')" class="text-emerald-700 hover:bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 text-[10px] font-semibold" title="รับเข้า">+ รับ</button>
+                        <button type="button" onclick="stkOpenMove('${eid}','out')" class="text-rose-700 hover:bg-rose-50 border border-rose-200 rounded px-1.5 py-0.5 text-[10px] font-semibold" title="เบิกออก">− เบิก</button>
+                        <button type="button" onclick="stkOpenMove('${eid}','adjust')" class="text-slate-600 hover:bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-[10px]" title="ปรับยอดตามนับจริง">ปรับ</button>
+                        <button type="button" onclick="stkShowHistory('${eid}')" class="text-slate-500 hover:text-indigo-600 px-1" title="ดูประวัติ"><i class="fa-solid fa-clock-rotate-left text-xs"></i></button>
+                        <button type="button" onclick="stkOpenItem('${eid}')" class="text-indigo-500 hover:text-indigo-700 px-1" title="แก้ไขรายการ"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
+                        <button type="button" onclick="stkDeleteItem('${eid}')" class="text-rose-400 hover:text-rose-600 px-1" title="ลบรายการ"><i class="fa-solid fa-trash text-xs"></i></button>
+                    </td></tr>`;
+            }).join('') : `<tr><td colspan="9" class="px-2 py-8 text-center text-slate-400">${items.length ? 'ไม่พบรายการที่ตรงกับตัวกรอง' : 'ยังไม่มีรายการ — กด "เพิ่มรายการ"'}</td></tr>`;
+            // ประวัติ
+            const hi = document.getElementById('stkHistItem');
+            if (hi) { const cur = hi.value; hi.innerHTML = '<option value="">ทุกรายการ</option>' + items.slice().sort((a, b) => String(a.name).localeCompare(String(b.name))).map(i => `<option value="${escapeHtml(i.id)}">${escapeHtml(i.name)}</option>`).join(''); hi.value = items.some(i => i.id === cur) ? cur : ''; }
+            const hm = ((document.getElementById('stkHistMonth') || {}).value || '');
+            const hItem = hi ? hi.value : '';
+            const byId = new Map(d.items.map(i => [i.id, i]));
+            let mv = stkAllMoves().filter(m => { const it = byId.get(m.itemId); return it && it.section === sec && (!hItem || m.itemId === hItem) && (!hm || String(m.date || '').startsWith(hm)); });
+            mv.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : String(b.id).localeCompare(String(a.id))));
+            const typeLbl = { in: ['รับเข้า', 'bg-emerald-100 text-emerald-700'], out: ['เบิกออก', 'bg-rose-100 text-rose-700'], adjust: ['ปรับยอด', 'bg-slate-100 text-slate-600'] };
+            const hb = document.getElementById('stkHistBody');
+            if (hb) hb.innerHTML = mv.length ? mv.map(m => { const it = byId.get(m.itemId), t = typeLbl[m.type] || typeLbl.adjust;
+                return `<tr data-stk-move="${escapeHtml(m.id)}"><td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(m.date || '-')}</td>
+                    <td class="px-2 py-1.5 font-semibold">${escapeHtml(it.name)}</td>
+                    <td class="px-2 py-1.5 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${t[1]}">${t[0]}</span></td>
+                    <td class="px-2 py-1.5 text-right font-semibold ${m.type === 'in' || (m.type === 'adjust' && m.qty > 0) ? 'text-emerald-700' : 'text-rose-600'}">${m.type === 'in' ? '+' : (m.type === 'out' ? '−' : (m.qty > 0 ? '+' : ''))}${stkFmt(m.type === 'adjust' ? m.qty : Math.abs(m.qty))} ${escapeHtml(it.unit || '')}</td>
+                    <td class="px-2 py-1.5">${escapeHtml(m.ref || '-')}${m.doc ? ` <span class="text-[10px] text-indigo-600">ใบเบิก ${escapeHtml(m.doc)}</span>` : ''}</td>
+                    <td class="px-2 py-1.5">${escapeHtml(m.party || '-')}</td><td class="px-2 py-1.5 text-[11px]">${escapeHtml(m.note || '')}</td>
+                    <td class="px-2 py-1.5 text-center">${m.derived ? '<span class="text-[10px] text-slate-300" title="รายการอัตโนมัติจากใบเบิก — แก้ที่ใบเบิก">อัตโนมัติ</span>' : `<button type="button" onclick="stkDeleteMove('${escapeHtml(m.id)}')" class="text-rose-400 hover:text-rose-600 px-1" title="ลบรายการ"><i class="fa-solid fa-trash text-xs"></i></button>`}</td></tr>`;
+            }).join('') : '<tr><td colspan="8" class="px-2 py-6 text-center text-slate-400">ไม่มีความเคลื่อนไหว</td></tr>';
+            stkUpdateBadge();
+        }
+        function stkShowHistory(itemId) { const hi = document.getElementById('stkHistItem'); if (hi) hi.value = itemId; const hm = document.getElementById('stkHistMonth'); if (hm) hm.value = ''; stkRender(); const h = document.getElementById('stkHistBody'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+
+        function stkOpenItem(itemId) {
+            stkCloseForms();
+            const d = stkEnsure(), it = itemId ? d.items.find(i => i.id === itemId) : null;
+            stkUi.itemEditId = it ? it.id : null;
+            const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = (v === undefined || v === null) ? '' : v; };
+            set('stkItemName', it ? it.name : ''); set('stkItemCat', it ? it.category : ''); set('stkItemUnit', it ? it.unit : (stkUi.section === 'product' ? 'ผืน' : ''));
+            set('stkItemMin', it && it.minQty ? it.minQty : ''); set('stkItemOpen', ''); set('stkItemNote', it ? it.note : '');
+            const sl = document.getElementById('stkItemSlip');
+            if (sl) { sl.innerHTML = '<option value="">— ไม่ผูก —</option>' + PACK_MATERIALS.map(m => `<option value="${m.key}">${escapeHtml(m.label + (m.size !== '-' ? ' ' + m.size : ''))}</option>`).join(''); sl.value = it ? (it.slipKey || '') : ''; }
+            const sw = document.getElementById('stkItemSlipWrap'); if (sw) sw.classList.toggle('hidden', stkUi.section !== 'raw');
+            const ow = document.getElementById('stkItemOpenWrap'); if (ow) ow.classList.toggle('hidden', !!it);
+            const t = document.getElementById('stkItemTitle'); if (t) t.textContent = it ? `แก้ไขรายการ — ${it.name}` : (stkUi.section === 'raw' ? 'เพิ่มรายการวัตถุดิบ' : 'เพิ่มรายการสินค้า');
+            const c = document.getElementById('stkItemCard'); if (c) { c.classList.remove('hidden'); c.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+        }
+        function stkSaveItem() {
+            const v = id => ((document.getElementById(id) || {}).value || '').trim();
+            const name = v('stkItemName'), unit = v('stkItemUnit');
+            if (!name) { showToast('กรุณากรอกชื่อรายการ', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            if (!unit) { showToast('กรุณาระบุหน่วย (เช่น กก., ม้วน)', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            const d = stkEnsure();
+            const data = { name, unit, category: v('stkItemCat') || (stkUi.section === 'raw' ? 'อื่นๆ' : 'สินค้า'), minQty: Math.max(0, Number(v('stkItemMin')) || 0), note: v('stkItemNote'), slipKey: stkUi.section === 'raw' ? v('stkItemSlip') : '' };
+            const dup = d.items.find(i => i.section === stkUi.section && i.id !== stkUi.itemEditId && i.name.trim().toLowerCase() === name.toLowerCase());
+            if (dup) { showToast(`มีรายการ "${name}" อยู่แล้ว`, 'fa-circle-exclamation', 'text-amber-400'); return; }
+            if (stkUi.itemEditId) { Object.assign(d.items.find(i => i.id === stkUi.itemEditId), data); }
+            else {
+                const it = Object.assign({ id: stkId('stk'), section: stkUi.section }, data); d.items.push(it);
+                const open = Number(v('stkItemOpen')) || 0;
+                if (open > 0) d.moves.push({ id: stkId('mv'), itemId: it.id, date: stkTodayKey(), type: 'in', qty: open, ref: '', party: '', note: 'ยอดยกมา' });
+            }
+            stkPersist(); stkCloseForms(); stkRender();
+            showToast(`บันทึกรายการ "${name}" แล้ว`, 'fa-floppy-disk', 'text-emerald-400');
+        }
+        function stkDeleteItem(itemId) {
+            const d = stkEnsure(), it = d.items.find(i => i.id === itemId); if (!it) return;
+            const n = d.moves.filter(m => m.itemId === itemId).length;
+            if (!window.confirm(`ลบรายการ "${it.name}" ${n ? `และประวัติรับ/เบิก ${n} รายการ ` : ''}ถาวรหรือไม่?`)) return;
+            d.items = d.items.filter(i => i.id !== itemId); d.moves = d.moves.filter(m => m.itemId !== itemId);
+            stkPersist(); stkCloseForms(); stkRender();
+            showToast('ลบรายการแล้ว', 'fa-circle-xmark', 'text-rose-400');
+        }
+
+        function stkOpenMove(itemId, type) {
+            stkCloseForms();
+            const it = stkEnsure().items.find(i => i.id === itemId); if (!it) return;
+            stkUi.moveItemId = itemId;
+            const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+            set('stkMoveType', type || 'in'); set('stkMoveDate', stkTodayKey()); set('stkMoveQty', ''); set('stkMoveRef', ''); set('stkMoveParty', ''); set('stkMoveNote', '');
+            const t = document.getElementById('stkMoveTitle'); if (t) t.textContent = `บันทึกรับ/เบิก — ${it.name} (${it.unit})`;
+            stkMoveHint();
+            const c = document.getElementById('stkMoveCard'); if (c) { c.classList.remove('hidden'); c.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+            const q = document.getElementById('stkMoveQty'); if (q) q.focus();
+        }
+        function stkMoveHint() {
+            const it = stkEnsure().items.find(i => i.id === stkUi.moveItemId); if (!it) return;
+            const bal = stkBalances().get(it.id).balance, type = (document.getElementById('stkMoveType') || {}).value || 'in';
+            const qty = Number((document.getElementById('stkMoveQty') || {}).value);
+            const hasQ = isFinite(qty) && (document.getElementById('stkMoveQty') || {}).value !== '';
+            const after = type === 'in' ? bal + (hasQ ? qty : 0) : (type === 'out' ? bal - (hasQ ? qty : 0) : (hasQ ? qty : bal));
+            const h = document.getElementById('stkMoveHint'); if (h) h.innerHTML = `คงเหลือปัจจุบัน <b>${stkFmt(bal)}</b> ${escapeHtml(it.unit)}${hasQ ? ` → หลังบันทึก <b class="${after < 0 ? 'text-rose-600' : 'text-teal-700'}" data-stk-after>${stkFmt(after)}</b>` : ''}`;
+            const ql = document.getElementById('stkMoveQtyLabel'); if (ql) ql.textContent = type === 'adjust' ? 'ยอดที่นับได้จริง' : 'จำนวน';
+            const pl = document.getElementById('stkMovePartyLabel'); if (pl) pl.textContent = type === 'in' ? 'ผู้ขาย/ผู้ส่ง' : (type === 'out' ? 'ผู้เบิก/ผู้รับ' : 'ผู้นับ');
+        }
+        function stkSaveMove() {
+            const d = stkEnsure(), it = d.items.find(i => i.id === stkUi.moveItemId); if (!it) return;
+            const v = id => ((document.getElementById(id) || {}).value || '').trim();
+            const type = v('stkMoveType'), date = v('stkMoveDate'), raw = v('stkMoveQty'), qty = Number(raw);
+            if (!date) { showToast('กรุณาระบุวันที่', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            if (raw === '' || !isFinite(qty) || qty < 0 || (type !== 'adjust' && qty <= 0)) { showToast('กรุณากรอกจำนวนให้ถูกต้อง', 'fa-circle-exclamation', 'text-amber-400'); return; }
+            const bal = stkBalances().get(it.id).balance;
+            if (type === 'out' && qty > bal && !window.confirm(`เบิก ${stkFmt(qty)} ${it.unit} เกินยอดคงเหลือ (${stkFmt(bal)}) — บันทึกต่อหรือไม่?`)) return;
+            const mv = { id: stkId('mv'), itemId: it.id, date, type, qty: type === 'adjust' ? Math.round((qty - bal) * 1000) / 1000 : qty, ref: v('stkMoveRef'), party: v('stkMoveParty'), note: v('stkMoveNote') };
+            if (type === 'adjust') { if (mv.qty === 0) { showToast('ยอดนับจริงเท่ากับยอดในระบบ ไม่ต้องปรับ', 'fa-circle-info', 'text-amber-400'); return; } mv.note = (mv.note ? mv.note + ' · ' : '') + `นับจริง ${stkFmt(qty)}`; }
+            d.moves.push(mv);
+            stkPersist(); stkCloseForms(); stkRender();
+            showToast(`บันทึก${type === 'in' ? 'รับเข้า' : (type === 'out' ? 'เบิกออก' : 'ปรับยอด')} "${it.name}" แล้ว`, 'fa-floppy-disk', 'text-emerald-400');
+        }
+        function stkDeleteMove(moveId) {
+            const d = stkEnsure(), m = d.moves.find(x => x.id === moveId); if (!m) return;
+            if (!window.confirm('ลบรายการรับ/เบิกนี้ถาวรหรือไม่?')) return;
+            d.moves = d.moves.filter(x => x.id !== moveId); stkPersist(); stkRender();
+            showToast('ลบรายการแล้ว', 'fa-circle-xmark', 'text-rose-400');
+        }
+
+        function stkExport() {
+            const d = stkEnsure(), bals = stkBalances(), secLbl = { raw: 'วัตถุดิบ', product: 'สินค้า' }, byId = new Map(d.items.map(i => [i.id, i]));
+            const a1 = [['ส่วน', 'หมวด', 'รายการ', 'หน่วย', 'รับเข้ารวม', 'เบิกออกรวม', 'ปรับยอดรวม', 'คงเหลือ', 'จุดสั่งซื้อขั้นต่ำ', 'สถานะ']];
+            d.items.slice().sort((a, b) => a.section.localeCompare(b.section) || String(a.category).localeCompare(String(b.category)) || String(a.name).localeCompare(String(b.name))).forEach(i => { const b = bals.get(i.id); a1.push([secLbl[i.section], i.category, i.name, i.unit, b.inQty, b.outQty, b.adjQty, b.balance, i.minQty || '', stkStatus(i, b.balance, b).label]); });
+            const a2 = [['วันที่', 'ส่วน', 'หมวด', 'รายการ', 'ประเภท', 'จำนวน', 'หน่วย', 'อ้างอิง M/O, S/O', 'เลขที่ใบเบิก', 'ผู้เกี่ยวข้อง', 'หมายเหตุ']];
+            stkAllMoves().sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(m => { const i = byId.get(m.itemId); if (i) a2.push([m.date, secLbl[i.section], i.category, i.name, { in: 'รับเข้า', out: 'เบิกออก', adjust: 'ปรับยอด' }[m.type], m.qty, i.unit, m.ref || '', m.doc || '', m.party || '', m.note || '']); });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a1), 'ยอดคงเหลือ');
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a2), 'ความเคลื่อนไหว');
+            XLSX.writeFile(wb, 'Stock สินค้าและวัตถุดิบ.xlsx');
+        }
+        function stkBackup() {
+            const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data: stkEnsure() }, null, 1)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `stock-backup-${stkTodayKey()}.json`; document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+            showToast('ดาวน์โหลดไฟล์สำรอง Stock แล้ว', 'fa-floppy-disk', 'text-emerald-400');
+        }
+        function stkRestoreData(obj) {
+            const d = obj && obj.data ? obj.data : obj;
+            if (!d || !Array.isArray(d.items) || !Array.isArray(d.moves)) return false;
+            stockData = { items: d.items.filter(i => i && i.id && i.name), moves: d.moves.filter(m => m && m.id && m.itemId) };
+            stkPersist(); stkCloseForms(); stkRender(); return true;
+        }
+        function stkRestore(input) {
+            const f = input.files && input.files[0]; input.value = ''; if (!f) return;
+            const r = new FileReader();
+            r.onload = () => {
+                let obj; try { obj = JSON.parse(r.result); } catch (e) { showToast('ไฟล์ไม่ใช่ไฟล์สำรอง Stock', 'fa-triangle-exclamation', 'text-rose-400'); return; }
+                const d = obj && obj.data ? obj.data : obj;
+                if (!d || !Array.isArray(d.items) || !Array.isArray(d.moves)) { showToast('ไฟล์ไม่ใช่ไฟล์สำรอง Stock', 'fa-triangle-exclamation', 'text-rose-400'); return; }
+                if (!window.confirm(`กู้คืนข้อมูล Stock จากไฟล์ (${d.items.length} รายการ, ${d.moves.length} ความเคลื่อนไหว) — แทนที่ข้อมูลปัจจุบันทั้งหมด?`)) return;
+                if (stkRestoreData(obj)) showToast('กู้คืนข้อมูล Stock แล้ว', 'fa-rotate-left', 'text-emerald-400');
+            };
+            r.readAsText(f);
         }
 
         // ---- การเบิกใช้กาว (glue usage) -----------------------------------------------------------------
