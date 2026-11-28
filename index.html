@@ -751,7 +751,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h3 class="font-bold text-sm text-fuchsia-900"><i class="fa-solid fa-wand-magic-sparkles mr-2 text-fuchsia-600"></i>แผน AI วางแผนให้ทั้งหมด — เทียบกับแผนปัจจุบัน</h3>
-                            <p class="text-[11px] text-slate-500 mt-0.5 max-w-3xl">จำลองให้ M/O, S/O ที่ยังไม่ส่งมอบทุกใบ: ใช้จำนวนวันที่ AI คำนวณจากกำลังผลิต ("ตั้งค่าเวลาผลิต") แล้วจัดคิวข้ามแผนกด้วยตัวจัดคิวเดียวกับระบบ (ดีไซน์ → ย้อม → ทอ → ตกแต่ง, ใครกำหนดส่งก่อนได้คิวก่อน) แล้วเทียบวันเสร็จกับแผนปัจจุบันและกำหนดส่งลูกค้า — <b>เป็นการจำลองเท่านั้น ไม่เปลี่ยนข้อมูลจริง</b></p>
+                            <p class="text-[11px] text-slate-500 mt-0.5 max-w-3xl">จำลองเฉพาะ M/O, S/O <b>ที่กำลังผลิตอยู่จริงตอนนี้</b> (อยู่แผนกย้อม/ทอ/ตกแต่ง) — วางแผนใหม่จาก<b>วันนี้</b>เป็นต้นไป: แผนกที่ผ่านไปแล้วไม่นับ, แผนกที่กำลังทำอยู่นับเฉพาะวันที่เหลือ (หักความคืบหน้า), แผนกถัดไปนับเต็ม ใช้จำนวนวันที่ AI คำนวณจากกำลังผลิต ("ตั้งค่าเวลาผลิต") และจัดคิวด้วยตัวจัดคิวเดียวกับระบบ (กำหนดส่งก่อนได้คิวก่อน) แล้วเทียบวันเสร็จกับแผนปัจจุบันและกำหนดส่งลูกค้า — <b>เป็นการจำลองเท่านั้น ไม่เปลี่ยนข้อมูลจริง</b></p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <input type="text" id="aiPlanSearch" oninput="renderAiPlanCompare()" placeholder="ค้นหา M/O, S/O, ลูกค้า..." class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs w-48">
@@ -765,7 +765,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                                 <option value="aiMissing">AI คำนวณไม่ครบ</option>
                             </select>
                             <button type="button" onclick="exportAiPlanCompare()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"><i class="fa-solid fa-file-excel mr-1"></i>ส่งออก Excel</button>
-                            <button type="button" onclick="aiPlanApplyAll()" title="เขียนจำนวนวันตามแผน AI ลงทุก M/O, S/O จริง" class="px-3 py-1.5 rounded-lg text-xs font-semibold border border-fuchsia-500 text-fuchsia-700 bg-white hover:bg-fuchsia-50"><i class="fa-solid fa-check-double mr-1"></i>ใช้แผน AI ทั้งหมดจริง…</button>
                         </div>
                     </div>
                     <div id="aiPlanWarn" class="hidden text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2"></div>
@@ -4594,7 +4593,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-155';
+        const APP_BUILD = 'QCDashboard-156';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -14410,14 +14409,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         // =========================================================================================
         // 2026-11-28: แท็บ "แผน AI (เปรียบเทียบ)" ในภาพรวมการผลิต — "ใช้ระบบ AI เป็นคนวางแผนให้ทั้งหมด เพื่อเปรียบเทียบ"
-        // จำลอง (ไม่เขียนข้อมูล) ว่าถ้าใช้จำนวนวันที่ AI คำนวณ (computeProductionSuggestions) กับทุก M/O, S/O ที่ยังไม่ส่งมอบ
-        // แล้วจัดคิวข้ามแผนกด้วยตัวจัดคิวเดียวกับ recomputeAllSchedules() (scheduleStageEDD + getStageConcurrency)
-        // แต่ละใบจะเสร็จวันไหน เทียบกับ "แผนปัจจุบัน" (order.planDates) และกำหนดส่งลูกค้า (order.dueDate)
+        // 2026-11-28 (แก้): "วางแผน AI ให้ใช้แต่ M/O, S/O ปัจจุบัน" → นับเฉพาะใบที่กำลังผลิตอยู่จริงตอนนี้ (อยู่แผนกย้อม/ทอ/ตกแต่ง,
+        // ยังไม่รอส่ง/ส่งแล้ว) วางแผนใหม่ "จากวันนี้เป็นต้นไป": แผนกที่ผ่านไปแล้วไม่นับ, แผนกที่กำลังทำอยู่นับเฉพาะวันที่เหลือ
+        // (หักความคืบหน้า), แผนกถัดไปนับเต็ม; ใบเก่าที่ยังอยู่แผนกวางแผน/ออกแบบไม่นำมาจัดคิว
+        // จำลอง (ไม่เขียนข้อมูล) ด้วยจำนวนวันที่ AI คำนวณ (computeProductionSuggestions) + ตัวจัดคิวเดียวกับระบบ
+        // (scheduleStageEDD + getStageConcurrency) แล้วเทียบวันเสร็จกับ "แผนปัจจุบัน" (order.planDates) และกำหนดส่งลูกค้า
         // แผนกที่ AI คำนวณไม่ได้ (ยังไม่ตั้งค่ากำลังผลิต/ไม่มีข้อมูล) ใช้จำนวนวันเดิมของ M/O นั้นแทน และทำเครื่องหมายไว้
         // =========================================================================================
         let overviewTab = 'main';
-        const AI_PLAN_STAGES = ['design', 'dyeing', 'weaving', 'finishing'];
-        const AI_PLAN_STAGE_LABEL = { design: 'ดีไซน์', dyeing: 'ย้อม', weaving: 'ทอ', finishing: 'ตกแต่ง' };
+        const AI_PLAN_STAGES = ['dyeing', 'weaving', 'finishing'];
+        const AI_PLAN_STAGE_LABEL = { dyeing: 'ย้อม', weaving: 'ทอ', finishing: 'ตกแต่ง' };
+        function aiPlanToday() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
         function overviewSetTab(tab) {
             overviewTab = tab === 'ai' ? 'ai' : 'main';
             const root = document.getElementById('overviewViewContainer'); if (!root) return;
@@ -14429,24 +14431,37 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (b2) b2.className = overviewTab === 'ai' ? on.replace('bg-indigo-600', 'bg-fuchsia-600') : off;
             if (overviewTab === 'ai') renderAiPlanCompare();
         }
+        // ใบที่กำลังผลิตอยู่จริง = อยู่แผนกย้อม/ทอ/ตกแต่ง (ยังไม่รอส่ง/ส่งแล้ว)
+        function aiPlanInScope(order) { return !order.shipped && !order.readyToShip && AI_PLAN_STAGES.includes(getEffectiveStage(order)); }
+        // สัดส่วนงานที่เหลือของแผนกที่กำลังทำอยู่ (0..1) — ทอ: ตร.ม.ที่ทอแล้ว, ตกแต่ง: ตร.ม.ที่แต่งแล้ว, อื่น ๆ: % ความคืบหน้า
+        function aiPlanRemainFrac(order, stage) {
+            const total = Number(order.totalSqm) || 0;
+            let done = null;
+            if (stage === 'weaving' && total > 0 && order.weaving && order.weaving.mode !== 'external') done = Math.min(total, Number(order.weaving.sqmWoven) || 0) / total;
+            else if (stage === 'finishing' && total > 0 && order.finishing && Array.isArray(order.finishing.efficiencyLog) && order.finishing.efficiencyLog.length) done = Math.min(total, order.finishing.efficiencyLog.reduce((t, l) => t + (Number(l.areaSqm) || 0), 0)) / total;
+            else done = Math.max(0, Math.min(100, Number((order[stage] || {}).percent) || 0)) / 100;
+            return Math.max(0, Math.min(1, 1 - done));
+        }
+        // จัดคิวใหม่จากวันนี้: daysOf(order, idx, stage) = จำนวนวันเต็มของแผนกนั้น; ตัดแผนกที่ผ่านไปแล้ว + หักความคืบหน้าของแผนกปัจจุบัน
         function aiPlanRunSchedule(daysOf) {
+            const today = parseDateOnly(aiPlanToday());
             const active = [];
-            productionOrders.forEach((order, idx) => {
-                if (order.shipped) return;
-                const a = normalizeDateString(order.openDate) || normalizeDateString(order.createdAt);
-                const anchor = a ? parseDateOnly(a) : null; if (!anchor) return;
-                active.push({ order, idx, anchor });
-            });
+            productionOrders.forEach((order, idx) => { if (aiPlanInScope(order)) active.push({ order, idx, cur: AI_PLAN_STAGES.indexOf(getEffectiveStage(order)) }); });
             const cursor = {}, due = {}, out = new Map();
-            active.forEach(a => { cursor[a.idx] = a.anchor; const d = normalizeDateString(a.order.dueDate); due[a.idx] = d ? parseDateOnly(d) : null; out.set(a.idx, {}); });
-            AI_PLAN_STAGES.forEach(stage => {
+            active.forEach(a => { cursor[a.idx] = today; const d = normalizeDateString(a.order.dueDate); due[a.idx] = d ? parseDateOnly(d) : null; out.set(a.idx, {}); });
+            AI_PLAN_STAGES.forEach((stage, si) => {
                 const items = [];
-                active.forEach(a => { const days = Number(daysOf(a.order, a.idx, stage)) || 0; if (days <= 0) return; items.push({ id: a.idx, earliestStart: cursor[a.idx], duration: days, dueDate: due[a.idx] }); });
+                active.forEach(a => {
+                    if (si < a.cur) return; // แผนกที่ผ่านไปแล้ว
+                    let days = Number(daysOf(a.order, a.idx, stage)) || 0; if (days <= 0) return;
+                    if (si === a.cur) { const frac = aiPlanRemainFrac(a.order, stage); days = frac <= 0 ? 0 : Math.max(1, Math.ceil(days * frac - 1e-9)); if (days <= 0) return; }
+                    items.push({ id: a.idx, earliestStart: cursor[a.idx], duration: days, dueDate: due[a.idx] });
+                });
                 scheduleStageEDD(items, getStageConcurrency(stage)).forEach((res, idx) => { cursor[idx] = res.finish; out.get(idx)[stage] = formatDateKeyUTC(res.finish); });
             });
             return out;
         }
-        function aiPlanLastDate(pd) { pd = pd || {}; return pd.finishing || pd.weaving || pd.dyeing || pd.design || ''; }
+        function aiPlanLastDate(pd) { pd = pd || {}; return pd.finishing || pd.weaving || pd.dyeing || ''; }
         function aiPlanDayDiff(a, b) { const da = parseDateOnly(a), db = parseDateOnly(b); return (da && db) ? Math.round((da.getTime() - db.getTime()) / 86400000) : null; }
         function aiPlanBuildRows() {
             const cache = new Map(), fallback = new Map();
@@ -14464,16 +14479,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const sim = aiPlanRunSchedule(aiDaysOf);
             const rows = [];
             productionOrders.forEach((order, idx) => {
-                if (!sim.has(idx) || getEffectiveStage(order) === 'ready_to_ship') return;
+                if (!sim.has(idx)) return;
+                const cs = AI_PLAN_STAGES.indexOf(getEffectiveStage(order));
                 const sch = sim.get(idx), curFinish = aiPlanLastDate(order.planDates), aiFinish = aiPlanLastDate(sch);
                 const due = normalizeDateString(order.dueDate) || '';
-                const dur = {}; AI_PLAN_STAGES.forEach(st => { dur[st] = { cur: Number((order.planDurations || {})[st]) || 0, ai: Number(aiDaysOf(order, idx, st)) || 0, fb: !!(fallback.get(idx) && fallback.get(idx).has(st)) }; });
+                const dur = {};
+                AI_PLAN_STAGES.forEach((st, si) => {
+                    const full = Number(aiDaysOf(order, idx, st)) || 0, frac = si === cs ? aiPlanRemainFrac(order, st) : 1;
+                    dur[st] = { cur: Number((order.planDurations || {})[st]) || 0, ai: si < cs ? 0 : (si === cs ? (frac <= 0 || full <= 0 ? 0 : Math.max(1, Math.ceil(full * frac - 1e-9))) : full), skip: si < cs, now: si === cs, fb: !!(fallback.get(idx) && fallback.get(idx).has(st)) };
+                });
                 const curLate = (curFinish && due) ? aiPlanDayDiff(curFinish, due) : null, aiLate = (aiFinish && due) ? aiPlanDayDiff(aiFinish, due) : null;
                 const shift = (curFinish && aiFinish) ? aiPlanDayDiff(aiFinish, curFinish) : null;
-                const fbList = AI_PLAN_STAGES.filter(st => dur[st].fb);
+                const fbList = AI_PLAN_STAGES.filter((st, si) => dur[st].fb && si >= cs);
                 const stt = v => v === null ? 'nodue' : (v > 0 ? 'late' : 'ontime');
                 rows.push({ order, orderIndex: idx, moSo: order.moSo, customer: order.customerName || '', sqm: Number(order.totalSqm) || 0, due, dur, curFinish, aiFinish, shift, curLate, aiLate,
-                    curStatus: stt(curLate), aiStatus: stt(aiLate), fb: fbList, missing: fbList.length > 0 });
+                    curStatus: stt(curLate), aiStatus: stt(aiLate), fb: fbList, missing: fbList.length > 0, stageLabel: AI_PLAN_STAGE_LABEL[getEffectiveStage(order)] || '' });
             });
             rows.sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || a.orderIndex - b.orderIndex);
             return rows;
@@ -14494,15 +14514,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
         function aiPlanFmtDate(v) { const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : '-'; }
         const AI_PLAN_COLUMNS = [
-            { key: 'moSo', label: 'M/O, S/O' }, { key: 'customer', label: 'ลูกค้า' }, { key: 'sqm', label: 'ตร.ม.' }, { key: 'due', label: 'กำหนดส่ง' },
-            { key: 'dDesignCur', label: 'ดีไซน์ ปัจจุบัน (วัน)' }, { key: 'dDesignAi', label: 'ดีไซน์ AI (วัน)' }, { key: 'dDyeCur', label: 'ย้อม ปัจจุบัน (วัน)' }, { key: 'dDyeAi', label: 'ย้อม AI (วัน)' },
-            { key: 'dWeaveCur', label: 'ทอ ปัจจุบัน (วัน)' }, { key: 'dWeaveAi', label: 'ทอ AI (วัน)' }, { key: 'dFinCur', label: 'ตกแต่ง ปัจจุบัน (วัน)' }, { key: 'dFinAi', label: 'ตกแต่ง AI (วัน)' },
-            { key: 'curFinish', label: 'เสร็จตามแผนปัจจุบัน' }, { key: 'aiFinish', label: 'เสร็จตามแผน AI' }, { key: 'shift', label: 'AI ต่างจากปัจจุบัน (วัน, + = ช้ากว่า)' },
+            { key: 'moSo', label: 'M/O, S/O' }, { key: 'customer', label: 'ลูกค้า' }, { key: 'stageLabel', label: 'อยู่แผนก' }, { key: 'sqm', label: 'ตร.ม.' }, { key: 'due', label: 'กำหนดส่ง' },
+            { key: 'dDyeCur', label: 'ย้อม ปัจจุบัน (วัน)' }, { key: 'dDyeAi', label: 'ย้อม AI ที่เหลือ (วัน)' },
+            { key: 'dWeaveCur', label: 'ทอ ปัจจุบัน (วัน)' }, { key: 'dWeaveAi', label: 'ทอ AI ที่เหลือ (วัน)' }, { key: 'dFinCur', label: 'ตกแต่ง ปัจจุบัน (วัน)' }, { key: 'dFinAi', label: 'ตกแต่ง AI ที่เหลือ (วัน)' },
+            { key: 'curFinish', label: 'เสร็จตามแผนปัจจุบัน' }, { key: 'aiFinish', label: 'เสร็จตามแผน AI (วางใหม่จากวันนี้)' }, { key: 'shift', label: 'AI ต่างจากปัจจุบัน (วัน, + = ช้ากว่า)' },
             { key: 'curStatusLabel', label: 'แผนปัจจุบัน vs กำหนดส่ง' }, { key: 'aiStatusLabel', label: 'แผน AI vs กำหนดส่ง' }, { key: 'note', label: 'หมายเหตุ' }
         ];
         function aiPlanStatusLabel(status, late) { return status === 'nodue' ? 'ไม่มีกำหนดส่ง' : (status === 'late' ? `เกิน ${late} วัน` : `ทัน (เหลือ ${Math.abs(late)} วัน)`); }
         function aiPlanFlatRows(rows) {
-            return rows.map(r => ({ moSo: r.moSo, customer: r.customer, sqm: r.sqm, due: r.due, dDesignCur: r.dur.design.cur, dDesignAi: r.dur.design.ai, dDyeCur: r.dur.dyeing.cur, dDyeAi: r.dur.dyeing.ai,
+            return rows.map(r => ({ moSo: r.moSo, customer: r.customer, stageLabel: r.stageLabel, sqm: r.sqm, due: r.due, dDyeCur: r.dur.dyeing.cur, dDyeAi: r.dur.dyeing.ai,
                 dWeaveCur: r.dur.weaving.cur, dWeaveAi: r.dur.weaving.ai, dFinCur: r.dur.finishing.cur, dFinAi: r.dur.finishing.ai, curFinish: r.curFinish, aiFinish: r.aiFinish, shift: r.shift === null ? '' : r.shift,
                 curStatusLabel: aiPlanStatusLabel(r.curStatus, r.curLate), aiStatusLabel: aiPlanStatusLabel(r.aiStatus, r.aiLate), note: r.fb.length ? 'ใช้ค่าเดิม (AI คำนวณไม่ได้): ' + r.fb.map(s => AI_PLAN_STAGE_LABEL[s]).join(', ') : '' }));
         }
@@ -14518,7 +14538,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const chip = (label, val, sub, cls) => `<div class="px-3 py-2 rounded-xl border ${cls || 'border-slate-200 bg-slate-50'}"><p class="text-[10px] text-slate-500">${label}</p><p class="text-base font-bold text-slate-800">${val}</p>${sub ? `<p class="text-[10px] text-slate-500">${sub}</p>` : ''}</div>`;
             const sm = document.getElementById('aiPlanSummary');
             if (sm) sm.innerHTML = [
-                chip('M/O, S/O ที่เทียบ', all, 'ยังไม่ส่งมอบ/ยังไม่รอส่ง'),
+                chip('M/O, S/O ที่กำลังผลิต', all, 'อยู่แผนกย้อม/ทอ/ตกแต่ง'),
                 chip('ทันกำหนด — แผนปัจจุบัน', `${cnt(rows, r => r.curStatus === 'ontime')}`, `จาก ${withDue.length} ใบที่มีกำหนดส่ง`, 'border-sky-200 bg-sky-50'),
                 chip('ทันกำหนด — แผน AI', `${cnt(rows, r => r.aiStatus === 'ontime')}`, `จาก ${withDue.length} ใบที่มีกำหนดส่ง`, 'border-fuchsia-200 bg-fuchsia-50'),
                 chip('เกินกำหนด — แผนปัจจุบัน', curLate.length, curLate.length ? `เฉลี่ย ${avg(curLate, r => r.curLate).toFixed(1)} วัน` : '-', 'border-rose-200 bg-rose-50'),
@@ -14533,18 +14553,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 const noCap = !(s.tufting && Number(s.tufting.loomCount) > 0) || !(s.finishing && Number(s.finishing.staffCount) > 0);
                 const allMissing = all > 0 && cnt(rows, r => r.missing) === all;
                 warn.classList.toggle('hidden', !(noCap || allMissing));
-                warn.textContent = allMissing ? 'AI ยังคำนวณให้ทุกใบไม่ได้ — กรุณาตั้งค่ากำลังผลิตทุกแผนก ("ตั้งค่าเวลาผลิต") และกรอกพื้นที่/แผนสั่งย้อมของ M/O ก่อน ตอนนี้แผน AI = แผนปัจจุบัน' : 'ยังตั้งค่าจำนวนจอทอ/พนักงานบางแผนกไม่ครบ — ผลจำลองอาจไม่ตรงกับความจริง ("ตั้งค่าเวลาผลิต")';
+                warn.textContent = allMissing ? 'AI ยังคำนวณให้ทุกใบไม่ได้ — กรุณาตั้งค่ากำลังผลิตทุกแผนก ("ตั้งค่าเวลาผลิต") และกรอกพื้นที่/แผนสั่งย้อมของ M/O ก่อน ตอนนี้แผน AI ใช้จำนวนวันเดิม' : 'ยังตั้งค่าจำนวนจอทอ/พนักงานบางแผนกไม่ครบ — ผลจำลองอาจไม่ตรงกับความจริง ("ตั้งค่าเวลาผลิต")';
             }
-            const durCell = (d) => { if (!d.cur && !d.ai) return '<span class="text-slate-300">-</span>'; const cls = d.ai < d.cur ? 'text-emerald-700 font-semibold' : (d.ai > d.cur ? 'text-rose-600 font-semibold' : 'text-slate-600'); return `<span class="text-slate-500">${d.cur || '-'}</span> → <span class="${cls}" ${d.fb ? 'title="AI คำนวณไม่ได้ — ใช้ค่าเดิม"' : ''}>${d.ai || '-'}${d.fb ? '*' : ''}</span>`; };
+            const durCell = (d) => { if (d.skip) return '<span class="text-slate-300" title="ผ่านแผนกนี้แล้ว">เสร็จแล้ว</span>'; if (!d.cur && !d.ai) return '<span class="text-slate-300">-</span>'; const cls = d.ai < d.cur ? 'text-emerald-700 font-semibold' : (d.ai > d.cur ? 'text-rose-600 font-semibold' : 'text-slate-600'); return `<span class="text-slate-500">${d.cur || '-'}</span> → <span class="${cls}" ${d.fb ? 'title="AI คำนวณไม่ได้ — ใช้ค่าเดิม"' : (d.now ? 'title="วันที่เหลือของแผนกที่กำลังทำอยู่ (หักความคืบหน้าแล้ว)"' : '')}>${d.ai || '-'}${d.fb ? '*' : ''}</span>`; };
             const stCell = (status, late) => status === 'nodue' ? '<span class="text-slate-400">-</span>' : (status === 'late' ? `<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-semibold whitespace-nowrap">เกิน ${late} วัน</span>` : `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold whitespace-nowrap">ทัน (เหลือ ${Math.abs(late)} วัน)</span>`);
             const rowHtml = r => `<tr data-aiplan-row="${e(r.moSo)}" class="hover:bg-slate-50/70">
-                <td class="px-2 py-2 font-semibold whitespace-nowrap ${moSoTextColorClass(r.order)}">${e(r.moSo)}</td><td class="px-2 py-2">${e(r.customer || '-')}</td><td class="px-2 py-2 text-right">${r.sqm ? r.sqm.toLocaleString('th-TH', { maximumFractionDigits: 2 }) : '-'}</td><td class="px-2 py-2 whitespace-nowrap">${aiPlanFmtDate(r.due)}</td>
+                <td class="px-2 py-2 font-semibold whitespace-nowrap ${moSoTextColorClass(r.order)}">${e(r.moSo)}</td><td class="px-2 py-2">${e(r.customer || '-')}</td><td class="px-2 py-2 whitespace-nowrap">${e(r.stageLabel)}</td><td class="px-2 py-2 text-right">${r.sqm ? r.sqm.toLocaleString('th-TH', { maximumFractionDigits: 2 }) : '-'}</td><td class="px-2 py-2 whitespace-nowrap">${aiPlanFmtDate(r.due)}</td>
                 ${AI_PLAN_STAGES.map(s2 => `<td class="px-2 py-2 text-center whitespace-nowrap">${durCell(r.dur[s2])}</td>`).join('')}
                 <td class="px-2 py-2 whitespace-nowrap">${aiPlanFmtDate(r.curFinish)}</td><td class="px-2 py-2 whitespace-nowrap font-semibold text-fuchsia-800">${aiPlanFmtDate(r.aiFinish)}</td>
                 <td class="px-2 py-2 text-center whitespace-nowrap ${r.shift === null ? 'text-slate-300' : (r.shift < 0 ? 'text-emerald-700 font-semibold' : (r.shift > 0 ? 'text-rose-600 font-semibold' : 'text-slate-500'))}">${r.shift === null ? '-' : (r.shift > 0 ? '+' : '') + r.shift}</td>
                 <td class="px-2 py-2">${stCell(r.curStatus, r.curLate)}</td><td class="px-2 py-2">${stCell(r.aiStatus, r.aiLate)}</td></tr>`;
-            const thead = ['M/O, S/O', 'ลูกค้า', 'ตร.ม.', 'กำหนดส่ง'].map(l => `<th class="px-2 py-2 text-left">${l}</th>`).join('')
-                + AI_PLAN_STAGES.map(s2 => `<th class="px-2 py-2 text-center whitespace-nowrap">${AI_PLAN_STAGE_LABEL[s2]}<br><span class="normal-case font-normal">ปัจจุบัน → AI (วัน)</span></th>`).join('')
+            const thead = ['M/O, S/O', 'ลูกค้า', 'อยู่แผนก', 'ตร.ม.', 'กำหนดส่ง'].map(l => `<th class="px-2 py-2 text-left">${l}</th>`).join('')
+                + AI_PLAN_STAGES.map(s2 => `<th class="px-2 py-2 text-center whitespace-nowrap">${AI_PLAN_STAGE_LABEL[s2]}<br><span class="normal-case font-normal">ปัจจุบัน → AI ที่เหลือ (วัน)</span></th>`).join('')
                 + ['เสร็จตามแผนปัจจุบัน', 'เสร็จตามแผน AI'].map(l => `<th class="px-2 py-2 text-left">${l}</th>`).join('')
                 + '<th class="px-2 py-2 text-center">AI ต่าง (วัน)</th><th class="px-2 py-2 text-left">แผนปัจจุบัน vs กำหนดส่ง</th><th class="px-2 py-2 text-left">แผน AI vs กำหนดส่ง</th>';
             const isSo = r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO';
@@ -14555,11 +14575,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const rows = aiPlanFilteredRows();
             if (!rows.length) { showToast('ไม่มีรายการให้ส่งออก', 'fa-circle-info', 'text-amber-400'); return; }
             exportFlatRowsToExcel('แผน AI เทียบแผนปัจจุบัน.xlsx', 'แผน AI', AI_PLAN_COLUMNS, aiPlanFlatRows(rows));
-        }
-        function aiPlanApplyAll() {
-            if (!confirm('ใช้แผน AI กับทุก M/O, S/O จริง?\n\nระบบจะเขียนจำนวนวันที่ AI คำนวณลงใบงานทุกใบ (แทนจำนวนวันเดิม) และจัดคิววันที่ใหม่ — แก้กลับเป็นกำหนดเองรายใบได้ภายหลัง')) return;
-            applyAiPlanToAllOrders();
-            renderAiPlanCompare();
         }
 
         function renderProductionOverview() {
