@@ -45,7 +45,7 @@
         .app-navigation-tabs button:hover { background: #e8f0f7; }
         #tabOverviewBtn.bg-white, #tabBoardBtn.bg-white,
         #tabRecordsBtn.bg-white, #tabShippingBtn.bg-white, #tabShippedBtn.bg-white,
-        #tabIssuesBtn.bg-white, #tabAnalyticsBtn.bg-white, #tabCentralBtn.bg-white {
+        #tabIssuesBtn.bg-white, #tabAnalyticsBtn.bg-white {
             background: var(--brand-800) !important; color: #fff !important; box-shadow: none !important;
         }
         #globalSearchFilterWrapper input, #globalSearchFilterWrapper select { border-color: var(--line); background: #fff; }
@@ -652,12 +652,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <button onclick="switchView('analytics')" id="tabAnalyticsBtn" class="flex-1 md:flex-none px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-indigo-700 transition">
                     <i class="fa-solid fa-chart-column mr-1.5"></i> วิเคราะห์ข้อมูล
                 </button>
-                <!-- NEW (2026-09-11): "Dashboard กลาง" — ภาพรวมกำลังการผลิต/คิวงานข้ามแผนกสำหรับผู้บริหาร,
-                     แยกจาก "วิเคราะห์ข้อมูล" (ซึ่งเน้น QC/ปัญหา) — เน้นภาระงานเทียบกำลังการผลิตจริงของแต่ละ
-                     แผนก (จำนวนจอทอ/พนักงาน) และงานเสี่ยงเลยกำหนดแยกตามแผนก ต่อยอดจาก recomputeAllSchedules(). -->
-                <button onclick="switchView('central')" id="tabCentralBtn" class="flex-1 md:flex-none px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-indigo-700 transition">
-                    <i class="fa-solid fa-gauge-high mr-1.5"></i> Dashboard กลาง
-                </button>
+                <!-- 2026-11-28: เอาแท็บ "Dashboard กลาง" ออกตามคำขอ (ทำแท็บ "แผน AI (เปรียบเทียบ)" ในภาพรวมการผลิตแทน) -->
                 <!-- NEW (2026-09-29): SC-FOS Planning V1 — Delivery Control (Original vs Revised Due
                      Date), Planning Baseline (Plan-vs-Actual), Delay Log, OTD/Schedule-Adherence KPI,
                      and daily Capacity check — see renderPlanningDashboard(). -->
@@ -746,6 +741,38 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
              number (เลขรัน 1, 2, 3...) sorted by due date, so the two order types are never mixed
              together in one list. -->
         <div id="overviewViewContainer" class="space-y-4">
+            <!-- 2026-11-28: แท็บย่อยในภาพรวมการผลิต — "ภาพรวม" (เดิม) และ "แผน AI (เปรียบเทียบ)" -->
+            <div id="overviewTabBar" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 flex flex-wrap gap-1.5">
+                <button type="button" id="ovTabMainBtn" onclick="overviewSetTab('main')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm"><i class="fa-solid fa-diagram-project mr-1.5"></i>ภาพรวม</button>
+                <button type="button" id="ovTabAiBtn" onclick="overviewSetTab('ai')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"><i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i>แผน AI (เปรียบเทียบ)</button>
+            </div>
+            <div id="overviewAiPane" class="hidden space-y-4">
+                <div class="bg-white rounded-2xl shadow-sm border border-fuchsia-100 p-4 space-y-3">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h3 class="font-bold text-sm text-fuchsia-900"><i class="fa-solid fa-wand-magic-sparkles mr-2 text-fuchsia-600"></i>แผน AI วางแผนให้ทั้งหมด — เทียบกับแผนปัจจุบัน</h3>
+                            <p class="text-[11px] text-slate-500 mt-0.5 max-w-3xl">จำลองให้ M/O, S/O ที่ยังไม่ส่งมอบทุกใบ: ใช้จำนวนวันที่ AI คำนวณจากกำลังผลิต ("ตั้งค่าเวลาผลิต") แล้วจัดคิวข้ามแผนกด้วยตัวจัดคิวเดียวกับระบบ (ดีไซน์ → ย้อม → ทอ → ตกแต่ง, ใครกำหนดส่งก่อนได้คิวก่อน) แล้วเทียบวันเสร็จกับแผนปัจจุบันและกำหนดส่งลูกค้า — <b>เป็นการจำลองเท่านั้น ไม่เปลี่ยนข้อมูลจริง</b></p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="text" id="aiPlanSearch" oninput="renderAiPlanCompare()" placeholder="ค้นหา M/O, S/O, ลูกค้า..." class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs w-48">
+                            <select id="aiPlanFilter" onchange="renderAiPlanCompare()" class="px-2 py-1.5 border border-slate-200 rounded-lg text-xs bg-white">
+                                <option value="">ทุกรายการ</option>
+                                <option value="curLate">เกินกำหนด (แผนปัจจุบัน)</option>
+                                <option value="aiLate">เกินกำหนด (แผน AI)</option>
+                                <option value="aiFixes">แผน AI ทันแต่แผนปัจจุบันไม่ทัน</option>
+                                <option value="aiEarlier">AI เสร็จเร็วกว่า</option>
+                                <option value="aiLater">AI เสร็จช้ากว่า</option>
+                                <option value="aiMissing">AI คำนวณไม่ครบ</option>
+                            </select>
+                            <button type="button" onclick="exportAiPlanCompare()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"><i class="fa-solid fa-file-excel mr-1"></i>ส่งออก Excel</button>
+                            <button type="button" onclick="aiPlanApplyAll()" title="เขียนจำนวนวันตามแผน AI ลงทุก M/O, S/O จริง" class="px-3 py-1.5 rounded-lg text-xs font-semibold border border-fuchsia-500 text-fuchsia-700 bg-white hover:bg-fuchsia-50"><i class="fa-solid fa-check-double mr-1"></i>ใช้แผน AI ทั้งหมดจริง…</button>
+                        </div>
+                    </div>
+                    <div id="aiPlanWarn" class="hidden text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2"></div>
+                    <div id="aiPlanSummary" class="flex flex-wrap gap-2"></div>
+                </div>
+                <div id="aiPlanSplitContainer"></div>
+            </div>
             <!-- Overview summary panel: company-wide totals at a glance. Populated by
                  renderOverviewSummaryPanel() (called from renderProductionOverview()). -->
             <div id="overviewSummaryPanel" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
@@ -2725,84 +2752,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </div>
         </div>
 
-        <!-- NEW (2026-09-11): "Dashboard กลาง" — ภาพรวมกำลังการผลิต/คิวงานข้ามแผนกสำหรับผู้บริหาร ต่างจาก
-             "วิเคราะห์ข้อมูล" (เน้น QC/ปัญหา) ตรงที่เน้น "ภาระงานเทียบกำลังการผลิตจริง" ของแต่ละแผนก
-             (จำนวนจอทอ/พนักงานจาก productionSettings) และงานเสี่ยงเลยกำหนดแยกตามแผนก — ดึงข้อมูลจาก
-             productionOrders ที่มีอยู่ในเครื่องอยู่แล้ว ไม่ต้องรอ Supabase — ดู renderCentralDashboard(). -->
-        <div id="centralViewContainer" class="hidden space-y-4">
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-                    <p class="text-[11px] text-slate-400 uppercase font-semibold tracking-wide">งานที่กำลังดำเนินการ</p>
-                    <p id="centralKpiActiveOrders" class="text-2xl font-bold text-slate-800 mt-1">0</p>
-                    <p id="centralKpiActiveOrdersNote" class="text-[11px] text-slate-400 mt-0.5">-</p>
-                </div>
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-                    <p class="text-[11px] text-slate-400 uppercase font-semibold tracking-wide">เลยกำหนดส่งแล้ว</p>
-                    <p id="centralKpiOverdue" class="text-2xl font-bold text-rose-600 mt-1">0</p>
-                    <p id="centralKpiOverdueNote" class="text-[11px] text-slate-400 mt-0.5">-</p>
-                </div>
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-                    <p class="text-[11px] text-slate-400 uppercase font-semibold tracking-wide">ใกล้ถึงกำหนดส่ง (7 วัน)</p>
-                    <p id="centralKpiAtRisk" class="text-2xl font-bold text-amber-600 mt-1">0</p>
-                    <p id="centralKpiAtRiskNote" class="text-[11px] text-slate-400 mt-0.5">-</p>
-                </div>
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-                    <p class="text-[11px] text-slate-400 uppercase font-semibold tracking-wide">ส่งมอบแล้ว (30 วันล่าสุด)</p>
-                    <p id="centralKpiShipped30d" class="text-2xl font-bold text-emerald-600 mt-1">0</p>
-                    <p id="centralKpiShipped30dNote" class="text-[11px] text-slate-400 mt-0.5">-</p>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-                <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
-                    <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-gauge-high mr-2 text-indigo-600"></i> ภาระงานเทียบกำลังการผลิตแต่ละแผนก</h3>
-                    <div class="flex items-center gap-3 text-[11px] text-slate-500">
-                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span> งานพอดีกำลังผลิต</span>
-                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block"></span> งานล้นกำลังผลิต</span>
-                    </div>
-                </div>
-                <p class="text-[11px] text-slate-400 mb-3">เทียบ "จำนวนงานที่กำลังอยู่ในคิวของแผนกนี้ตอนนี้" กับ "กำลังการผลิตจริง" (จำนวนจอทอ/จำนวนพนักงานจากหน้า "ตั้งค่าเวลาผลิต") — ดูเพื่อวางแผนว่าแผนกไหนกำลังจะคอขวด</p>
-                <div id="centralCapacityChart" class="space-y-3"></div>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-                <h3 class="font-bold text-slate-800 text-sm mb-1"><i class="fa-solid fa-industry mr-2 text-teal-600"></i> จำนวนงานที่ยังไม่ส่งมอบ แยกตามแผนกปัจจุบัน</h3>
-                <p class="text-[11px] text-slate-400 mb-3">นับจาก currentStage ของทุก M/O, S/O ที่ยังไม่ส่งมอบ</p>
-                <div id="centralByStageChart" class="space-y-2.5"></div>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-                <h3 class="font-bold text-slate-800 text-sm mb-1"><i class="fa-solid fa-hourglass-half mr-2 text-rose-600"></i> M/O, S/O ที่ใกล้/เลยกำหนดส่งมากที่สุด</h3>
-                <p class="text-[11px] text-slate-400 mb-3">เรียงจากกำหนดส่งเร็วที่สุดก่อน แสดงสูงสุด 10 รายการ</p>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-xs">
-                        <thead>
-                            <tr class="text-left text-slate-400 uppercase text-[10px] tracking-wide border-b border-slate-100">
-                                <th class="py-2 pr-3">M/O, S/O</th>
-                                <th class="py-2 pr-3">ลูกค้า</th>
-                                <th class="py-2 pr-3">แผนกปัจจุบัน</th>
-                                <th class="py-2 pr-3">กำหนดส่ง</th>
-                                <th class="py-2 pr-3">สถานะ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="centralUrgentTableBody" class="divide-y divide-slate-100 text-slate-700"></tbody>
-                    </table>
-                </div>
-                <p id="centralUrgentEmpty" class="hidden text-xs text-slate-400 text-center py-6">ไม่มี M/O, S/O ที่ใกล้หรือเลยกำหนดส่งในขณะนี้ 🎉</p>
-            </div>
-
-            <!-- NEW (2026-09): KPI ทุกแผนกให้ไปอยู่ใน Dashboard กลาง — สรุปตัวเลข KPI หลักของแต่ละแผนก
-                 (วางแผน/ดีไซน์-ขยายลาย/ย้อม/ทากาวตกแต่ง) ไว้ในที่เดียวเพื่อดูภาพรวมได้ทันที โดยไม่ทำซ้ำตาราง
-                 แก้ไขข้อมูลแบบละเอียด (ซึ่งยังอยู่ที่แท็บ KPI ของแต่ละแผนกในหน้า "แผนผังการผลิต" เหมือนเดิม
-                 เพื่อไม่ให้มีจุดแก้ไขข้อมูลชุดเดียวกันซ้ำกันสองที่) — กดปุ่ม "ดูรายละเอียด" ในแต่ละการ์ดเพื่อไปยัง
-                 แท็บ KPI เต็มรูปแบบของแผนกนั้นได้ทันที (ดู goToDeptKpiFromCentral()). -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-                <h3 class="font-bold text-slate-800 text-sm mb-1"><i class="fa-solid fa-chart-line mr-2 text-violet-600"></i> KPI แผนกวางแผน / ดีไซน์-ขยายลาย / ย้อม / ทากาวตกแต่ง</h3>
-                <p class="text-[11px] text-slate-400 mb-3">สรุปตัวเลข KPI หลักของแต่ละแผนก — กด "ดูรายละเอียด" เพื่อไปยังหน้ารายงาน KPI เต็มรูปแบบของแผนกนั้น</p>
-                <div id="centralDeptKpiGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3"></div>
-            </div>
-        </div>
-
         <!-- NEW (2026-09-29): SC-FOS Planning V1 — "Planning & Capacity" view. renderPlanningDashboard()
              injects its content here (KPI cards, Daily Capacity Check, งานเสี่ยง/เลย Baseline table). -->
         <div id="planningViewContainer" class="hidden space-y-4"></div>
@@ -4645,7 +4594,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-154';
+        const APP_BUILD = 'QCDashboard-155';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -4854,6 +4803,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         function switchView(view) {
+            if (view === 'central') view = 'overview'; // 2026-11-28: เอา Dashboard กลางออกแล้ว
             currentView = view;
             const tabs = {
                 overview: { btn: 'tabOverviewBtn', container: 'overviewViewContainer' },
@@ -4863,7 +4813,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 shipped: { btn: 'tabShippedBtn', container: 'shippedViewContainer' },
                 issues: { btn: 'tabIssuesBtn', container: 'issuesViewContainer' },
                 analytics: { btn: 'tabAnalyticsBtn', container: 'analyticsViewContainer' },
-                central: { btn: 'tabCentralBtn', container: 'centralViewContainer' },
                 // NEW (2026-09-29): SC-FOS Planning V1 — see renderPlanningDashboard().
                 planning: { btn: 'tabPlanningBtn', container: 'planningViewContainer' }
             };
@@ -4887,7 +4836,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (view === 'shipped') renderQcShippedArchive();
             if (view === 'issues') renderIssuesTable();
             if (view === 'analytics') renderAnalyticsDashboard();
-            if (view === 'central') renderCentralDashboard();
             if (view === 'planning') renderPlanningDashboard();
         }
 
@@ -5576,227 +5524,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                         </div>
                         <div class="w-16 shrink-0 text-xs font-bold text-slate-700 text-right">${it.total} ใบ</div>
                     </div>
-                `;
-            }).join('');
-        }
-
-        // =========================================================================================
-        // NEW (2026-09-11): "Dashboard กลาง" — ภาพรวมกำลังการผลิต/คิวงานข้ามแผนกสำหรับผู้บริหาร/Admin.
-        // ใช้ productionOrders ที่มีอยู่ในเครื่องอยู่แล้ว (localStorage + ซิงค์ Google Sheets ปกติ) จึงใช้
-        // งานได้ทันทีไม่ต้องรอตั้งค่า Supabase — ดู getStageConcurrency()/recomputeAllSchedules() (ระบบ
-        // จัดคิวอัตโนมัติ) ที่ metric "กำลังการผลิต" ในหน้านี้อ้างอิงตัวเลขเดียวกัน.
-        // =========================================================================================
-        function renderCentralDashboard() {
-            const activeOrders = productionOrders.filter(o => getEffectiveStage(o) !== 'shipped');
-
-            document.getElementById('centralKpiActiveOrders').textContent = String(activeOrders.length);
-            const moCount = activeOrders.filter(o => (o.orderType || detectOrderTypeFromMoSo(o.moSo)) === 'MO').length;
-            document.getElementById('centralKpiActiveOrdersNote').textContent = `${moCount} M/O • ${activeOrders.length - moCount} S/O`;
-
-            let overdueCount = 0, atRiskCount = 0;
-            activeOrders.forEach(o => {
-                const w = getDeadlineWarning(o);
-                if (!w) return;
-                if (w.level === 'overdue') overdueCount++; else atRiskCount++;
-            });
-            document.getElementById('centralKpiOverdue').textContent = String(overdueCount);
-            document.getElementById('centralKpiOverdueNote').textContent = overdueCount > 0 ? 'ต้องเร่งติดตามด่วน' : 'ไม่มีงานเลยกำหนด';
-            document.getElementById('centralKpiAtRisk').textContent = String(atRiskCount);
-            document.getElementById('centralKpiAtRiskNote').textContent = `ภายใน ${DEADLINE_WARNING_DAYS} วันข้างหน้า`;
-
-            const todayMs = new Date(new Date().toISOString().split('T')[0]).getTime();
-            const THIRTY_DAYS_MS = 30 * 86400000;
-            const shipped30 = productionOrders.filter(o => {
-                if (!o.shippedDate) return false;
-                const d = parseDateOnly(normalizeDateString(o.shippedDate));
-                if (!d) return false;
-                const diff = todayMs - d.getTime();
-                return diff >= 0 && diff <= THIRTY_DAYS_MS;
-            });
-            const shippedSqm = shipped30.reduce((sum, o) => sum + (Number(o.totalSqm) || 0), 0);
-            document.getElementById('centralKpiShipped30d').textContent = String(shipped30.length);
-            document.getElementById('centralKpiShipped30dNote').textContent = `รวม ${shippedSqm.toLocaleString('th-TH')} ตร.ม.`;
-
-            renderCentralCapacityChart(activeOrders);
-            renderHorizontalBarList('centralByStageChart', null, ORDER_STAGES.map(stage => ({
-                label: STAGE_LABELS[stage], value: activeOrders.filter(o => o.currentStage === stage).length
-            })).filter(it => it.value > 0 || true), 'bg-indigo-500');
-            renderCentralUrgentTable(activeOrders);
-            renderCentralDeptKpiGrid(activeOrders);
-        }
-
-        // NEW (2026-09): จาก Dashboard กลาง กดเข้าไปดูรายงาน KPI เต็มรูปแบบของแผนกนั้น ๆ ได้ทันที —
-        // ใช้กลไกเดิมที่มีอยู่แล้ว (สลับไปแท็บ "แผนผังการผลิต" -> เลือกแผนก -> เปิดแท็บย่อย KPI ของแผนกนั้น)
-        // จุดเดียวกับที่ setDeptKpiSubTab() ใช้อยู่แล้ว จึงไม่มีโค้ด/ตารางซ้ำซ้อนกับของเดิม
-        function goToDeptKpiFromCentral(dept) {
-            switchView('board');
-            setBoardDepartmentTab(dept);
-            // NEW (2026-09-16): แผนกทอ isn't part of the generic 4-department "บอร์ด/รายงาน KPI" sub-tab
-            // pattern (setDeptKpiSubTab) — it already has its own "บอร์ดงานทอ/บันทึกการทอรายวัน" pair (see
-            // setWeavingSubTab()), and "บันทึกการทอรายวัน" already IS its KPI-style report (the flattened
-            // log table + per-grade %เทียบเกรด summary), so the central card's "ดูรายละเอียด" opens that.
-            if (dept === 'weaving') {
-                setWeavingSubTab('log');
-                return;
-            }
-            setDeptKpiSubTab(dept, 'kpi');
-        }
-
-        // สรุปตัวเลข KPI หลักของ 4 แผนก (วางแผน/ดีไซน์-ขยายลาย/ย้อม/ทากาวตกแต่ง) มาแสดงเป็นการ์ดใน
-        // Dashboard กลาง — คำนวณจากข้อมูลเดิมที่มีอยู่แล้วทั้งหมด (order.dyeing/design/finishing และ
-        // surplusYarnLedger/designJobLogs) ไม่สร้างข้อมูลซ้ำ เป็นแค่มุมมองสรุปเพื่อดูภาพรวมทุกแผนกในที่เดียว
-        function renderCentralDeptKpiGrid(activeOrders) {
-            const grid = document.getElementById('centralDeptKpiGrid');
-            if (!grid) return;
-            const orders = activeOrders || productionOrders;
-
-            // --- วางแผน: จำนวน M/O,S/O ที่ยังไม่ส่ง + ปริมาณไหม Surplus คงเหลือรวมล่าสุด ---
-            const planningDueCount = orders.filter(o => o.dueDate).length;
-            const surplusTotalKg = (typeof surplusYarnLedger !== 'undefined' ? surplusYarnLedger : [])
-                .reduce((sum, r) => sum + (Number(r.weightInKg) || 0), 0);
-
-            // --- ดีไซน์/ขยายลาย: จำนวนงานออกแบบที่บันทึก + % ตรงเวลา, จำนวนรายการขยายลายทั้งหมด ---
-            const designJobs = (typeof designJobLogs !== 'undefined' ? designJobLogs : []);
-            let designOnTimeCount = 0, designOnTimeTotal = 0;
-            designJobs.forEach(job => {
-                const { onTime } = computeDesignJobDerived(job);
-                if (onTime !== null) { designOnTimeTotal++; if (onTime) designOnTimeCount++; }
-            });
-            const designOnTimePct = designOnTimeTotal > 0 ? Math.round((designOnTimeCount / designOnTimeTotal) * 100) : null;
-            let transferCount = 0;
-            productionOrders.forEach(o => { transferCount += ((o.design && o.design.patternTransferLog) || []).length; });
-
-            // --- ย้อม: จำนวนคำสั่งย้อมทั้งหมด (ปกติ+เพิ่ม) และจำนวนที่ย้อมเพิ่ม ---
-            let dyeRegularCount = 0, dyeExtraCount = 0;
-            productionOrders.forEach(o => {
-                ((o.dyeing && o.dyeing.dyeOrderLog) || []).forEach(item => { if (isOutsourcedDyeRow(item)) return; item.isExtra ? dyeExtraCount++ : dyeRegularCount++; });
-            });
-
-            // --- ทากาวตกแต่ง: ประสิทธิภาพเฉลี่ย (ตร.ม./ชม.) + จำนวนรายการใช้กาวเกินมาตรฐาน ---
-            let effTotalSqm = 0, effTotalHours = 0, glueOverStandardCount = 0, glueTotalCount = 0;
-            productionOrders.forEach(o => {
-                ((o.finishing && o.finishing.efficiencyLog) || []).forEach(item => {
-                    effTotalSqm += Number(item.areaSqm) || 0;
-                    effTotalHours += Number(item.hours) || 0;
-                });
-                ((o.finishing && o.finishing.glueUsageLog) || []).forEach(item => {
-                    glueTotalCount++;
-                    // NEW (2026-09-16): sumGlueUsageKg() reads productionSettings.finishing.glueTypes[]
-                    // instead of the old hardcoded eur178Kg/kg66012/th31Kg trio — see the finishing glue
-                    // KPI code for why (dynamic glue types).
-                    const total = sumGlueUsageKg(item);
-                    const std = Number(item.standardKg) || 0;
-                    if (std > 0 && total > std) glueOverStandardCount++;
-                });
-            });
-            const avgProductivity = effTotalHours > 0 ? (effTotalSqm / effTotalHours).toFixed(2) : null;
-
-            // --- ทอ: ภาพรวมทั้งบริษัทวันนี้ — จำนวนจอที่กำลังทอ/จอทั้งหมด, ตร.ม. รวมวันนี้, % เทียบเกรด
-            // เฉลี่ยถ่วงน้ำหนักตามชั่วโมงทำงานวันนี้ (ตามที่ผู้ใช้เลือก "สรุปภาพรวมทั้งบริษัท") ---
-            const weavingStats = computeWeavingTodayStats();
-
-            const card = (icon, color, title, rows, dept) => `
-                <div class="border border-slate-100 rounded-xl p-3.5 flex flex-col justify-between">
-                    <div>
-                        <h4 class="font-semibold text-slate-800 text-xs mb-2"><i class="fa-solid ${icon} mr-1.5 text-${color}-600"></i> ${escapeHtml(title)}</h4>
-                        <div class="space-y-1.5">
-                            ${rows.map(r => `
-                                <div class="flex items-center justify-between text-[11px]">
-                                    <span class="text-slate-400">${escapeHtml(r.label)}</span>
-                                    <span class="font-bold text-slate-700">${escapeHtml(r.value)}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    <button type="button" onclick="goToDeptKpiFromCentral('${dept}')" class="mt-3 w-full text-center text-[11px] font-semibold text-${color}-700 bg-${color}-50 hover:bg-${color}-100 rounded-lg py-1.5 transition">
-                        ดูรายละเอียด <i class="fa-solid fa-arrow-right ml-1"></i>
-                    </button>
-                </div>
-            `;
-
-            grid.innerHTML =
-                card('fa-clipboard-list', 'indigo', 'แผนกวางแผน', [
-                    { label: 'M/O, S/O ที่มีกำหนดส่ง', value: String(planningDueCount) },
-                    { label: 'ไหม Surplus คงเหลือรวม', value: surplusTotalKg > 0 ? `${surplusTotalKg.toLocaleString('th-TH')} กก.` : '-' }
-                ], 'planning') +
-                card('fa-palette', 'fuchsia', 'ดีไซน์/ขยายลาย', [
-                    { label: 'งานออกแบบที่บันทึก', value: String(designJobs.length) },
-                    { label: '% ตรงเวลา', value: designOnTimePct === null ? '-' : `${designOnTimePct}%` },
-                    { label: 'รายการขยายลายทั้งหมด', value: String(transferCount) }
-                ], 'design') +
-                card('fa-flask', 'sky', 'แผนกย้อม', [
-                    { label: 'คำสั่งย้อมปกติ', value: String(dyeRegularCount) },
-                    { label: 'คำสั่งย้อมเพิ่ม', value: String(dyeExtraCount) }
-                ], 'dyeing') +
-                card('fa-layer-group', 'amber', 'ทากาวตกแต่ง', [
-                    { label: 'ประสิทธิภาพเฉลี่ย (ตร.ม./ชม.)', value: avgProductivity === null ? '-' : avgProductivity },
-                    { label: 'ใช้กาวเกินมาตรฐาน', value: glueTotalCount > 0 ? `${glueOverStandardCount}/${glueTotalCount} รายการ` : '-' }
-                ], 'finishing') +
-                card('fa-hand-holding-heart', 'teal', 'แผนกทอ', [
-                    { label: 'จอที่กำลังทอวันนี้', value: `${weavingStats.occupiedLoomsCount}/${weavingStats.totalLooms} จอ` },
-                    { label: 'ตร.ม. ที่ทอวันนี้', value: `${weavingStats.totalSqm.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ตร.ม.` },
-                    { label: '% เทียบเกรดเฉลี่ยวันนี้', value: weavingStats.avgGradePercent === null ? '-' : `${weavingStats.avgGradePercent}%` }
-                ], 'weaving');
-        }
-
-        // เทียบ "จำนวนงานที่กำลังอยู่ในคิวของแผนกนี้ตอนนี้" (นับจาก currentStage) กับ "กำลังการผลิตจริง"
-        // (getStageConcurrency() — จำนวนจอทอ/จำนวนพนักงาน จากหน้า "ตั้งค่าเวลาผลิต", ตัวเดียวกับที่
-        // recomputeAllSchedules() ใช้จัดคิวอัตโนมัติ) — ย้อม (dyeing) ไม่มีค่ากำลังการผลิตให้ตั้ง จึงไม่แสดง
-        // ในกราฟนี้ (จุดเดียวกับข้อจำกัดที่ recomputeAllSchedules() มี — ดูคอมเมนต์ตรงนั้น).
-        function renderCentralCapacityChart(activeOrders) {
-            const container = document.getElementById('centralCapacityChart');
-            if (!container) return;
-            const stages = [
-                { key: 'design', unit: 'คน' },
-                { key: 'weaving', unit: 'จอทอ' },
-                { key: 'finishing', unit: 'คน' }
-            ];
-            container.innerHTML = stages.map(s => {
-                const queueCount = activeOrders.filter(o => o.currentStage === s.key).length;
-                const capacity = getStageConcurrency(s.key) || 1;
-                const ratio = queueCount / capacity;
-                const overloaded = ratio > 1;
-                const pct = Math.max(Math.min(ratio, 1) * 100, queueCount > 0 ? 4 : 0);
-                const label = STAGE_LABELS[s.key];
-                return `
-                    <div>
-                        <div class="flex items-center justify-between text-[11px] text-slate-600 mb-1">
-                            <span class="font-semibold">${escapeHtml(label)}</span>
-                            <span>${queueCount} งาน / กำลังผลิต ${capacity} ${s.unit}${overloaded ? ' <span class="text-rose-600 font-bold">(งานล้นกำลังผลิต!)</span>' : ''}</span>
-                        </div>
-                        <div class="bg-slate-100 rounded-md h-5 overflow-hidden">
-                            <div class="h-5 rounded-r-md ${overloaded ? 'bg-rose-500' : 'bg-emerald-500'}" style="width:${pct}%"></div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function renderCentralUrgentTable(activeOrders) {
-            const tbody = document.getElementById('centralUrgentTableBody');
-            const emptyEl = document.getElementById('centralUrgentEmpty');
-            if (!tbody) return;
-            const withDueDate = activeOrders.filter(o => o.dueDate).sort((a, b) => a.dueDate < b.dueDate ? -1 : (a.dueDate > b.dueDate ? 1 : 0));
-            const top10 = withDueDate.slice(0, 10);
-            if (!top10.length) {
-                tbody.innerHTML = '';
-                if (emptyEl) emptyEl.classList.remove('hidden');
-                return;
-            }
-            if (emptyEl) emptyEl.classList.add('hidden');
-            tbody.innerHTML = top10.map(o => {
-                const w = getDeadlineWarning(o);
-                let statusHtml = '<span class="text-emerald-600 text-[11px] font-semibold">ปกติ</span>';
-                if (w && w.level === 'overdue') statusHtml = `<span class="text-rose-600 text-[11px] font-semibold">เลยกำหนด ${Math.abs(w.daysRemaining)} วัน</span>`;
-                else if (w && w.level === 'at_risk') statusHtml = `<span class="text-amber-600 text-[11px] font-semibold">เหลือ ${w.daysRemaining} วัน</span>`;
-                return `
-                    <tr class="hover:bg-slate-50 cursor-pointer" onclick="openOrderDetailModal(${productionOrders.indexOf(o)})">
-                        <td class="py-2 pr-3 font-semibold text-slate-800">${escapeHtml(o.moSo)}</td>
-                        <td class="py-2 pr-3">${escapeHtml(o.customerName || '-')}</td>
-                        <td class="py-2 pr-3">${escapeHtml(STAGE_LABELS[o.currentStage] || o.currentStage)}</td>
-                        <td class="py-2 pr-3">${escapeHtml(o.dueDate || '-')}</td>
-                        <td class="py-2 pr-3">${statusHtml}</td>
-                    </tr>
                 `;
             }).join('');
         }
@@ -14681,7 +14408,162 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <p class="text-[10px] text-slate-400">เบิกไปย้อม = ยอด "นน.โอนจากใบเบิก (กก.)" ในบันทึกสั่งย้อม (รวมแถวจ้างย้อมนอก = ไหมของเราที่ส่งไปย้อม · ไหมที่ซื้อจากโรงย้อมไม่ตัดสต๊อก — ระบบตัดให้อัตโนมัติตามใบส่งของที่นำเข้า)${s.externalBought > 0.005 ? ` · <span class="text-orange-700 font-semibold" data-yarn-external-bought>ไหมภายนอก (ซื้อจากโรงย้อม ไม่ตัดสต๊อก) ${s.externalBought.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.</span>` : ''} ${s.start ? `นับตั้งแต่ ${escapeHtml(s.start)}` : ''}${s.undated ? ` · มี ${s.undated} แถวที่ไม่มีวันที่ (นับรวม)` : ''} · คงเหลือสุทธิ = คงเหลือ − ประมาณการไหมที่ยังต้องใช้ (ติดลบ = ต้องสั่งเพิ่ม) · ข้อมูลรับไหมเก็บในเบราว์เซอร์เครื่องนี้ — สำรองด้วย "ส่งออก Excel"</p>`;
         }
 
+        // =========================================================================================
+        // 2026-11-28: แท็บ "แผน AI (เปรียบเทียบ)" ในภาพรวมการผลิต — "ใช้ระบบ AI เป็นคนวางแผนให้ทั้งหมด เพื่อเปรียบเทียบ"
+        // จำลอง (ไม่เขียนข้อมูล) ว่าถ้าใช้จำนวนวันที่ AI คำนวณ (computeProductionSuggestions) กับทุก M/O, S/O ที่ยังไม่ส่งมอบ
+        // แล้วจัดคิวข้ามแผนกด้วยตัวจัดคิวเดียวกับ recomputeAllSchedules() (scheduleStageEDD + getStageConcurrency)
+        // แต่ละใบจะเสร็จวันไหน เทียบกับ "แผนปัจจุบัน" (order.planDates) และกำหนดส่งลูกค้า (order.dueDate)
+        // แผนกที่ AI คำนวณไม่ได้ (ยังไม่ตั้งค่ากำลังผลิต/ไม่มีข้อมูล) ใช้จำนวนวันเดิมของ M/O นั้นแทน และทำเครื่องหมายไว้
+        // =========================================================================================
+        let overviewTab = 'main';
+        const AI_PLAN_STAGES = ['design', 'dyeing', 'weaving', 'finishing'];
+        const AI_PLAN_STAGE_LABEL = { design: 'ดีไซน์', dyeing: 'ย้อม', weaving: 'ทอ', finishing: 'ตกแต่ง' };
+        function overviewSetTab(tab) {
+            overviewTab = tab === 'ai' ? 'ai' : 'main';
+            const root = document.getElementById('overviewViewContainer'); if (!root) return;
+            Array.from(root.children).forEach(el => { if (el.id === 'overviewTabBar' || el.id === 'overviewAiPane') return; el.style.display = overviewTab === 'ai' ? 'none' : ''; });
+            const pane = document.getElementById('overviewAiPane'); if (pane) pane.classList.toggle('hidden', overviewTab !== 'ai');
+            const on = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm', off = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100';
+            const b1 = document.getElementById('ovTabMainBtn'), b2 = document.getElementById('ovTabAiBtn');
+            if (b1) b1.className = overviewTab === 'main' ? on : off;
+            if (b2) b2.className = overviewTab === 'ai' ? on.replace('bg-indigo-600', 'bg-fuchsia-600') : off;
+            if (overviewTab === 'ai') renderAiPlanCompare();
+        }
+        function aiPlanRunSchedule(daysOf) {
+            const active = [];
+            productionOrders.forEach((order, idx) => {
+                if (order.shipped) return;
+                const a = normalizeDateString(order.openDate) || normalizeDateString(order.createdAt);
+                const anchor = a ? parseDateOnly(a) : null; if (!anchor) return;
+                active.push({ order, idx, anchor });
+            });
+            const cursor = {}, due = {}, out = new Map();
+            active.forEach(a => { cursor[a.idx] = a.anchor; const d = normalizeDateString(a.order.dueDate); due[a.idx] = d ? parseDateOnly(d) : null; out.set(a.idx, {}); });
+            AI_PLAN_STAGES.forEach(stage => {
+                const items = [];
+                active.forEach(a => { const days = Number(daysOf(a.order, a.idx, stage)) || 0; if (days <= 0) return; items.push({ id: a.idx, earliestStart: cursor[a.idx], duration: days, dueDate: due[a.idx] }); });
+                scheduleStageEDD(items, getStageConcurrency(stage)).forEach((res, idx) => { cursor[idx] = res.finish; out.get(idx)[stage] = formatDateKeyUTC(res.finish); });
+            });
+            return out;
+        }
+        function aiPlanLastDate(pd) { pd = pd || {}; return pd.finishing || pd.weaving || pd.dyeing || pd.design || ''; }
+        function aiPlanDayDiff(a, b) { const da = parseDateOnly(a), db = parseDateOnly(b); return (da && db) ? Math.round((da.getTime() - db.getTime()) / 86400000) : null; }
+        function aiPlanBuildRows() {
+            const cache = new Map(), fallback = new Map();
+            const aiDaysOf = (order, idx, stage) => {
+                let sug = cache.get(idx);
+                if (!sug) { try { sug = computeProductionSuggestions(order) || {}; } catch (e) { sug = {}; } cache.set(idx, sug); }
+                const d = sug[stage] && sug[stage].days;
+                if (d === null || d === undefined) {
+                    const cur = Number((order.planDurations || {})[stage]) || 0;
+                    if (cur > 0) { if (!fallback.has(idx)) fallback.set(idx, new Set()); fallback.get(idx).add(stage); }
+                    return cur;
+                }
+                return d;
+            };
+            const sim = aiPlanRunSchedule(aiDaysOf);
+            const rows = [];
+            productionOrders.forEach((order, idx) => {
+                if (!sim.has(idx) || getEffectiveStage(order) === 'ready_to_ship') return;
+                const sch = sim.get(idx), curFinish = aiPlanLastDate(order.planDates), aiFinish = aiPlanLastDate(sch);
+                const due = normalizeDateString(order.dueDate) || '';
+                const dur = {}; AI_PLAN_STAGES.forEach(st => { dur[st] = { cur: Number((order.planDurations || {})[st]) || 0, ai: Number(aiDaysOf(order, idx, st)) || 0, fb: !!(fallback.get(idx) && fallback.get(idx).has(st)) }; });
+                const curLate = (curFinish && due) ? aiPlanDayDiff(curFinish, due) : null, aiLate = (aiFinish && due) ? aiPlanDayDiff(aiFinish, due) : null;
+                const shift = (curFinish && aiFinish) ? aiPlanDayDiff(aiFinish, curFinish) : null;
+                const fbList = AI_PLAN_STAGES.filter(st => dur[st].fb);
+                const stt = v => v === null ? 'nodue' : (v > 0 ? 'late' : 'ontime');
+                rows.push({ order, orderIndex: idx, moSo: order.moSo, customer: order.customerName || '', sqm: Number(order.totalSqm) || 0, due, dur, curFinish, aiFinish, shift, curLate, aiLate,
+                    curStatus: stt(curLate), aiStatus: stt(aiLate), fb: fbList, missing: fbList.length > 0 });
+            });
+            rows.sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || a.orderIndex - b.orderIndex);
+            return rows;
+        }
+        function aiPlanFilteredRows() {
+            const q = ((document.getElementById('aiPlanSearch') || {}).value || '').trim().toLowerCase();
+            const f = (document.getElementById('aiPlanFilter') || {}).value || '';
+            return aiPlanBuildRows().filter(r => {
+                if (q && ![r.moSo, r.customer, r.order.customerPO].some(x => String(x || '').toLowerCase().includes(q))) return false;
+                if (f === 'curLate') return r.curStatus === 'late';
+                if (f === 'aiLate') return r.aiStatus === 'late';
+                if (f === 'aiFixes') return r.curStatus === 'late' && r.aiStatus === 'ontime';
+                if (f === 'aiEarlier') return r.shift !== null && r.shift < 0;
+                if (f === 'aiLater') return r.shift !== null && r.shift > 0;
+                if (f === 'aiMissing') return r.missing;
+                return true;
+            });
+        }
+        function aiPlanFmtDate(v) { const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : '-'; }
+        const AI_PLAN_COLUMNS = [
+            { key: 'moSo', label: 'M/O, S/O' }, { key: 'customer', label: 'ลูกค้า' }, { key: 'sqm', label: 'ตร.ม.' }, { key: 'due', label: 'กำหนดส่ง' },
+            { key: 'dDesignCur', label: 'ดีไซน์ ปัจจุบัน (วัน)' }, { key: 'dDesignAi', label: 'ดีไซน์ AI (วัน)' }, { key: 'dDyeCur', label: 'ย้อม ปัจจุบัน (วัน)' }, { key: 'dDyeAi', label: 'ย้อม AI (วัน)' },
+            { key: 'dWeaveCur', label: 'ทอ ปัจจุบัน (วัน)' }, { key: 'dWeaveAi', label: 'ทอ AI (วัน)' }, { key: 'dFinCur', label: 'ตกแต่ง ปัจจุบัน (วัน)' }, { key: 'dFinAi', label: 'ตกแต่ง AI (วัน)' },
+            { key: 'curFinish', label: 'เสร็จตามแผนปัจจุบัน' }, { key: 'aiFinish', label: 'เสร็จตามแผน AI' }, { key: 'shift', label: 'AI ต่างจากปัจจุบัน (วัน, + = ช้ากว่า)' },
+            { key: 'curStatusLabel', label: 'แผนปัจจุบัน vs กำหนดส่ง' }, { key: 'aiStatusLabel', label: 'แผน AI vs กำหนดส่ง' }, { key: 'note', label: 'หมายเหตุ' }
+        ];
+        function aiPlanStatusLabel(status, late) { return status === 'nodue' ? 'ไม่มีกำหนดส่ง' : (status === 'late' ? `เกิน ${late} วัน` : `ทัน (เหลือ ${Math.abs(late)} วัน)`); }
+        function aiPlanFlatRows(rows) {
+            return rows.map(r => ({ moSo: r.moSo, customer: r.customer, sqm: r.sqm, due: r.due, dDesignCur: r.dur.design.cur, dDesignAi: r.dur.design.ai, dDyeCur: r.dur.dyeing.cur, dDyeAi: r.dur.dyeing.ai,
+                dWeaveCur: r.dur.weaving.cur, dWeaveAi: r.dur.weaving.ai, dFinCur: r.dur.finishing.cur, dFinAi: r.dur.finishing.ai, curFinish: r.curFinish, aiFinish: r.aiFinish, shift: r.shift === null ? '' : r.shift,
+                curStatusLabel: aiPlanStatusLabel(r.curStatus, r.curLate), aiStatusLabel: aiPlanStatusLabel(r.aiStatus, r.aiLate), note: r.fb.length ? 'ใช้ค่าเดิม (AI คำนวณไม่ได้): ' + r.fb.map(s => AI_PLAN_STAGE_LABEL[s]).join(', ') : '' }));
+        }
+        function renderAiPlanCompare() {
+            const root = document.getElementById('aiPlanSplitContainer'); if (!root) return;
+            const rows = aiPlanFilteredRows(), e = escapeHtml;
+            const all = rows.length;
+            const withDue = rows.filter(r => r.curStatus !== 'nodue' && r.aiStatus !== 'nodue');
+            const cnt = (arr, fn) => arr.filter(fn).length;
+            const curLate = rows.filter(r => r.curStatus === 'late'), aiLate = rows.filter(r => r.aiStatus === 'late');
+            const avg = (arr, fn) => arr.length ? arr.reduce((t, r) => t + fn(r), 0) / arr.length : 0;
+            const shifts = rows.filter(r => r.shift !== null);
+            const chip = (label, val, sub, cls) => `<div class="px-3 py-2 rounded-xl border ${cls || 'border-slate-200 bg-slate-50'}"><p class="text-[10px] text-slate-500">${label}</p><p class="text-base font-bold text-slate-800">${val}</p>${sub ? `<p class="text-[10px] text-slate-500">${sub}</p>` : ''}</div>`;
+            const sm = document.getElementById('aiPlanSummary');
+            if (sm) sm.innerHTML = [
+                chip('M/O, S/O ที่เทียบ', all, 'ยังไม่ส่งมอบ/ยังไม่รอส่ง'),
+                chip('ทันกำหนด — แผนปัจจุบัน', `${cnt(rows, r => r.curStatus === 'ontime')}`, `จาก ${withDue.length} ใบที่มีกำหนดส่ง`, 'border-sky-200 bg-sky-50'),
+                chip('ทันกำหนด — แผน AI', `${cnt(rows, r => r.aiStatus === 'ontime')}`, `จาก ${withDue.length} ใบที่มีกำหนดส่ง`, 'border-fuchsia-200 bg-fuchsia-50'),
+                chip('เกินกำหนด — แผนปัจจุบัน', curLate.length, curLate.length ? `เฉลี่ย ${avg(curLate, r => r.curLate).toFixed(1)} วัน` : '-', 'border-rose-200 bg-rose-50'),
+                chip('เกินกำหนด — แผน AI', aiLate.length, aiLate.length ? `เฉลี่ย ${avg(aiLate, r => r.aiLate).toFixed(1)} วัน` : '-', 'border-rose-200 bg-rose-50'),
+                chip('AI เสร็จเร็วกว่า', cnt(shifts, r => r.shift < 0), shifts.length ? `เฉลี่ยต่าง ${avg(shifts, r => r.shift).toFixed(1)} วัน/ใบ` : '-', 'border-emerald-200 bg-emerald-50'),
+                chip('AI เสร็จช้ากว่า', cnt(shifts, r => r.shift > 0), '', 'border-amber-200 bg-amber-50'),
+                chip('AI คำนวณไม่ครบ', cnt(rows, r => r.missing), 'ใช้จำนวนวันเดิมแทนบางแผนก')
+            ].join('');
+            const warn = document.getElementById('aiPlanWarn');
+            if (warn) {
+                const s = productionSettings || {};
+                const noCap = !(s.tufting && Number(s.tufting.loomCount) > 0) || !(s.finishing && Number(s.finishing.staffCount) > 0);
+                const allMissing = all > 0 && cnt(rows, r => r.missing) === all;
+                warn.classList.toggle('hidden', !(noCap || allMissing));
+                warn.textContent = allMissing ? 'AI ยังคำนวณให้ทุกใบไม่ได้ — กรุณาตั้งค่ากำลังผลิตทุกแผนก ("ตั้งค่าเวลาผลิต") และกรอกพื้นที่/แผนสั่งย้อมของ M/O ก่อน ตอนนี้แผน AI = แผนปัจจุบัน' : 'ยังตั้งค่าจำนวนจอทอ/พนักงานบางแผนกไม่ครบ — ผลจำลองอาจไม่ตรงกับความจริง ("ตั้งค่าเวลาผลิต")';
+            }
+            const durCell = (d) => { if (!d.cur && !d.ai) return '<span class="text-slate-300">-</span>'; const cls = d.ai < d.cur ? 'text-emerald-700 font-semibold' : (d.ai > d.cur ? 'text-rose-600 font-semibold' : 'text-slate-600'); return `<span class="text-slate-500">${d.cur || '-'}</span> → <span class="${cls}" ${d.fb ? 'title="AI คำนวณไม่ได้ — ใช้ค่าเดิม"' : ''}>${d.ai || '-'}${d.fb ? '*' : ''}</span>`; };
+            const stCell = (status, late) => status === 'nodue' ? '<span class="text-slate-400">-</span>' : (status === 'late' ? `<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-semibold whitespace-nowrap">เกิน ${late} วัน</span>` : `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold whitespace-nowrap">ทัน (เหลือ ${Math.abs(late)} วัน)</span>`);
+            const rowHtml = r => `<tr data-aiplan-row="${e(r.moSo)}" class="hover:bg-slate-50/70">
+                <td class="px-2 py-2 font-semibold whitespace-nowrap ${moSoTextColorClass(r.order)}">${e(r.moSo)}</td><td class="px-2 py-2">${e(r.customer || '-')}</td><td class="px-2 py-2 text-right">${r.sqm ? r.sqm.toLocaleString('th-TH', { maximumFractionDigits: 2 }) : '-'}</td><td class="px-2 py-2 whitespace-nowrap">${aiPlanFmtDate(r.due)}</td>
+                ${AI_PLAN_STAGES.map(s2 => `<td class="px-2 py-2 text-center whitespace-nowrap">${durCell(r.dur[s2])}</td>`).join('')}
+                <td class="px-2 py-2 whitespace-nowrap">${aiPlanFmtDate(r.curFinish)}</td><td class="px-2 py-2 whitespace-nowrap font-semibold text-fuchsia-800">${aiPlanFmtDate(r.aiFinish)}</td>
+                <td class="px-2 py-2 text-center whitespace-nowrap ${r.shift === null ? 'text-slate-300' : (r.shift < 0 ? 'text-emerald-700 font-semibold' : (r.shift > 0 ? 'text-rose-600 font-semibold' : 'text-slate-500'))}">${r.shift === null ? '-' : (r.shift > 0 ? '+' : '') + r.shift}</td>
+                <td class="px-2 py-2">${stCell(r.curStatus, r.curLate)}</td><td class="px-2 py-2">${stCell(r.aiStatus, r.aiLate)}</td></tr>`;
+            const thead = ['M/O, S/O', 'ลูกค้า', 'ตร.ม.', 'กำหนดส่ง'].map(l => `<th class="px-2 py-2 text-left">${l}</th>`).join('')
+                + AI_PLAN_STAGES.map(s2 => `<th class="px-2 py-2 text-center whitespace-nowrap">${AI_PLAN_STAGE_LABEL[s2]}<br><span class="normal-case font-normal">ปัจจุบัน → AI (วัน)</span></th>`).join('')
+                + ['เสร็จตามแผนปัจจุบัน', 'เสร็จตามแผน AI'].map(l => `<th class="px-2 py-2 text-left">${l}</th>`).join('')
+                + '<th class="px-2 py-2 text-center">AI ต่าง (วัน)</th><th class="px-2 py-2 text-left">แผนปัจจุบัน vs กำหนดส่ง</th><th class="px-2 py-2 text-left">แผน AI vs กำหนดส่ง</th>';
+            const isSo = r => (r.order.orderType || detectOrderTypeFromMoSo(r.order.moSo)) === 'SO';
+            const mo = rows.filter(r => !isSo(r)), so = rows.filter(isSo);
+            renderSplitOrderTypeTables('aiPlanSplitContainer', thead, mo.map(rowHtml).join(''), so.map(rowHtml).join(''), mo.length, so.length, 13);
+        }
+        function exportAiPlanCompare() {
+            const rows = aiPlanFilteredRows();
+            if (!rows.length) { showToast('ไม่มีรายการให้ส่งออก', 'fa-circle-info', 'text-amber-400'); return; }
+            exportFlatRowsToExcel('แผน AI เทียบแผนปัจจุบัน.xlsx', 'แผน AI', AI_PLAN_COLUMNS, aiPlanFlatRows(rows));
+        }
+        function aiPlanApplyAll() {
+            if (!confirm('ใช้แผน AI กับทุก M/O, S/O จริง?\n\nระบบจะเขียนจำนวนวันที่ AI คำนวณลงใบงานทุกใบ (แทนจำนวนวันเดิม) และจัดคิววันที่ใหม่ — แก้กลับเป็นกำหนดเองรายใบได้ภายหลัง')) return;
+            applyAiPlanToAllOrders();
+            renderAiPlanCompare();
+        }
+
         function renderProductionOverview() {
+            if (overviewTab === 'ai') { try { renderAiPlanCompare(); } catch (e) { console.error('renderAiPlanCompare failed:', e); } }
             renderOverviewSummaryPanel();
             try { renderYarnEstimatePanel(); } catch (e) { console.error('renderYarnEstimatePanel failed:', e); }
             try { renderYarnStockPanel(); } catch (e) { console.error('renderYarnStockPanel failed:', e); }
