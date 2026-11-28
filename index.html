@@ -1397,6 +1397,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <div class="flex items-center justify-end gap-1.5 px-1">
                         <span class="text-[11px] text-slate-400">งานที่อยู่แผนกทอ</span>
                         <span id="boardCount-weaving" class="text-[11px] bg-white text-teal-700 font-semibold px-2 py-0.5 rounded-full border border-teal-200">0</span>
+                        <span id="boardSqm-weaving" title="รวมพื้นที่ (ตร.ม.) ของ M/O, S/O ที่อยู่แผนกทอ ตามตัวกรองที่เลือก" class="text-[11px] bg-teal-50 text-teal-800 font-semibold px-2 py-0.5 rounded-full border border-teal-200">0.00 ตร.ม.</span>
                     </div>
                     <div id="boardColumn-weaving" class="flex flex-col gap-3"></div>
                 </div>
@@ -1405,6 +1406,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <div class="flex items-center justify-end gap-1.5 px-1">
                         <span class="text-[11px] text-slate-400">งานที่อยู่แผนกตกแต่ง/บรรจุ</span>
                         <span id="boardCount-finishing" class="text-[11px] bg-white text-fuchsia-700 font-semibold px-2 py-0.5 rounded-full border border-fuchsia-200">0</span>
+                        <span id="boardSqm-finishing" title="รวมพื้นที่ (ตร.ม.) ของ M/O, S/O ที่อยู่แผนกตกแต่ง/บรรจุ ตามตัวกรองที่เลือก" class="text-[11px] bg-fuchsia-50 text-fuchsia-800 font-semibold px-2 py-0.5 rounded-full border border-fuchsia-200">0.00 ตร.ม.</span>
+                        <span id="boardShipSqm" title="รวมพื้นที่ (ตร.ม.) ของ M/O, S/O ที่ผลิตเสร็จและรอส่งทั้งหมด (ยังไม่ยืนยันจัดส่ง) — ไม่ขึ้นกับตัวกรองเดือน/ค้นหา" class="text-[11px] bg-orange-50 text-orange-800 font-semibold px-2 py-0.5 rounded-full border border-orange-200">รอส่งรวม 0.00 ตร.ม. (0 รายการ)</span>
                     </div>
                     <div id="boardColumn-finishing" class="flex flex-col gap-3"></div>
                 </div>
@@ -3892,6 +3895,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     </div>
 
     <!-- Printable single-record QC sheet (hidden on screen, shown only during single-record print) -->
+    <!-- 2026-11-27: กรอกข้อมูลก่อนพิมพ์ ใบส่งจ้างย้อมภายนอก -->
+    <div id="dyeExtModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-orange-600 text-white px-4 py-3 flex justify-between items-center">
+                <h3 class="font-bold text-sm flex items-center gap-2"><i class="fa-solid fa-truck-fast"></i> ใบส่งจ้างย้อมภายนอก</h3>
+                <button type="button" onclick="dyeExtModalClose()" class="text-orange-100 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 space-y-3 text-xs">
+                <p id="dyeExtInfo" class="text-slate-600"></p>
+                <div><label class="block font-semibold text-slate-600 mb-1">โรงย้อม / ผู้รับจ้าง</label><input id="dyeExtVendor" list="dyeExtVendorList" type="text" class="w-full p-2 border border-slate-200 rounded-lg" placeholder="เช่น Siam Dyemaster"><datalist id="dyeExtVendorList"></datalist></div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block font-semibold text-slate-600 mb-1">เลขที่ใบส่งจ้าง</label><input id="dyeExtDocNo" type="text" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                    <div><label class="block font-semibold text-slate-600 mb-1">ผู้ติดต่อ / โทร</label><input id="dyeExtContact" type="text" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                    <div><label class="block font-semibold text-slate-600 mb-1">ราคา/กก. (บาท)</label><input id="dyeExtPrice" type="number" min="0" step="0.01" class="w-full p-2 border border-slate-200 rounded-lg" placeholder="เว้นว่างถ้ายังไม่ตกลง"></div>
+                    <div><label class="block font-semibold text-slate-600 mb-1">กำหนดส่งกลับ</label><input id="dyeExtReturn" type="date" class="w-full p-2 border border-slate-200 rounded-lg"></div>
+                </div>
+                <p class="text-[10px] text-slate-400">เว้นช่องไหนว่างไว้ ในใบจะเป็นช่องว่างให้เขียนมือ · ระบบจำโรงย้อม/ผู้ติดต่อ/ราคาล่าสุดไว้ในเครื่องนี้</p>
+            </div>
+            <div class="px-4 py-3 bg-slate-50 flex justify-end gap-2">
+                <button type="button" onclick="dyeExtModalClose()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-300 text-slate-600 bg-white hover:bg-slate-100">ยกเลิก</button>
+                <button type="button" id="dyeExtPrintBtn" onclick="dyeExtModalPrint()" class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white"><i class="fa-solid fa-print mr-1"></i>พิมพ์ใบส่งจ้าง</button>
+            </div>
+        </div>
+    </div>
     <div id="printArea"></div>
 
     <script>
@@ -4618,7 +4645,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // ถ้าไม่ตรงจะขึ้นแถบ "มีเวอร์ชันใหม่ — แตะเพื่ออัปเดต" (แตะแล้วโหลดหน้าใหม่ข้ามแคช ข้อมูลที่ซิงก์ไว้ไม่หาย)
         // ต้องแก้ APP_BUILD ทุกครั้งที่ปล่อยเวอร์ชันใหม่ (ขึ้นต้นด้วย QCDashboard-)
         // =========================================================================================
-        const APP_BUILD = 'QCDashboard-152';
+        const APP_BUILD = 'QCDashboard-154';
         let appUpdateLastCheck = 0;
         function showAppUpdateBanner(newBuild) {
             if (document.getElementById('appUpdateBanner')) return;
@@ -14822,6 +14849,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             });
         }
 
+        function boardFmtSqm(n) { return (Number(n) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        // รอส่งรวมทั้งหมด: ทุก M/O, S/O ที่ผลิตเสร็จแล้วแต่ยังไม่ยืนยันจัดส่ง (getEffectiveStage = ready_to_ship) — ไม่ขึ้นกับตัวกรอง
+        function getWaitingShipSqmTotal() {
+            const list = productionOrders.filter(o => getEffectiveStage(o) === 'ready_to_ship');
+            return { n: list.length, sqm: list.reduce((t, o) => t + (Number(o.totalSqm) || 0), 0) };
+        }
+        function updateBoardShipSqm() {
+            const el = document.getElementById('boardShipSqm'); if (!el) return;
+            const w = getWaitingShipSqmTotal();
+            el.textContent = `รอส่งรวม ${boardFmtSqm(w.sqm)} ตร.ม. (${w.n} รายการ)`;
+        }
         function renderProductionBoard() {
             // 2026-11-20: ต้องจำโฟกัส/ตำแหน่งเลื่อนของใบวางแผน "ก่อน" ที่ลูปด้านล่างล้างคอลัมน์ (column.innerHTML = '') ไม่งั้นโฟกัสและตำแหน่งเลื่อนหายตั้งแต่ตรงนั้น
             pwUiKeep = pwCaptureUiState(document.getElementById('boardColumn-planning'));
@@ -14850,6 +14888,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     });
                 }
                 countEl.textContent = ordersHere.length;
+                // 2026-11-28: สรุปตร.ม. ของงานที่อยู่แผนกนั้น (แผนกทอ / ตกแต่ง) ตามตัวกรองเดียวกับตัวเลขจำนวนงาน + ยอดรอส่งรวมทั้งหมด
+                { const sqmEl = document.getElementById(`boardSqm-${stage}`); if (sqmEl) sqmEl.textContent = `${boardFmtSqm(ordersHere.reduce((t, o) => t + (Number(o.totalSqm) || 0), 0))} ตร.ม.`; }
+                if (stage === 'finishing') updateBoardShipSqm();
 
                 // NEW (2026-09-16): "ตรงบอร์ดงานแผนกทอ" ให้เปลี่ยนเป็นจอทอพรมจริง" — the weaving column no
                 // longer renders one generic Kanban card per order; it renders one card per PHYSICAL LOOM
@@ -17601,6 +17642,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                             <button type="button" data-pw-piecepct-toggle onclick="planningWsTogglePiecePct(${orderIndex})" title="ใช้เมื่อ M/O มีหลายชิ้นและแบบแต่ละชิ้นมี % สี/% พื้นที่ว่างไม่เท่ากัน" class="px-3 py-1.5 text-xs font-semibold rounded border ${c.perPiece ? 'bg-teal-700 text-white border-teal-700 hover:bg-teal-800' : 'text-teal-700 border-teal-600 bg-white hover:bg-teal-50'}">${c.perPiece ? '✓ แยก % สีรายชิ้น (เปิดอยู่)' : 'แยก % สี/พื้นที่ว่าง รายชิ้น'}</button>
                             <button type="button" onclick="planningWsAddRow(${orderIndex})" class="px-3 py-1.5 text-xs font-semibold text-teal-700 border border-teal-600 rounded bg-white hover:bg-teal-50">+ เพิ่มแถวสี</button>
                             <button type="button" data-pw-print-dye onclick="planningWsPrintDyeOrder(${orderIndex})" title="พิมพ์ใบสั่งย้อมตามยอดสั่งย้อมสุทธิในใบนี้ (รูปแบบเดียวกับชีต SIAM)" class="px-3 py-1.5 text-xs font-semibold text-violet-700 border border-violet-500 rounded bg-white hover:bg-violet-50"><i class="fa-solid fa-print mr-1"></i>พิมพ์ใบสั่งย้อม</button>
+                            ${dyeFormButtonsHtml(orderIndex, '')}
                             ${c.rows.length > 0 ? `<button type="button" data-pw-clear-rows onclick="planningWsClearRows(${orderIndex})" title="ลบแถวสีทั้งหมด เพื่อคีย์/อ่านจากแบบใหม่" class="px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-300 rounded bg-white hover:bg-rose-50"><i class="fa-regular fa-trash-can mr-1"></i>ล้างแถวสีทั้งหมด</button>` : ''}
                         </div>
                     </div>
@@ -17647,6 +17689,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <div class="flex flex-wrap items-center gap-2 pt-1">
                         <button type="button" onclick="planningWsApplyDyePlan(${orderIndex})" ${c.netKg > 0 ? '' : 'disabled'} class="px-3 py-1.5 text-xs font-semibold rounded ${c.netKg > 0 ? 'bg-teal-700 text-white hover:bg-teal-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}">นำยอดสั่งย้อมไปใส่ "แผนสั่งย้อม"</button>
                         <button type="button" data-pw-print-dye2 onclick="planningWsPrintDyeOrder(${orderIndex})" title="พิมพ์ใบสั่งย้อมตามยอดสั่งย้อมสุทธิในใบนี้ (รูปแบบเดียวกับชีต SIAM) — ถ้ายังไม่มียอดสี จะพิมพ์ใบที่ตารางสีว่าง" class="px-3 py-1.5 text-xs font-semibold rounded border border-violet-500 text-violet-700 bg-white hover:bg-violet-50"><i class="fa-solid fa-print mr-1"></i>พิมพ์ใบสั่งย้อม</button>
+                        ${dyeFormButtonsHtml(orderIndex, '2')}
                         <p class="text-[11px] text-slate-500">${existingPlan.length > 0 ? `แผนสั่งย้อมตอนนี้มี ${existingPlan.length} สี รวม ${planningWsFmt(existingPlan.reduce((s, r) => s + (Number(r.kg) || 0), 0), 2)} กก. — กดแล้วอัปเดตตามรหัสสี (ไม่ลบรายการ Surplus เดิม)` : 'แผนสั่งย้อมยังว่าง — กดแล้วระบบสร้างให้ตามรหัสสี และแผนกย้อมจะเห็นทันที'}</p>
                         ${planningWsPushedPlanRows(order).length > 0 ? `<button type="button" data-pw-dyeplan-remove onclick="planningWsRemoveDyePlan(${orderIndex})" title="ลบแถวแผนสั่งย้อมที่เคยนำมาจากใบคำนวณนี้ (ไม่ลบรายการ Surplus และบันทึกย้อมจริง)" class="px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-300 rounded bg-white hover:bg-rose-50"><i class="fa-regular fa-trash-can mr-1"></i>ลบแผนสั่งย้อมที่นำไปใส่</button>` : ''}
                     </div>
@@ -18524,21 +18567,53 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 if (pr && pr.yarnSource === 'overdye') notes.push('ย้อมทับ');
                 if (pr && (pr.useSurplus || Number(pr.surplusKg) > 0) && Number(pr.surplusKg) > 0) notes.push(`ใช้ Surplus ${planningWsFmt(pr.surplusKg, 2)} กก. (ย้อมใหม่ ${planningWsFmt(Math.max(0, g.kg - Number(pr.surplusKg)), 2)})`);
                 if (pr && pr.yarnNote) notes.push(pr.yarnNote);
-                return { no: idx + 1, code: g.code, type: sp.type, tex: sp.tex, kg: planningWsRound(g.kg, 3), reqDate: (pr && pr.reqDate) || dyeFinish, where: where === 'external' ? 'ย้อมนอก' : 'ย้อมใน', note: notes.join(' · ') };
+                return { no: idx + 1, code: g.code, type: sp.type, tex: sp.tex, kg: planningWsRound(g.kg, 3), reqDate: (pr && pr.reqDate) || dyeFinish, where: where === 'external' ? 'ย้อมนอก' : 'ย้อมใน', whereKey: where, ownKg: planningWsRound(g.kg * (pr ? getDyeRowOwnShare(pr) : 1), 3), note: notes.join(' · ') };
             });
         }
+        // 2026-11-27: แถวสำหรับฟอร์ม "ใบสั่งย้อมภายในบริษัท / ใบส่งจ้างย้อมภายนอก" — ใช้ยอดจากใบคำนวณของแผนก
+        // ถ้ายังไม่มีก็ใช้แผนสั่งย้อม (dyeing.colorOrders) หักไหม Surplus แล้ว; แยกตาม "ย้อมที่" ของแต่ละสี
+        function planningDyeFormRows(order, scope) {
+            let rows = planningWsDyeOrderRows(order);
+            if (!rows.length) {
+                const dyeFinish = (order.planDates || {}).dyeing || '';
+                rows = (((order.dyeing || {}).colorOrders) || []).filter(r => r && typeof r === 'object').map((pr, i) => {
+                    const kg = Number(pr.kg) || 0, net = Math.max(0, kg - (pr.useSurplus ? Math.min(kg, Number(pr.surplusKg) || 0) : 0));
+                    if (!(net > 0)) return null;
+                    const m = String(pr.colorCode || '').match(/^(.*?)\s+\/\s+(.+)$/);
+                    const code = (m ? m[1] : String(pr.colorCode || '')).trim() || `สี ${i + 1}`;
+                    const sp = planningWsSplitYarnTex(String(pr.yarnType || (m ? m[2] : '') || ''));
+                    const where = getDyeRowWhere(order, pr), notes = [];
+                    if (pr.yarnSource === 'overdye') notes.push('ย้อมทับ');
+                    if (pr.useSurplus && Number(pr.surplusKg) > 0) notes.push(`ใช้ Surplus ${planningWsFmt(pr.surplusKg, 2)} กก.`);
+                    if (pr.yarnNote) notes.push(pr.yarnNote);
+                    if (pr.lotNo) notes.push('LOT ' + pr.lotNo);
+                    return { code, type: sp.type, tex: sp.tex, kg: planningWsRound(net, 3), reqDate: pr.reqDate || dyeFinish, where: where === 'external' ? 'ย้อมนอก' : 'ย้อมใน', whereKey: where, ownKg: planningWsRound(net * getDyeRowOwnShare(pr), 3), note: notes.join(' · ') };
+                }).filter(Boolean);
+            }
+            if (scope === 'internal' || scope === 'external') rows = rows.filter(r => r.whereKey === scope);
+            return rows.map((r, i) => Object.assign({}, r, { no: i + 1 }));
+        }
         function planningWsDyeShortDate(v) { const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}` : String(v || ''); }
-        function buildPlanningDyeOrderPrintHTML(order) {
-            const c = planningWsComputeColors(order), rows = planningWsDyeOrderRows(order), ws = planningWsGet(order);
+        function buildPlanningDyeOrderPrintHTML(order, opts) {
+            // opts.scope: 'internal' = ใบสั่งย้อมภายในบริษัท (เฉพาะสีที่ย้อมใน) · 'external' = ใบส่งจ้างย้อมภายนอก (เฉพาะสีที่ย้อมนอก + ช่องโรงย้อม/ราคา)
+            //             ไม่ระบุ = ฟอร์มเดิม (ทุกสี ตามโหมดของ M/O)
+            const scope = (opts && (opts.scope === 'internal' || opts.scope === 'external')) ? opts.scope : 'all', ext = (opts && opts.ext) || {};
+            const c = planningWsComputeColors(order), rows = scope === 'all' ? planningWsDyeOrderRows(order) : planningDyeFormRows(order, scope), ws = planningWsGet(order);
             const e = escapeHtml, f2 = v => planningWsFmt(v, 2);
-            const isExt = (order.dyeing || {}).mode === 'external';
+            const isExt = scope === 'external' ? true : (scope === 'internal' ? false : (order.dyeing || {}).mode === 'external');
             const total = rows.reduce((s, r) => s + r.kg, 0);
             const today = new Date(); const todayTxt = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
             const area = planningWsTotalArea(order);
             const blankTxt = c.blankPctEff > 0 ? ` (พื้นที่ว่าง ${f2(c.blankPctEff)}%)` : '';
-            const minRows = 12, n = Math.max(minRows, rows.length);
+            const minRows = scope === 'all' ? 12 : 8, n = Math.max(minRows, rows.length);
             const body = Array.from({ length: n }, (_, i) => { const r = rows[i];
                 return `<tr><td class="c">${r ? r.no : ''}</td><td class="c b">${r ? e(r.code) : ''}</td><td>${r ? e(r.type) : ''}</td><td class="c">${r ? e(r.tex) : ''}</td><td class="r b">${r ? f2(r.kg) : ''}</td><td class="c">${r ? e(planningWsDyeShortDate(r.reqDate)) : ''}</td><td class="c">${r ? r.where : ''}</td><td class="n">${r ? e(r.note) : ''}</td></tr>`; }).join('');
+            // ใบส่งจ้างย้อมภายนอก: ตารางมี ไหมของเราส่งไป / ราคา / จำนวนเงิน
+            const price = Number(ext.price) > 0 ? Number(ext.price) : 0;
+            const sumOwn = rows.reduce((t, r) => t + (r.ownKg || 0), 0), sumAmt = price ? total * price : 0;
+            const extBody = Array.from({ length: n }, (_, i) => { const r = rows[i]; const buy = r ? Math.max(0, r.kg - (r.ownKg || 0)) : 0;
+                const note = r ? [r.note, buy > 0.005 ? `ซื้อไหมจากผู้รับจ้าง ${f2(buy)} กก.` : ''].filter(Boolean).join(' · ') : '';
+                return `<tr><td class="c">${r ? r.no : ''}</td><td class="c b">${r ? e(r.code) : ''}</td><td>${r ? e([r.type, r.tex].filter(Boolean).join(' ')) : ''}</td><td class="r b">${r ? f2(r.kg) : ''}</td><td class="r">${r ? f2(r.ownKg || 0) : ''}</td><td class="r">${r && price ? f2(price) : ''}</td><td class="r">${r && price ? f2(r.kg * price) : ''}</td><td class="c">${r ? e(planningWsDyeShortDate(r.reqDate)) : ''}</td><td class="n">${e(note)}</td></tr>`; }).join('');
             // บล็อกท้ายใบ: ต่อคุณภาพ — คำนวณ g/ตร.ม., เผื่อ, พื้นที่จริง, เฉลี่ยหลังเผื่อ
             const qg = new Map();
             c.rows.forEach(x => { if (!(x.area > 0)) return; const k = String(x.row.quality || '-') + '|' + x.allowance; if (!qg.has(k)) qg.set(k, { q: String(x.row.quality || '-'), gsm: x.kgPerSqm * 1000, allow: x.allowance, area: 0, net: 0 }); const g = qg.get(k); g.area += x.area; g.net += x.netKg; });
@@ -18560,18 +18635,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 .pwd .foot{margin-top:4mm;font-size:10px;color:#555;text-align:right;}
             </style>`;
             return css + `<div class="pwd print-sheet">
-                <h1>${isExt ? 'ใบสั่งจ้างย้อมนอกบริษัท' : 'ใบสั่งย้อม'}</h1><p class="sub">Siam Carpets Manufacturing · แผนกวางแผน → แผนกย้อม</p>
+                <h1>${scope === 'external' ? 'ใบส่งจ้างย้อมภายนอก' : (scope === 'internal' ? 'ใบสั่งย้อมภายในบริษัท' : (isExt ? 'ใบสั่งจ้างย้อมนอกบริษัท' : 'ใบสั่งย้อม'))}</h1><p class="sub">Siam Carpets Manufacturing · แผนกวางแผน → แผนกย้อม</p>
                 <table class="info"><tr><td class="l">M/O, S/O</td><td><b>${e(order.moSo || '-')}</b></td><td class="l">วันที่ออกใบสั่ง</td><td>${todayTxt}</td></tr>
                 <tr><td class="l">Design</td><td>${e(order.designRef || planningWsTitle(order))}</td><td class="l">กำหนดส่งลูกค้า</td><td>${e(order.dueDate || '-')}</td></tr>
                 <tr><td class="l">ลูกค้า</td><td>${e(order.customerName || '-')}</td><td class="l">โปรเจกต์/PO</td><td>${e(order.customerPO || '-')}</td></tr>
                 <tr><td class="l">คุณภาพ</td><td>${e(order.quality || '-')}</td><td class="l">พื้นที่รวม</td><td>${f2(area)} ตร.ม.${e(blankTxt)}</td></tr>
+                ${scope === 'external' ? `<tr><td class="l">โรงย้อม / ผู้รับจ้าง</td><td><b>${e(ext.vendor || '')}</b>&nbsp;</td><td class="l">เลขที่ใบส่งจ้าง</td><td>${e(ext.docNo || '')}&nbsp;</td></tr>
+                <tr><td class="l">ผู้ติดต่อ / โทร</td><td>${e(ext.contact || '')}&nbsp;</td><td class="l">กำหนดส่งกลับ</td><td>${e(ext.returnDate ? planningWsDyeShortDate(ext.returnDate) + '/' + String(ext.returnDate).slice(0, 4) : '')}&nbsp;</td></tr>` : ''}
                 <tr><td class="l">ประเภทการย้อม</td><td>${isExt ? 'จ้างย้อมนอกบริษัท' : 'ย้อมในบริษัท'}</td><td class="l">อ้างถึง</td><td>&nbsp;</td></tr></table>
-                <h2>รายการสีที่สั่งย้อม (${rows.length} สี)</h2>
-                <table class="grid"><colgroup><col style="width:6%"><col style="width:13%"><col style="width:19%"><col style="width:12%"><col style="width:12%"><col style="width:11%"><col style="width:9%"><col style="width:18%"></colgroup>
+                <h2>${scope === 'external' ? 'รายการสีที่ส่งจ้างย้อม' : (scope === 'internal' ? 'รายการสีที่ย้อมในบริษัท' : 'รายการสีที่สั่งย้อม')} (${rows.length} สี)</h2>
+                ${scope === 'external' ? `<table class="grid"><colgroup><col style="width:5%"><col style="width:11%"><col style="width:18%"><col style="width:11%"><col style="width:11%"><col style="width:9%"><col style="width:11%"><col style="width:8%"><col style="width:16%"></colgroup>
+                <thead><tr><th>No.</th><th>สี</th><th>ชนิดไหม / TEX</th><th>น้ำหนักจ้างย้อม (กก.)</th><th>ไหมของเราส่งไป (กก.)</th><th>ราคา/กก. (บาท)</th><th>จำนวนเงิน (บาท)</th><th>วันที่ต้องการ</th><th>หมายเหตุ</th></tr></thead>
+                <tbody>${extBody}</tbody><tfoot><tr class="tot"><td colspan="3" class="r">รวม</td><td class="r">${rows.length ? f2(total) : ''}</td><td class="r">${rows.length ? f2(sumOwn) : ''}</td><td></td><td class="r">${rows.length && price ? f2(sumAmt) : ''}</td><td colspan="2"></td></tr></tfoot></table>` : `<table class="grid"><colgroup><col style="width:6%"><col style="width:13%"><col style="width:19%"><col style="width:12%"><col style="width:12%"><col style="width:11%"><col style="width:9%"><col style="width:18%"></colgroup>
                 <thead><tr><th>No.</th><th>สี</th><th>ชนิดไหม</th><th>TEX</th><th>น้ำหนัก (กก.)</th><th>วันที่ต้องการ</th><th>สถานที่</th><th>หมายเหตุ</th></tr></thead>
-                <tbody>${body}</tbody><tfoot><tr class="tot"><td colspan="4" class="r">รวม</td><td class="r">${rows.length ? f2(total) : ''}</td><td colspan="3"></td></tr></tfoot></table>
-                ${specRows ? `<h2>การคำนวณ</h2><table class="grid"><thead><tr><th>คุณภาพ</th><th>คำนวณ</th><th>เผื่อ</th><th>พื้นที่จริง (ตร.ม.)</th><th>เฉลี่ยหลังเผื่อ (กก./ตร.ม.)</th><th>รวมหลังเผื่อ (กก.)</th></tr></thead><tbody>${specRows}</tbody></table>` : ''}
-                <div class="sig"><div><i></i>ผู้สั่งย้อม (แผนกวางแผน)</div><div><i></i>ผู้อนุมัติ</div><div><i></i>${isExt ? 'ผู้รับจ้างย้อม' : 'แผนกย้อม (ผู้รับงาน)'}</div></div>
+                <tbody>${body}</tbody><tfoot><tr class="tot"><td colspan="4" class="r">รวม</td><td class="r">${rows.length ? f2(total) : ''}</td><td colspan="3"></td></tr></tfoot></table>`}
+                ${scope === 'external' ? `<p class="n" style="margin-top:3mm;">เงื่อนไข: ผู้รับจ้างย้อมตามรหัสสีและน้ำหนักที่ระบุ และส่งคืนไหมที่ย้อมแล้วภายในกำหนด พร้อมใบส่งของ (ระบุเลข LOT) — ไหมที่ผู้รับจ้างจัดหาเอง ให้ระบุน้ำหนักในใบส่งของ</p>` : ''}
+                ${specRows && scope !== 'external' ? `<h2>การคำนวณ</h2><table class="grid"><thead><tr><th>คุณภาพ</th><th>คำนวณ</th><th>เผื่อ</th><th>พื้นที่จริง (ตร.ม.)</th><th>เฉลี่ยหลังเผื่อ (กก./ตร.ม.)</th><th>รวมหลังเผื่อ (กก.)</th></tr></thead><tbody>${specRows}</tbody></table>` : ''}
+                <div class="sig"><div><i></i>${scope === 'external' ? 'ผู้สั่งจ้าง (แผนกวางแผน)' : 'ผู้สั่งย้อม (แผนกวางแผน)'}</div><div><i></i>ผู้อนุมัติ</div><div><i></i>${isExt ? 'ผู้รับจ้างย้อม' : 'แผนกย้อม (ผู้รับงาน)'}</div></div>
                 <p class="foot">พิมพ์เมื่อ: ${new Date().toLocaleString('th-TH')}</p></div>`;
         }
         function planningWsPrintDyeOrder(orderIndex) {
@@ -18582,6 +18662,58 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             document.body.classList.add('print-single-mode');
             showToast(empty ? 'ยังไม่มียอดสั่งย้อม — พิมพ์ใบสั่งย้อมที่ตารางสีว่างไว้ให้เขียนมือ' : 'กำลังเปิดหน้าต่างพิมพ์ใบสั่งย้อม... เลือก "Save as PDF" เพื่อบันทึกเป็นไฟล์ได้', 'fa-print', 'text-violet-400');
             setTimeout(() => window.print(), 150);
+        }
+
+        // ===== 2026-11-27: ใบสั่งย้อมภายในบริษัท / ใบส่งจ้างย้อมภายนอก (แยกตาม "ย้อมที่" ของแต่ละสี) =====
+        // ภายใน: พิมพ์ได้ทันที · ภายนอก: เปิดหน้าต่างกรอก โรงย้อม/เลขที่ใบ/ผู้ติดต่อ/ราคา/กำหนดส่งกลับ ก่อนพิมพ์
+        // (จำค่าล่าสุดของ โรงย้อม/ผู้ติดต่อ/ราคา ไว้ในเครื่อง — ไม่เก็บในใบงาน ไม่ต้องแก้ Apps Script)
+        const DYE_EXT_FORM_KEY = 'qc_dye_ext_form_v1';
+        let dyeExtPendingIdx = -1;
+        function dyeExtFormLoad() { try { return JSON.parse(localStorage.getItem(DYE_EXT_FORM_KEY) || '{}') || {}; } catch (e) { return {}; } }
+        function dyeExtFormSave(o) { try { localStorage.setItem(DYE_EXT_FORM_KEY, JSON.stringify(o)); } catch (e) { } }
+        function dyeFormPrintHtml(order, scope, ext) {
+            document.getElementById('printArea').innerHTML = buildPlanningDyeOrderPrintHTML(order, { scope, ext });
+            document.body.classList.add('print-single-mode');
+            setTimeout(() => window.print(), 150);
+        }
+        function planningPrintDyeFormInternal(orderIndex) {
+            const order = productionOrders[orderIndex]; if (!order) return;
+            const n = planningDyeFormRows(order, 'internal').length;
+            dyeFormPrintHtml(order, 'internal', {});
+            showToast(n ? `กำลังเปิดหน้าต่างพิมพ์ใบสั่งย้อมภายในบริษัท (${n} สี)...` : 'ไม่มีสีที่ย้อมในบริษัท — พิมพ์ใบสั่งย้อมภายในที่ตารางสีว่างไว้ให้เขียนมือ', 'fa-print', n ? 'text-sky-400' : 'text-amber-400');
+        }
+        function planningPrintDyeFormExternal(orderIndex) {
+            const order = productionOrders[orderIndex]; if (!order) return;
+            const rows = planningDyeFormRows(order, 'external'), saved = dyeExtFormLoad();
+            const planVendor = ((((order.dyeing || {}).colorOrders) || []).find(r => r && r.dyeVendor && getDyeRowWhere(order, r) === 'external') || {}).dyeVendor || '';
+            const earliest = rows.map(r => r.reqDate).filter(Boolean).sort()[0] || '';
+            dyeExtPendingIdx = orderIndex;
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            set('dyeExtVendor', planVendor || saved.vendor || ''); set('dyeExtDocNo', ''); set('dyeExtContact', saved.contact || ''); set('dyeExtPrice', saved.price || ''); set('dyeExtReturn', earliest ? String(earliest).slice(0, 10) : '');
+            const known = new Set(); try { (saved.vendors || []).forEach(v => known.add(v)); } catch (e) { }
+            productionOrders.forEach(o => (((o.dyeing || {}).colorOrders) || []).forEach(r => { if (r && r.dyeVendor) known.add(String(r.dyeVendor).trim()); }));
+            const dl = document.getElementById('dyeExtVendorList'); if (dl) dl.innerHTML = Array.from(known).filter(Boolean).map(v => `<option value="${escapeHtml(v)}">`).join('');
+            const info = document.getElementById('dyeExtInfo');
+            if (info) info.innerHTML = `${escapeHtml(order.moSo || '')} · ${escapeHtml(order.customerName || '-')} — ` + (rows.length ? `สีที่ย้อมนอก <b>${rows.length}</b> สี รวม <b>${planningWsFmt(rows.reduce((t, r) => t + r.kg, 0), 2)}</b> กก.` : '<span class="text-amber-600">ยังไม่มีสีที่ตั้งเป็น "ย้อมนอก" — จะพิมพ์ฟอร์มที่ตารางสีว่างไว้ให้เขียนมือ</span>');
+            document.getElementById('dyeExtModal').classList.remove('hidden');
+            setTimeout(() => { const el = document.getElementById('dyeExtVendor'); if (el) el.focus(); }, 50);
+        }
+        function dyeExtModalClose() { const m = document.getElementById('dyeExtModal'); if (m) m.classList.add('hidden'); dyeExtPendingIdx = -1; }
+        function dyeExtModalPrint() {
+            const order = productionOrders[dyeExtPendingIdx]; if (!order) { dyeExtModalClose(); return; }
+            const val = id => ((document.getElementById(id) || {}).value || '').trim();
+            const ext = { vendor: val('dyeExtVendor'), docNo: val('dyeExtDocNo'), contact: val('dyeExtContact'), price: val('dyeExtPrice'), returnDate: val('dyeExtReturn') };
+            const saved = dyeExtFormLoad(); const vendors = Array.isArray(saved.vendors) ? saved.vendors.slice() : [];
+            if (ext.vendor && !vendors.includes(ext.vendor)) vendors.unshift(ext.vendor);
+            dyeExtFormSave({ vendor: ext.vendor, contact: ext.contact, price: ext.price, vendors: vendors.slice(0, 15) });
+            const n = planningDyeFormRows(order, 'external').length;
+            dyeExtModalClose();
+            dyeFormPrintHtml(order, 'external', ext);
+            showToast(n ? `กำลังเปิดหน้าต่างพิมพ์ใบส่งจ้างย้อมภายนอก (${n} สี)...` : 'ยังไม่มีสีที่ย้อมนอก — พิมพ์ใบส่งจ้างที่ตารางสีว่างไว้ให้เขียนมือ', 'fa-print', n ? 'text-sky-400' : 'text-amber-400');
+        }
+        function dyeFormButtonsHtml(orderIndex, sfx) {
+            return `<button type="button" data-pw-print-dye-int${sfx || ''} onclick="planningPrintDyeFormInternal(${orderIndex})" title="ใบสั่งย้อมภายในบริษัท — เฉพาะสีที่ตั้ง 'ย้อมใน'" class="px-3 py-1.5 text-xs font-semibold rounded border border-sky-500 text-sky-700 bg-white hover:bg-sky-50"><i class="fa-solid fa-industry mr-1"></i>ใบสั่งย้อมภายในบริษัท</button>
+                            <button type="button" data-pw-print-dye-ext${sfx || ''} onclick="planningPrintDyeFormExternal(${orderIndex})" title="ใบส่งจ้างย้อมภายนอก — เฉพาะสีที่ตั้ง 'ย้อมนอก' (กรอกโรงย้อม/ราคาก่อนพิมพ์)" class="px-3 py-1.5 text-xs font-semibold rounded border border-orange-500 text-orange-700 bg-white hover:bg-orange-50"><i class="fa-solid fa-truck-fast mr-1"></i>ใบส่งจ้างย้อมภายนอก</button>`;
         }
 
         function planningWsApplyDyePlan(orderIndex) {
@@ -25048,13 +25180,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 const open = kpiDyeOrdOpen.has(g.order.moSo), o = g.order;
                 const cnt = {}; g.rows.forEach(r => { cnt[r.status] = (cnt[r.status] || 0) + 1; });
                 const chips = Object.keys(KPI_DYEORD_STATUS).filter(k => cnt[k]).map(k => `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${KPI_DYEORD_STATUS[k][1]}">${KPI_DYEORD_STATUS[k][0]} ${cnt[k]}</span>`).join(' ');
+                const hasInt = g.rows.some(r => r.whereLabel !== 'ย้อมนอก'), hasExt = g.rows.some(r => r.whereLabel !== 'ย้อมใน');
                 const main = `<tr class="hover:bg-slate-50/80 cursor-pointer ${open ? 'bg-indigo-50/40' : ''}" data-dyeord-group="${escapeHtml(o.moSo)}" onclick="kpiDyeOrdToggle(${g.orderIndex})">
                     <td class="px-2 py-2 text-slate-400"><i class="fa-solid fa-chevron-${open ? 'down' : 'right'} text-[10px]"></i></td>
                     <td class="px-2 py-2 font-semibold ${moSoTextColorClass(o)} whitespace-nowrap">${escapeHtml(o.moSo)}</td><td class="px-2 py-2">${escapeHtml(o.customerName || '-')}</td><td class="px-2 py-2 text-slate-500">${escapeHtml(o.customerPO || '')}</td>
                     <td class="px-2 py-2 text-right">${g.rows.length}</td><td class="px-2 py-2 text-right">${f(gsum(g, 'orderedKg'))}</td><td class="px-2 py-2 text-right text-sky-700">${gsum(g, 'surplusKg') ? f(gsum(g, 'surplusKg')) : '-'}</td>
                     <td class="px-2 py-2 text-right font-semibold">${f(gsum(g, 'netKg'))}</td><td class="px-2 py-2 text-right text-emerald-700">${f(gsum(g, 'dyedKg'))}</td><td class="px-2 py-2 text-right ${gsum(g, 'remainKg') > 0 ? 'text-amber-700 font-semibold' : 'text-slate-400'}">${f(gsum(g, 'remainKg'))}</td>
                     <td class="px-2 py-2"><div class="flex flex-wrap gap-1">${chips}</div></td>
-                    <td class="px-2 py-2 text-center"><button type="button" onclick="event.stopPropagation(); openDyeingOrderPrintFromOrder(${g.orderIndex})" class="text-slate-500 hover:text-violet-600 px-1" title="พิมพ์ใบสั่งย้อมของ M/O นี้"><i class="fa-solid fa-print text-xs"></i></button></td></tr>`;
+                    <td class="px-2 py-2 text-center whitespace-nowrap"><button type="button" onclick="event.stopPropagation(); openDyeingOrderPrintFromOrder(${g.orderIndex})" class="text-slate-500 hover:text-violet-600 px-1" title="พิมพ์ใบสั่งย้อมของ M/O นี้"><i class="fa-solid fa-print text-xs"></i></button><button type="button" data-dyeord-int onclick="event.stopPropagation(); planningPrintDyeFormInternal(${g.orderIndex})" class="text-sky-600 hover:text-sky-800 px-1 ${hasInt ? '' : 'opacity-30'}" title="ใบสั่งย้อมภายในบริษัท (สีที่ย้อมใน ${g.rows.filter(r => r.whereLabel !== 'ย้อมนอก').length} สี)"><i class="fa-solid fa-industry text-xs"></i></button><button type="button" data-dyeord-ext onclick="event.stopPropagation(); planningPrintDyeFormExternal(${g.orderIndex})" class="text-orange-600 hover:text-orange-800 px-1 ${hasExt ? '' : 'opacity-30'}" title="ใบส่งจ้างย้อมภายนอก (สีที่ย้อมนอก ${g.rows.filter(r => r.whereLabel !== 'ย้อมใน').length} สี)"><i class="fa-solid fa-truck-fast text-xs"></i></button></td></tr>`;
                 if (!open) return main;
                 const detail = `<tr data-dyeord-detail="${escapeHtml(o.moSo)}"><td></td><td colspan="11" class="px-2 pb-3 pt-0 bg-slate-50/60">
                     <table class="w-full text-xs"><thead class="text-[10px] text-slate-500 uppercase"><tr><th class="px-2 py-1 text-left">Code สี</th><th class="px-2 py-1 text-left">ชนิดไหม</th><th class="px-2 py-1 text-right">สั่งย้อม</th><th class="px-2 py-1 text-right">Surplus</th><th class="px-2 py-1 text-right">สุทธิ</th><th class="px-2 py-1 text-right">ย้อมแล้ว</th><th class="px-2 py-1 text-right">คงเหลือ</th><th class="px-2 py-1 text-left">วันที่ต้องการ</th><th class="px-2 py-1 text-left">ย้อมที่</th><th class="px-2 py-1 text-left">สถานะ</th><th class="px-2 py-1 text-left">หมายเหตุ</th></tr></thead>
